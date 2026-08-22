@@ -411,7 +411,7 @@ function fa_enqueue_recaptcha() {
 
     wp_enqueue_script(
         'google-recaptcha',
-        'https://www.google.com/recaptcha/api.js?render=6LdJsZltAAAAFH6Ho3Hwuh8YU9WiLWFvoa2F4uK',
+        'https://www.google.com/recaptcha/api.js?render=6LevnXYtAAAAMJD8mj2aeDja_yK6R20db50KgpD',
         array(),
         null,
         true
@@ -450,7 +450,7 @@ function law_consultation_submit() {
     /**
      * Google reCAPTCHA Verification
      */
-    $recaptcha_secret = '6LdJsZltAAAADPZUg7jZMcDxqjS5sj-eRukVhx9';
+    $recaptcha_secret = '6LevnXYtAAAABkAlW1joZ1sy2Bw_ieBD6V2Ide4';
 
     $recaptcha_response = isset($_POST['g-recaptcha-response'])
         ? sanitize_text_field($_POST['g-recaptcha-response'])
@@ -573,7 +573,7 @@ function ug_consultation_submit() {
     /**
      * Google reCAPTCHA Verification
      */
-    $recaptcha_secret = '6LdJsZltAAAADPZUg7jZMcDxqjS5sj-eRukVhx9';
+    $recaptcha_secret = '6LevnXYtAAAABkAlW1joZ1sy2Bw_ieBD6V2Ide4';
 
     $recaptcha_response = isset($_POST['g-recaptcha-response'])
         ? sanitize_text_field($_POST['g-recaptcha-response'])
