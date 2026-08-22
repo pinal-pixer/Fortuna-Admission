@@ -198,39 +198,56 @@
         Submit
     </button>
     <script>
-      document.addEventListener("DOMContentLoaded", function () {
-
-          grecaptcha.ready(function () {
-
-              grecaptcha.execute("6LdJsZltAAAAFH6Ho3Hwuh8YU9WiLWFvoa2F4uK", {
-                  action: "law_consultation"
-              }).then(function (token) {
-
-                  document.getElementById("g-recaptcha-response").value = token;
-
-              });
-
-          });
-
-      });
-    </script>
-   <script>
     document.addEventListener("DOMContentLoaded", function () {
 
-        const form = document.querySelector(".law-consultation-form");
+        const form      = document.querySelector(".law-consultation-form");
+        const tokenField = document.getElementById("g-recaptcha-response");
 
-        if (!form) return;
+        if (!form || !tokenField) return;
 
-        form.addEventListener("submit", function () {
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) {
+                btn.disabled    = true;
+                btn.textContent = "Submitting...";
+            }
 
             window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({ event: "LawFormSubmit" });
 
-            window.dataLayer.push({
-                event: "LawFormSubmit"
+            function submitForm(token) {
+                tokenField.value = token || "";
+                form.submit();
+            }
+
+            if (typeof grecaptcha === "undefined") {
+                submitForm("");
+                return;
+            }
+
+            var fallback = setTimeout(function () { submitForm(""); }, 4000);
+
+            grecaptcha.ready(function () {
+                grecaptcha.execute("6LdJsZltAAAAFH6Ho3Hwuh8YU9WiLWFvoa2F4uK", {
+                    action: "law_consultation"
+                }).then(function (token) {
+                    clearTimeout(fallback);
+                    submitForm(token);
+                }).catch(function () {
+                    clearTimeout(fallback);
+                    submitForm("");
+                });
             });
 
         });
 
     });
-  </script>
+    </script>
 </form>

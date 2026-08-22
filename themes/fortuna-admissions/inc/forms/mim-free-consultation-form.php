@@ -287,76 +287,39 @@
 <script>
     document.addEventListener("DOMContentLoaded", function () {
 
-        grecaptcha.ready(function () {
+        const form        = document.querySelector(".mim-consultation-form");
+        const tokenField  = document.getElementById("g-recaptcha-response");
+        const ajaxUrl     = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
 
-            grecaptcha.execute("6LdJsZltAAAAFH6Ho3Hwuh8YU9WiLWFvoa2F4uK", {
-                action: "mim_consultation"
-            }).then(function (token) {
-
-                document.getElementById("g-recaptcha-response").value = token;
-
-            });
-
-        });
-
-    });
-</script>
-
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-
-        const form = document.querySelector(".mim-consultation-form");
-
-        if (!form) {
-            return;
-        }
+        if (!form || !tokenField) return;
 
         form.addEventListener("submit", function (event) {
-
             event.preventDefault();
 
-            const submitButton = form.querySelector('button[type="submit"]');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
 
+            const submitButton = form.querySelector('button[type="submit"]');
             if (submitButton) {
-                submitButton.disabled = true;
+                submitButton.disabled    = true;
                 submitButton.textContent = "Submitting...";
             }
 
-            grecaptcha.ready(function () {
+            function doFetch(token) {
+                tokenField.value = token || "";
 
-                grecaptcha.execute(
-                    "6LdJsZltAAAAFH6Ho3Hwuh8YU9WiLWFvoa2F4uK",
-                    {
-                        action: "mim_consultation"
-                    }
-                ).then(function (token) {
+                const formData = new FormData(form);
 
-                    document.getElementById(
-                        "g-recaptcha-response"
-                    ).value = token;
-
-                    const formData = new FormData(form);
-
-                    fetch(
-                        "<?php echo esc_url(admin_url('admin-ajax.php')); ?>",
-                        {
-                            method: "POST",
-                            body: formData
-                        }
-                    )
-                    .then(function (response) {
-                        return response.json();
-                    })
+                fetch(ajaxUrl, { method: "POST", body: formData })
+                    .then(function (response) { return response.json(); })
                     .then(function (result) {
 
                         if (result.success) {
 
-                            window.dataLayer =
-                                window.dataLayer || [];
-
-                            window.dataLayer.push({
-                                event: "MIMFormSubmit"
-                            });
+                            window.dataLayer = window.dataLayer || [];
+                            window.dataLayer.push({ event: "MIMFormSubmit" });
 
                             form.innerHTML = `
                                 <div class="mim-consultation-success">
@@ -372,13 +335,13 @@
                         } else {
 
                             if (submitButton) {
-                                submitButton.disabled = false;
+                                submitButton.disabled    = false;
                                 submitButton.textContent = "Submit";
                             }
 
-                            alert(
-                                result.data?.message ||
-                                "Something went wrong. Please try again."
+                            alert(result.data && result.data.message
+                                ? result.data.message
+                                : "Something went wrong. Please try again."
                             );
                         }
 
@@ -386,22 +349,36 @@
                     .catch(function () {
 
                         if (submitButton) {
-                            submitButton.disabled = false;
+                            submitButton.disabled    = false;
                             submitButton.textContent = "Submit";
                         }
 
-                        alert(
-                            "Something went wrong while submitting the form. Please try again."
-                        );
+                        alert("Something went wrong while submitting the form. Please try again.");
 
                     });
+            }
 
+            if (typeof grecaptcha === "undefined") {
+                doFetch("");
+                return;
+            }
+
+            var fallback = setTimeout(function () { doFetch(""); }, 4000);
+
+            grecaptcha.ready(function () {
+                grecaptcha.execute("6LdJsZltAAAAFH6Ho3Hwuh8YU9WiLWFvoa2F4uK", {
+                    action: "mim_consultation"
+                }).then(function (token) {
+                    clearTimeout(fallback);
+                    doFetch(token);
+                }).catch(function () {
+                    clearTimeout(fallback);
+                    doFetch("");
                 });
-
             });
 
         });
 
     });
- </script>
+</script>
 </form>

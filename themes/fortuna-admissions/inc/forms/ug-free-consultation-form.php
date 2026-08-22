@@ -568,24 +568,49 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
 
-            const form = document.querySelector(".ug-consultation-form");
+            const form       = document.querySelector(".ug-consultation-form");
             const tokenField = document.getElementById("g-recaptcha-response");
 
             if (!form || !tokenField) return;
 
             form.addEventListener("submit", function (e) {
-
                 e.preventDefault();
+
+                if (!form.checkValidity()) {
+                    form.reportValidity();
+                    return;
+                }
+
+                const btn = form.querySelector('button[type="submit"]');
+                if (btn) {
+                    btn.disabled    = true;
+                    btn.textContent = "Submitting...";
+                }
 
                 window.dataLayer = window.dataLayer || [];
                 window.dataLayer.push({ event: "UGFormSubmit" });
+
+                function submitForm(token) {
+                    tokenField.value = token || "";
+                    form.submit();
+                }
+
+                if (typeof grecaptcha === "undefined") {
+                    submitForm("");
+                    return;
+                }
+
+                var fallback = setTimeout(function () { submitForm(""); }, 4000);
 
                 grecaptcha.ready(function () {
                     grecaptcha.execute("6LdJsZltAAAAFH6Ho3Hwuh8YU9WiLWFvoa2F4uK", {
                         action: "ug_consultation"
                     }).then(function (token) {
-                        tokenField.value = token;
-                        form.submit();
+                        clearTimeout(fallback);
+                        submitForm(token);
+                    }).catch(function () {
+                        clearTimeout(fallback);
+                        submitForm("");
                     });
                 });
 
