@@ -30,6 +30,7 @@ add_action( 'wp_enqueue_scripts', 'child_enqueue_styles', 15 );
 
 require_once('inc/menu-walker.php');
 require_once('inc/shortcodes.php');
+require_once('inc/form-submissions.php');
 require_once('blocks/index.php');
 
 /*------------------------------------*\
@@ -498,6 +499,11 @@ function law_consultation_submit() {
     );
 
     /**
+     * Save to WordPress (backup layer)
+     */
+    $submission_id = fa_save_form_submission( 'law', $data );
+
+    /**
      * Send to Podio
      */
     $response = wp_remote_post(
@@ -508,6 +514,21 @@ function law_consultation_submit() {
             'timeout' => 30,
         )
     );
+
+    if ( $submission_id ) {
+        if ( is_wp_error( $response ) ) {
+            fa_update_podio_status( $submission_id, 'failed', $response->get_error_message() );
+            error_log( 'Law Consultation: Podio webhook error: ' . $response->get_error_message() );
+        } else {
+            $code = wp_remote_retrieve_response_code( $response );
+            if ( $code >= 200 && $code < 300 ) {
+                fa_update_podio_status( $submission_id, 'success' );
+            } else {
+                fa_update_podio_status( $submission_id, 'failed', 'HTTP ' . $code );
+                error_log( 'Law Consultation: Podio webhook HTTP ' . $code );
+            }
+        }
+    }
 
     /**
      * Redirect
@@ -631,6 +652,11 @@ function ug_consultation_submit() {
     );
 
     /**
+     * Save to WordPress (backup layer)
+     */
+    $submission_id = fa_save_form_submission( 'ug', $data );
+
+    /**
      * Send to Podio
      */
     $response = wp_remote_post(
@@ -642,12 +668,18 @@ function ug_consultation_submit() {
         )
     );
 
-    if ( is_wp_error($response) ) {
-        error_log('UG Consultation: Podio webhook error: ' . $response->get_error_message());
-    } else {
-        $podio_code = wp_remote_retrieve_response_code($response);
-        if ( $podio_code < 200 || $podio_code >= 300 ) {
-            error_log('UG Consultation: Podio webhook HTTP ' . $podio_code . ' | body: ' . wp_remote_retrieve_body($response));
+    if ( $submission_id ) {
+        if ( is_wp_error( $response ) ) {
+            fa_update_podio_status( $submission_id, 'failed', $response->get_error_message() );
+            error_log( 'UG Consultation: Podio webhook error: ' . $response->get_error_message() );
+        } else {
+            $podio_code = wp_remote_retrieve_response_code( $response );
+            if ( $podio_code >= 200 && $podio_code < 300 ) {
+                fa_update_podio_status( $submission_id, 'success' );
+            } else {
+                fa_update_podio_status( $submission_id, 'failed', 'HTTP ' . $podio_code );
+                error_log( 'UG Consultation: Podio webhook HTTP ' . $podio_code . ' | body: ' . wp_remote_retrieve_body( $response ) );
+            }
         }
     }
 
@@ -795,70 +827,55 @@ function mim_consultation_submit() {
     }
 
     $payload = array(
-  		'code' => $code,
-        'first_name' => $first_name,
-        'last_name' => $last_name,
-        'email' => $email,
-        'phone' => $phone,
-        'sms_consent' => $sms_consent,
-        'hear_about_us' => $hear_about_us,
-        'linkedin_url' => $linkedin_url,
-        'resume_url' => $resume_url,
+        'code'                   => $code,
+        'first_name'             => $first_name,
+        'last_name'              => $last_name,
+        'email'                  => $email,
+        'phone'                  => $phone,
+        'sms_consent'            => $sms_consent,
+        'hear_about_us'          => $hear_about_us,
+        'linkedin_url'           => $linkedin_url,
+        'resume_url'             => $resume_url,
         'additional_information' => $additional_information,
     );
 
+    /**
+     * Save to WordPress first (backup layer) — data is safe regardless of Podio outcome.
+     */
+    $submission_id = fa_save_form_submission( 'mim', $payload );
+
+    /**
+     * Send to Podio
+     */
     $webhook_response = wp_remote_post(
         'https://workflow-automation.podio.com/catch/9v0j9mmpvn0r3k9',
         array(
             'timeout' => 30,
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'Accept' => 'application/json',
+                'Accept'       => 'application/json',
             ),
-            'body' => wp_json_encode($payload),
+            'body' => wp_json_encode( $payload ),
         )
     );
 
-    if ( is_wp_error($webhook_response) ) {
-        error_log(
-            'MiM Consultation Webhook Error: ' .
-            $webhook_response->get_error_message()
-        );
-
-        wp_send_json_error(
-            array(
-                'message' => 'Something went wrong while submitting the form. Please try again.',
-            ),
-            500
-        );
+    if ( $submission_id ) {
+        if ( is_wp_error( $webhook_response ) ) {
+            fa_update_podio_status( $submission_id, 'failed', $webhook_response->get_error_message() );
+            error_log( 'MiM Consultation Webhook Error: ' . $webhook_response->get_error_message() );
+        } else {
+            $response_code = wp_remote_retrieve_response_code( $webhook_response );
+            if ( $response_code >= 200 && $response_code < 300 ) {
+                fa_update_podio_status( $submission_id, 'success' );
+            } else {
+                fa_update_podio_status( $submission_id, 'failed', 'HTTP ' . $response_code );
+                error_log( 'MiM Consultation Webhook HTTP Error: ' . $response_code );
+                error_log( 'MiM Consultation Webhook Response: ' . wp_remote_retrieve_body( $webhook_response ) );
+            }
+        }
     }
 
-    $response_code = wp_remote_retrieve_response_code(
-        $webhook_response
-    );
-
-    if (
-        $response_code < 200 ||
-        $response_code >= 300
-    ) {
-        error_log(
-            'MiM Consultation Webhook HTTP Error: ' .
-            $response_code
-        );
-
-        error_log(
-            'MiM Consultation Webhook Response: ' .
-            wp_remote_retrieve_body($webhook_response)
-        );
-
-        wp_send_json_error(
-            array(
-                'message' => 'Something went wrong while submitting the form. Please try again.',
-            ),
-            500
-        );
-    }
-
+    // Always return success — data is captured in WordPress even if Podio was unreachable.
     wp_send_json_success(
         array(
             'message' => 'Thanks for sharing this very helpful background information, which will be invaluable for our call together. We will be in touch soon.',
