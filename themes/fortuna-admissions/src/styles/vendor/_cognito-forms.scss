@@ -1,0 +1,120 @@
+.cog-form {
+  --font-family: $primary-font !important;
+  --highlight: var(--ast-global-color-0) !important;
+  --primary: var(--ast-global-color-0) !important;
+  --button-primary__background-color: linear-gradient(
+    90deg,
+    var(--ast-global-color-0) 0%,
+    var(--ast-global-color-1) 100%
+  ) !important;
+  --button-primary__font-family: $primary-font !important;
+  --button-secondary__font-family: $primary-font !important;
+  --header__font-family: $primary-font !important;
+  --heading__font-family: $primary-font !important;
+  --label__font-family: $primary-font !important;
+  --border-radius: 0 !important;
+  --button-primary__border-radius: 30px !important;
+
+  .cog-button {
+    border: none !important;
+    padding: 10px 24px !important;
+
+    @include breakpoint-max(lg) {
+      width: 100% !important;
+    }
+
+    &:hover {
+      background: var(--ast-global-color-0) !important;
+    }
+  }
+
+  .cog-page__navigation {
+    justify-content: flex-end !important;
+  }
+}
+
+#newsletter-form {
+  margin-block: 32px;
+
+  .cog-form {
+    margin-inline: 0;
+
+    // Stack Name row and Email row vertically (covers older .cog-wrapper
+    // and newer .cog-cols / .cog-section column-layout containers)
+    .cog-wrapper,
+    .cog-section,
+    .cog-row > .cog-cols {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 16px !important;
+      flex-wrap: wrap !important;
+    }
+
+    // Each field group / column takes full width so siblings wrap to next row
+    .cog-wrapper > .cog-row,
+    .cog-col,
+    .cog-cols > div,
+    .cog-field {
+      flex: 1 1 100% !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    // Inside the Name field, keep First and Last side-by-side
+    .cog-field {
+      .cog-name .cog-row,
+      &.cog-field--name .cog-row {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+
+        @include breakpoint-max(sm) {
+          flex-direction: column !important;
+          align-items: stretch !important;
+        }
+
+        .cog-input {
+          flex: 1 1 0 !important;
+          min-width: 0;
+        }
+      }
+    }
+  }
+
+  // Kill Cognito's default padding-bottom on the form page wrapper
+  // (the space between the Submit row and the disclaimer divider)
+  .cog-page,
+  .cog-page.cog-wrapper,
+  .cog-page.cog-wrapper.cog-transition-ltr {
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  // Hide Cognito's ::after pseudo-element. It's empty (430x0) but our
+  // flex-direction: column + gap on .cog-wrapper turns it into a flex
+  // item, producing a phantom 16px gap below the Submit row.
+  .cog-page::after,
+  .cog-page.cog-wrapper::after,
+  .cog-page.cog-wrapper.cog-transition-ltr::after,
+  .cog-form .cog-wrapper::after,
+  .cog-form .cog-row::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  .cog-page__navigation,
+  .cog-page__buttons {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  // Kill Cognito's default top/bottom margin on the Submit button
+  .cog-form .cog-button,
+  .cog-form .cog-button--navigation,
+  .cog-form .cog-button--primary {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+}

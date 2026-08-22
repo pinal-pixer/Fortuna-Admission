@@ -1,0 +1,24 @@
+// Media query breakpoints
+$breakpoints: (
+  "xsm": 479px,
+  "sm": 576px,
+  "md": 768px,
+  "lg": 992px,
+  'x': 1111px,
+  "xl": 1200px,
+  "xxl": 1400px,
+  "xxxl": 1600px,
+  "xxxxl": 1900px,
+);
+
+// Padding
+$side-padding: 24px;
+$modal-content-side-padding: 25px;
+
+// Container Widths
+$inner-max-width: 1080px;
+$inner-max-width-lg: 1221px;
+
+$header-height-mobile: 80px;
+
+$primary-font: 'Lexend', sans-serif;

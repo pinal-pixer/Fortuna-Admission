@@ -1,0 +1,14 @@
+{
+  "name": "studio/nav-menu",
+  "title": "Nav Menu",
+  "description": "",
+  "category": "fortuna",
+  "icon": "align-center",
+  "keywords": [
+    "custom"
+  ],
+  "acf": {
+    "mode": "edit",
+    "renderTemplate": "./template.php"
+  }
+}

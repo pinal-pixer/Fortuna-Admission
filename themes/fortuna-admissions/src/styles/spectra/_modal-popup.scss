@@ -1,0 +1,12 @@
+.uagb-modal-popup.uagb-modal-type-popup {
+  .uagb-modal-popup-close {
+    fill: #000 !important;
+  }
+
+  &.active {
+    .uagb-modal-popup-close {
+      top: 16px !important;
+      right: 16px !important;
+    }
+  }
+}

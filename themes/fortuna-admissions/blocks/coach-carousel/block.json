@@ -1,0 +1,14 @@
+{
+  "name": "studio/coach-carousel",
+  "title": "Coach Carousel",
+  "description": "",
+  "category": "fortuna",
+  "icon": "align-center",
+  "keywords": [
+    "custom"
+  ],
+  "acf": {
+    "mode": "edit",
+    "renderTemplate": "./template.php"
+  }
+}

@@ -1,0 +1,10 @@
+/* Link List */
+.link-list.uagb-buttons__outer-wrap .uagb-buttons__wrap {
+	align-items: start !important;
+}
+
+.link-list.wp-block-uagb-buttons .uagb-buttons-repeater:before {
+	content: "\2022";
+	color: var(--ast-global-color-8);
+	margin-right: 0.5rem;
+}

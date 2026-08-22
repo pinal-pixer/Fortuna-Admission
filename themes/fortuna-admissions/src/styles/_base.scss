@@ -1,0 +1,122 @@
+:root {
+	--padding-desktop: 48px;
+	--padding-mobile: 16px;
+	--gradient-blue: rgba(68, 101, 242, 0.40);
+	--gradient-blue-light: rgba(68, 101, 242, 0.24);
+	--gradient-orange: rgba(243, 107, 67, 0.40);
+	--gradient-white: rgba(255, 255, 255, 0.40);
+	--gradient-white-light: rgba(255, 255, 255, 0.24);
+}
+
+.wrapper-container.wp-block-uagb-container {
+	padding-left: var(--padding-desktop) !important;
+	padding-right: var(--padding-desktop) !important;
+}
+
+@media only screen and (max-width: 767px) {
+	.wrapper-container.wp-block-uagb-container {
+		padding-left: var(--padding-mobile) !important;
+		padding-right: var(--padding-mobile) !important;
+	}
+}
+
+/* Blog Single */
+.wp-block-uagb-container.blog-post-hero:before {
+	backdrop-filter: blur(6px);
+}
+
+/* Makes sure sticky newsletter box works (Blog Single) */
+@media only screen and (min-width: 977px) {
+	.blog-post__sidebar-col {
+		height: 100%;
+	}
+}
+
+/* Single template full width containers */
+.site-content .ast-container .wp-block-uagb-container.full-width-container {
+	margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  max-width: 100vw;
+  width: 100vw;
+}
+
+/* Coach Template */
+.coach-template-default .uagb-heading-text > ul {
+	margin-left: 0;
+}
+.coach-template-default .uagb-heading-text > ul ul {
+	margin-left: 1.5rem;
+}
+
+/* Buttons */
+.fa-button {
+	background: linear-gradient(90deg, #4465F2 0%, #253684 100%);
+	border-radius: 32px;
+	color: white;
+	font-weight: 600;
+	padding: 14px 24px;
+	text-decoration: none !important;
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 28px;
+	white-space: nowrap;
+
+	&:hover {
+		color: white;
+	}
+
+	&__icon {
+		flex: 0 0 20px;
+		display: flex;
+		align-items: center;
+
+		svg {
+			width: 20px;
+		}
+		
+		path {
+			fill: white;
+		}
+	}
+}
+
+#page {
+	overflow-x: hidden;
+}
+
+ul.wp-block-list {
+	margin-left: 0;
+	padding-left: 1.5rem;
+}
+
+/* Footer Service Links */
+.footer-services-links .current-service a {
+	color: white !important;
+	text-decoration: underline;
+}
+
+/* Single Post video iframe */
+.single-post .ast-oembed-container {
+	height: auto !important;
+}
+.single-post .blog-sidebar-callout {
+	position: relative;
+
+	.wp-block-uagb-buttons.uagb-buttons__outer-wrap {
+		position: absolute;
+		bottom: 18.5vw;
+
+		@media only screen and (min-width: 768px) {
+			bottom: 115px;
+		}
+
+		@media only screen and (min-width: 977px) {
+			bottom: 60px;
+		}
+
+		.uagb-buttons__wrap {
+			justify-content: center !important;
+		}
+	}
+}

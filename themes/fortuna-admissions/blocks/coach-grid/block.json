@@ -1,0 +1,14 @@
+{
+  "name": "studio/coach-grid",
+  "title": "Coach Grid",
+  "description": "",
+  "category": "fortuna",
+  "icon": "align-center",
+  "keywords": [
+    "custom"
+  ],
+  "acf": {
+    "mode": "edit",
+    "renderTemplate": "./template.php"
+  }
+}

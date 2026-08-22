@@ -1,0 +1,21 @@
+/* Accordions */
+.accordions.uagb-faq__outer-wrap .uagb-faq-child__outer-wrap .uagb-faq-content {
+  border-top: 1px solid #d2d2d2;
+}
+
+.accordions-numbered {
+  counter-reset: numbered-accordions;
+
+  .uagb-faq-item,
+  .accordion-item {
+    counter-increment: numbered-accordions;
+  }
+}
+
+.accordions-numbered {
+  &.uagb-faq__outer-wrap .uagb-faq-item .uagb-faq-questions::after,
+  .accordion-item .accordion-item__title::before {
+    content: counter(numbered-accordions);
+    @extend %styled-numbered-list;
+  }
+}

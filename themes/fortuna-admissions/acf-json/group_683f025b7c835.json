@@ -1,0 +1,46 @@
+{
+    "key": "group_683f025b7c835",
+    "title": "Nav Menu",
+    "fields": [
+        {
+            "key": "field_683f025bd7cca",
+            "label": "Menu",
+            "name": "menu",
+            "aria-label": "",
+            "type": "text",
+            "instructions": "Enter the menu name",
+            "required": 1,
+            "conditional_logic": 0,
+            "wrapper": {
+                "width": "",
+                "class": "",
+                "id": ""
+            },
+            "default_value": "",
+            "maxlength": "",
+            "allow_in_bindings": 1,
+            "placeholder": "e.g. \"Primary Menu\"",
+            "prepend": "",
+            "append": ""
+        }
+    ],
+    "location": [
+        [
+            {
+                "param": "block",
+                "operator": "==",
+                "value": "studio\/nav-menu"
+            }
+        ]
+    ],
+    "menu_order": 0,
+    "position": "normal",
+    "style": "default",
+    "label_placement": "top",
+    "instruction_placement": "label",
+    "hide_on_screen": "",
+    "active": true,
+    "description": "",
+    "show_in_rest": 0,
+    "modified": 1749045608
+}

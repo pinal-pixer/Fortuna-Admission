@@ -1,0 +1,14 @@
+{
+  "name": "studio/accordion",
+  "title": "Accordion",
+  "description": "",
+  "category": "fortuna",
+  "icon": "align-center",
+  "keywords": [
+    "custom"
+  ],
+  "acf": {
+    "mode": "edit",
+    "renderTemplate": "./template.php"
+  }
+}

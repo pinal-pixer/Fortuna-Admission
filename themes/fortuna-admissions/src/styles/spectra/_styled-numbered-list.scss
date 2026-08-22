@@ -1,0 +1,16 @@
+.styled-numbered-list {
+  counter-reset: numbered-accordions;
+
+  .wp-block-uagb-advanced-heading {
+    counter-increment: numbered-accordions;
+    padding-left: 36px;
+
+    &:after {
+      content: counter(numbered-accordions);
+      @extend %styled-numbered-list;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  }
+}

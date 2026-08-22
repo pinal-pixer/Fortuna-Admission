@@ -1,0 +1,14 @@
+/* Number Counter */
+.counter-number .wp-block-uagb-counter__number {
+	position: relative;
+	margin-bottom: 1.5rem;
+	&:after {
+		content: '';
+		width: 50px;
+		height: 5px;
+		background-color: #F26C44;
+		position: absolute;
+		top: calc(100% + 0.25rem);
+		left: 0;
+	}
+}

@@ -1,0 +1,15 @@
+/* Steps Diagram */
+@media only screen and (min-width: 977px) {
+	.diagram-arrow-right {
+		position: absolute !important;
+		right: -25%;
+		top: 50%;
+		width: 40px !important;
+	}
+}
+
+@media only screen and (max-width: 976px) {
+	.diagram-arrow-right {
+		transform: rotate(90deg);
+	}
+}

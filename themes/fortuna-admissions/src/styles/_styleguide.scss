@@ -1,0 +1,18 @@
+%scrollbar {
+  scrollbar-color: gray transparent;
+  scrollbar-width: thin;
+}
+
+%styled-numbered-list {
+  color: var(--ast-global-color-8);
+  margin-right: 8px;
+  border: 2px solid var(--ast-global-color-8);
+  border-radius: 50%;
+  height: 24px;
+  width: 24px;
+  flex: 0 0 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+}

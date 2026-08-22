@@ -1,0 +1,46 @@
+{
+    "key": "group_683effd3c4c50",
+    "title": "Menu Item",
+    "fields": [
+        {
+            "key": "field_683effd4f956a",
+            "label": "Submenu Template",
+            "name": "submenu_template",
+            "aria-label": "",
+            "type": "text",
+            "instructions": "Copy and paste the shortcode for the menu layout from Site Builder >> Hooks",
+            "required": 0,
+            "conditional_logic": 0,
+            "wrapper": {
+                "width": "",
+                "class": "",
+                "id": ""
+            },
+            "default_value": "",
+            "maxlength": "",
+            "allow_in_bindings": 0,
+            "placeholder": "",
+            "prepend": "",
+            "append": ""
+        }
+    ],
+    "location": [
+        [
+            {
+                "param": "nav_menu_item",
+                "operator": "==",
+                "value": "all"
+            }
+        ]
+    ],
+    "menu_order": 0,
+    "position": "normal",
+    "style": "default",
+    "label_placement": "top",
+    "instruction_placement": "label",
+    "hide_on_screen": "",
+    "active": true,
+    "description": "",
+    "show_in_rest": 0,
+    "modified": 1748982248
+}

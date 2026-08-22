@@ -1,0 +1,46 @@
+{
+    "key": "group_6840506d0ee18",
+    "title": "Mobile Menu",
+    "fields": [
+        {
+            "key": "field_6840506de89b7",
+            "label": "Mobile Menu",
+            "name": "mobile_menu",
+            "aria-label": "",
+            "type": "text",
+            "instructions": "Get the shortcode for the menu layout from Site Builder >> Hooks",
+            "required": 1,
+            "conditional_logic": 0,
+            "wrapper": {
+                "width": "",
+                "class": "",
+                "id": ""
+            },
+            "default_value": "",
+            "maxlength": "",
+            "allow_in_bindings": 0,
+            "placeholder": "",
+            "prepend": "",
+            "append": ""
+        }
+    ],
+    "location": [
+        [
+            {
+                "param": "block",
+                "operator": "==",
+                "value": "studio\/mobile-menu"
+            }
+        ]
+    ],
+    "menu_order": 0,
+    "position": "normal",
+    "style": "default",
+    "label_placement": "top",
+    "instruction_placement": "label",
+    "hide_on_screen": "",
+    "active": true,
+    "description": "",
+    "show_in_rest": 0,
+    "modified": 1749045716
+}

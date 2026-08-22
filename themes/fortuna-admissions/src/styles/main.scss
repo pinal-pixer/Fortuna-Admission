@@ -1,0 +1,32 @@
+@import "base";
+@import "gradients";
+@import "mixins";
+@import "styleguide";
+@import "utilities";
+@import "variables";
+
+/* Custom Blocks Styles */
+@import "partials/accordion";
+@import "partials/blog";
+@import "partials/coach-carousel";
+@import "partials/mobile-menu";
+@import "partials/modals";
+@import "partials/nav-menu";
+
+/* Spectra Blocks or Astra Theme Styles */
+@import "spectra/accordions";
+@import "spectra/author";
+@import "spectra/coach";
+@import "spectra/footer-cta";
+@import "spectra/link-list";
+@import "spectra/logo-grid";
+@import "spectra/modal-popup";
+@import "spectra/number-counter";
+@import "spectra/post-carousel";
+@import "spectra/steps-diagram";
+@import "spectra/styled-numbered-list";
+@import "spectra/tables";
+@import "spectra/testimonials";
+
+/* Other Styles */
+@import "vendor/cognito-forms";

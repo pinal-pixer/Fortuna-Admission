@@ -1,0 +1,14 @@
+{
+  "name": "studio/mobile-menu",
+  "title": "Mobile Menu",
+  "description": "",
+  "category": "fortuna",
+  "icon": "align-center",
+  "keywords": [
+    "custom"
+  ],
+  "acf": {
+    "mode": "edit",
+    "renderTemplate": "./template.php"
+  }
+}
