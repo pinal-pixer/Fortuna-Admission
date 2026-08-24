@@ -256,8 +256,8 @@
         </div>
 
         <div class="form-group bottom-margin">
-            <label class="radio-label" style="font-weight:400;font-size:14px;">
-                <input type="checkbox" name="student_sms" value="yes">
+            <label class="radio-label" style="font-weight:400;font-size:14px;align-items: flex-start;">
+                <input type="checkbox" name="student_sms" value="yes" style="margin-top: 4px;">
                 I consent to receive SMS messages from Fortuna Admissions at the student phone number provided.
             </label>
         </div>
@@ -310,8 +310,8 @@
         </div>
 
         <div class="form-group bottom-margin">
-            <label class="radio-label" style="font-weight:400;font-size:14px;">
-                <input type="checkbox" name="parent_sms" value="yes">
+            <label class="radio-label" style="font-weight:400;font-size:14px;align-items: flex-start;">
+                <input type="checkbox" name="parent_sms" value="yes" style="margin-top: 4px;">
                 I consent to receive SMS messages from Fortuna Admissions at the parent phone number provided.
             </label>
         </div>
