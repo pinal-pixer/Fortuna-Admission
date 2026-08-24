@@ -307,6 +307,9 @@
                 submitButton.textContent = "Submitting...";
             }
 
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({ event: "MIMFormSubmit" });
+
             function doFetch(token) {
                 tokenField.value = token || "";
 
@@ -317,9 +320,6 @@
                     .then(function (result) {
 
                         if (result.success) {
-
-                            window.dataLayer = window.dataLayer || [];
-                            window.dataLayer.push({ event: "MIMFormSubmit" });
 
                             form.innerHTML = `
                                 <div class="mim-consultation-success">

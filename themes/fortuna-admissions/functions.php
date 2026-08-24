@@ -850,12 +850,9 @@ function mim_consultation_submit() {
     $webhook_response = wp_remote_post(
         'https://workflow-automation.podio.com/catch/9v0j9mmpvn0r3k9',
         array(
+            'method'  => 'POST',
+            'body'    => $payload,
             'timeout' => 30,
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'Accept'       => 'application/json',
-            ),
-            'body' => wp_json_encode( $payload ),
         )
     );
 
