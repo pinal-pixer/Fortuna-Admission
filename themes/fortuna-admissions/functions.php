@@ -411,7 +411,7 @@ function fa_enqueue_recaptcha() {
 
     wp_enqueue_script(
         'google-recaptcha',
-        'https://www.google.com/recaptcha/api.js?render=6LevnXYtAAAAMJD8mj2aeDja_yK6R20db50KgpD',
+        'https://www.google.com/recaptcha/api.js?render=6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD',
         array(),
         null,
         true
@@ -450,7 +450,7 @@ function law_consultation_submit() {
     /**
      * Google reCAPTCHA Verification
      */
-    $recaptcha_secret = '6LevnXYtAAAABkAlW1joZ1sy2Bw_ieBD6V2Ide4';
+    $recaptcha_secret = '6LevnXYtAAAAABkAIW1joZ1sy2Bw_ieBD6V2Ide4';
 
     $recaptcha_response = isset($_POST['g-recaptcha-response'])
         ? sanitize_text_field($_POST['g-recaptcha-response'])
@@ -573,7 +573,7 @@ function ug_consultation_submit() {
     /**
      * Google reCAPTCHA Verification
      */
-    $recaptcha_secret = '6LevnXYtAAAABkAlW1joZ1sy2Bw_ieBD6V2Ide4';
+    $recaptcha_secret = '6LevnXYtAAAAABkAIW1joZ1sy2Bw_ieBD6V2Ide4';
 
     $recaptcha_response = isset($_POST['g-recaptcha-response'])
         ? sanitize_text_field($_POST['g-recaptcha-response'])
@@ -636,12 +636,12 @@ function ug_consultation_submit() {
         'student_last'                     => sanitize_text_field($_POST['student_last_name']),
         'student_email'                    => sanitize_email($_POST['student_email']),
         'student_phone'                    => sanitize_text_field($_POST['student_phone']),
-        'student_sms_consent'              => isset($_POST['student_sms_consent']) ? 'yes' : 'no',
+        'student_sms'                      => isset($_POST['student_sms']) ? 'yes' : 'no',
         'parent_first'                     => sanitize_text_field($_POST['parent_first_name']),
         'parent_last'                      => sanitize_text_field($_POST['parent_last_name']),
         'parent_email'                     => sanitize_email($_POST['parent_email']),
         'parent_phone'                     => sanitize_text_field($_POST['parent_phone']),
-        'parent_sms_consent'               => isset($_POST['parent_sms_consent']) ? 'yes' : 'no',
+        'parent_sms'                       => isset($_POST['parent_sms']) ? 'yes' : 'no',
         'country_of_residence'             => sanitize_text_field($_POST['country_of_residence']),
         'high_school'                      => sanitize_text_field($_POST['high_school_name']),
         'high_school_location'             => sanitize_text_field($_POST['high_school_location']),

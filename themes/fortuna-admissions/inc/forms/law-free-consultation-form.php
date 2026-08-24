@@ -235,7 +235,7 @@
             var fallback = setTimeout(function () { submitForm(""); }, 4000);
 
             grecaptcha.ready(function () {
-                grecaptcha.execute("6LevnXYtAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
+                grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
                     action: "law_consultation"
                 }).then(function (token) {
                     clearTimeout(fallback);

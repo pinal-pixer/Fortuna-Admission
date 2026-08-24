@@ -257,7 +257,7 @@
 
         <div class="form-group bottom-margin">
             <label class="radio-label" style="font-weight:400;font-size:14px;">
-                <input type="checkbox" name="student_sms_consent" value="yes">
+                <input type="checkbox" name="student_sms" value="yes">
                 I consent to receive SMS messages from Fortuna Admissions at the student phone number provided.
             </label>
         </div>
@@ -311,7 +311,7 @@
 
         <div class="form-group bottom-margin">
             <label class="radio-label" style="font-weight:400;font-size:14px;">
-                <input type="checkbox" name="parent_sms_consent" value="yes">
+                <input type="checkbox" name="parent_sms" value="yes">
                 I consent to receive SMS messages from Fortuna Admissions at the parent phone number provided.
             </label>
         </div>
@@ -603,7 +603,7 @@
                 var fallback = setTimeout(function () { submitForm(""); }, 4000);
 
                 grecaptcha.ready(function () {
-                    grecaptcha.execute("6LevnXYtAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
+                    grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
                         action: "ug_consultation"
                     }).then(function (token) {
                         clearTimeout(fallback);
