@@ -401,6 +401,36 @@ function mim_free_consultation_form_shortcode() {
     return ob_get_clean();
 }
 
+add_shortcode('mba_simple_free_consultation_form', 'mba_simple_free_consultation_form_shortcode');
+
+function mba_simple_free_consultation_form_shortcode() {
+
+    ob_start();
+
+    $form_file = get_stylesheet_directory() . '/inc/forms/mba-simple-free-consultation-form.php';
+
+    if ( file_exists( $form_file ) ) {
+        require $form_file;
+    }
+
+    return ob_get_clean();
+}
+
+add_shortcode('mba_full_free_consultation_form', 'mba_full_free_consultation_form_shortcode');
+
+function mba_full_free_consultation_form_shortcode() {
+
+    ob_start();
+
+    $form_file = get_stylesheet_directory() . '/inc/forms/mba-full-free-consultation-form.php';
+
+    if ( file_exists( $form_file ) ) {
+        require $form_file;
+    }
+
+    return ob_get_clean();
+}
+
 add_action('admin_post_nopriv_law_consultation_submit', 'law_consultation_submit');
 add_action('admin_post_law_consultation_submit', 'law_consultation_submit');
 
@@ -1000,6 +1030,256 @@ function mim_consultation_submit() {
      * RETURN SUCCESS TO FRONTEND
      * ============================================
      */
+    wp_send_json_success(
+        array(
+            'message' => 'Thanks for sharing this very helpful background information, which will be invaluable for our call together. We will be in touch soon.',
+        )
+    );
+}
+
+/**
+ * ============================================================================
+ * MBA — SIMPLE Free Consultation Form
+ * ----------------------------------------------------------------------------
+ * Short form (Name, Email, LinkedIn, How heard, Additional info).
+ * Uses admin-post redirect flow (no file upload, so no AJAX needed).
+ * NOTE: Podio webhook intentionally not wired yet — awaiting endpoint from
+ * client. Submissions are captured via fa_save_form_submission() so nothing
+ * is lost in the meantime.
+ * ============================================================================
+ */
+add_action('admin_post_nopriv_mba_simple_consultation_submit', 'mba_simple_consultation_submit');
+add_action('admin_post_mba_simple_consultation_submit', 'mba_simple_consultation_submit');
+
+function mba_simple_consultation_submit() {
+
+    if ( ! isset($_POST['mba_simple_consultation_submit']) ) {
+        return;
+    }
+
+    if (
+        ! isset($_POST['mba_simple_consultation_nonce_field']) ||
+        ! wp_verify_nonce(
+            $_POST['mba_simple_consultation_nonce_field'],
+            'mba_simple_consultation_nonce'
+        )
+    ) {
+        error_log('MBA Simple Consultation: Nonce verification failed. IP: ' . $_SERVER['REMOTE_ADDR']);
+        wp_safe_redirect(home_url('/mba/free-consultation/?error=security'));
+        exit;
+    }
+
+    if ( ! empty($_POST['website']) ) {
+        wp_safe_redirect(home_url('/mba/free-consultation/?error=spam'));
+        exit;
+    }
+
+    $recaptcha_secret = '6LevnXYtAAAAABkAIW1joZ1sy2Bw_ieBD6V2Ide4';
+
+    $recaptcha_response = isset($_POST['g-recaptcha-response'])
+        ? sanitize_text_field($_POST['g-recaptcha-response'])
+        : '';
+
+    $verify = wp_remote_post(
+        'https://www.google.com/recaptcha/api/siteverify',
+        array(
+            'body' => array(
+                'secret'   => $recaptcha_secret,
+                'response' => $recaptcha_response,
+                'remoteip' => $_SERVER['REMOTE_ADDR'],
+            ),
+            'timeout' => 30,
+        )
+    );
+
+    if ( is_wp_error( $verify ) ) {
+        error_log('MBA Simple Consultation: reCAPTCHA API error: ' . $verify->get_error_message());
+        wp_safe_redirect(home_url('/mba/free-consultation/?error=recaptcha'));
+        exit;
+    }
+
+    $result = json_decode(
+        wp_remote_retrieve_body($verify),
+        true
+    );
+
+    if (
+        empty($result['success']) ||
+        $result['score'] < 0.5 ||
+        $result['action'] !== 'mba_simple_consultation'
+    ) {
+        error_log('MBA Simple Consultation: reCAPTCHA failed. IP: ' . $_SERVER['REMOTE_ADDR']);
+        wp_safe_redirect(home_url('/mba/free-consultation/?error=recaptcha'));
+        exit;
+    }
+
+    /**
+     * Payload — JSON field names follow the UG form convention.
+     */
+    $data = array(
+        'first_name'             => sanitize_text_field($_POST['first_name']),
+        'last_name'              => sanitize_text_field($_POST['last_name']),
+        'email'                  => sanitize_email($_POST['email']),
+        'linkedin_url'           => esc_url_raw($_POST['linkedin_url']),
+        'how_did_you_hear'       => sanitize_text_field($_POST['hear_about_us']),
+        'additional_information' => sanitize_textarea_field($_POST['additional_information']),
+        'code'                   => sanitize_text_field($_POST['code']),
+    );
+
+    fa_save_form_submission( 'mba', $data );
+
+    // Podio webhook: intentionally omitted — endpoint pending from client.
+
+    wp_safe_redirect(home_url('/mba/free-consultation-thank-you/'));
+    exit;
+}
+
+/**
+ * ============================================================================
+ * MBA — FULL Free Consultation Form
+ * ----------------------------------------------------------------------------
+ * Longer form (Name, Email, Phone, SMS consent, How heard, LinkedIn,
+ * Resume upload, Additional info). Uses AJAX because of the resume file
+ * upload — returns JSON success/error to the front-end.
+ * NOTE: Podio webhook intentionally not wired yet — awaiting endpoint from
+ * client. Submissions are captured via fa_save_form_submission() so nothing
+ * is lost in the meantime.
+ * ============================================================================
+ */
+add_action('wp_ajax_nopriv_mba_full_consultation_submit', 'mba_full_consultation_submit');
+add_action('wp_ajax_mba_full_consultation_submit', 'mba_full_consultation_submit');
+
+function mba_full_consultation_submit() {
+
+    if (
+        ! isset($_POST['mba_full_consultation_nonce_field']) ||
+        ! wp_verify_nonce(
+            sanitize_text_field( wp_unslash($_POST['mba_full_consultation_nonce_field']) ),
+            'mba_full_consultation_nonce'
+        )
+    ) {
+        wp_send_json_error(
+            array( 'message' => 'Security verification failed. Please refresh the page and try again.' ),
+            403
+        );
+    }
+
+    if ( ! empty($_POST['website']) ) {
+        wp_send_json_error( array( 'message' => 'Spam submission detected.' ), 400 );
+    }
+
+    $first_name = isset($_POST['first_name'])
+        ? sanitize_text_field( wp_unslash($_POST['first_name']) )
+        : '';
+
+    $last_name = isset($_POST['last_name'])
+        ? sanitize_text_field( wp_unslash($_POST['last_name']) )
+        : '';
+
+    $email = isset($_POST['email'])
+        ? sanitize_email( wp_unslash($_POST['email']) )
+        : '';
+
+    $phone = isset($_POST['phone'])
+        ? sanitize_text_field( wp_unslash($_POST['phone']) )
+        : '';
+
+    $sms_consent = isset($_POST['sms_consent'])
+        ? sanitize_text_field( wp_unslash($_POST['sms_consent']) )
+        : '';
+
+    $hear_about_us = isset($_POST['hear_about_us'])
+        ? sanitize_text_field( wp_unslash($_POST['hear_about_us']) )
+        : '';
+
+    $linkedin_url = isset($_POST['linkedin_url'])
+        ? esc_url_raw( wp_unslash($_POST['linkedin_url']) )
+        : '';
+
+    $additional_information = isset($_POST['additional_information'])
+        ? sanitize_textarea_field( wp_unslash($_POST['additional_information']) )
+        : '';
+
+    $code = isset($_POST['code'])
+        ? sanitize_text_field( wp_unslash($_POST['code']) )
+        : '';
+
+    if (
+        empty($first_name) ||
+        empty($last_name) ||
+        empty($email) ||
+        empty($hear_about_us) ||
+        empty($linkedin_url) ||
+        empty($code)
+    ) {
+        wp_send_json_error(
+            array( 'message' => 'Please complete all required fields.' ),
+            400
+        );
+    }
+
+    if ( ! is_email($email) ) {
+        wp_send_json_error(
+            array( 'message' => 'Please enter a valid email address.' ),
+            400
+        );
+    }
+
+    $resume_url = '';
+
+    if (
+        isset($_FILES['resume']) &&
+        ! empty($_FILES['resume']['name'])
+    ) {
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+
+        $upload_overrides = array(
+            'test_form' => false,
+            'mimes' => array(
+                'pdf'  => 'application/pdf',
+                'doc'  => 'application/msword',
+                'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ),
+        );
+
+        $uploaded_file = wp_handle_upload(
+            $_FILES['resume'],
+            $upload_overrides
+        );
+
+        if ( isset($uploaded_file['error']) ) {
+            wp_send_json_error(
+                array( 'message' => 'Resume upload failed. Please try again.' ),
+                400
+            );
+        }
+
+        if ( ! empty($uploaded_file['url']) ) {
+            $resume_url = esc_url_raw( $uploaded_file['url'] );
+        }
+    }
+
+    /**
+     * Payload — JSON field names follow the UG form convention.
+     */
+    $data = array(
+        'code'                   => $code,
+        'first_name'             => $first_name,
+        'last_name'              => $last_name,
+        'email'                  => $email,
+        'phone'                  => $phone,
+        'sms_consent'            => $sms_consent ? 'Yes' : 'No',
+        'how_did_you_hear'       => $hear_about_us,
+        'linkedin_url'           => $linkedin_url,
+        'resume_url'             => $resume_url,
+        'additional_information' => $additional_information,
+    );
+
+    fa_save_form_submission( 'mba', $data );
+
+    // Podio webhook: intentionally omitted — endpoint pending from client.
+
     wp_send_json_success(
         array(
             'message' => 'Thanks for sharing this very helpful background information, which will be invaluable for our call together. We will be in touch soon.',
