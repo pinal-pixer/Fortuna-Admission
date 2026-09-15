@@ -85,6 +85,7 @@
     background: #fff
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")
         no-repeat right 8px center;
+
     background-size: 18px;
 }
 
@@ -95,7 +96,8 @@
 
 .mim-consultation-form .field-note {
     display: block;
-    margin-top: 6px;
+  	margin: 0;
+    margin-bottom: 6px;
     font-size: 12px;
     line-height: 16px;
     color: #555;
@@ -140,11 +142,13 @@
         flex-direction: column;
         gap: 15px;
     }
+
     .last-name-label {
         display: none !important;
     }
 }
 </style>
+
 
 <form
     method="post"
@@ -153,232 +157,461 @@
     enctype="multipart/form-data"
 >
 
-<input type="hidden" name="action" value="mim_consultation_submit">
+    <input type="hidden" name="action" value="mim_consultation_submit">
 
-<input type="hidden" name="mim_consultation_submit" value="1">
+    <input type="hidden" name="mim_consultation_submit" value="1">
 
-<?php wp_nonce_field( 'mim_consultation_nonce', 'mim_consultation_nonce_field' ); ?>
+    <?php wp_nonce_field( 'mim_consultation_nonce', 'mim_consultation_nonce_field' ); ?>
 
-<div class="form-row">
-    <div class="form-group">
-        <label>
-            Name <span class="asterisk">*</span>
-        </label>
+
+    <div class="form-row">
+
+        <div class="form-group">
+            <label>
+                Name <span class="asterisk">*</span>
+            </label>
+
+            <input
+                type="text"
+                name="first_name"
+                placeholder="First"
+                required
+            >
+        </div>
+
+
+        <div class="form-group">
+            <label class="last-name-label">Name</label>
+
+            <input
+                type="text"
+                name="last_name"
+                placeholder="Last"
+                required
+            >
+        </div>
+
+    </div>
+
+
+    <div class="form-row form-row-stacked">
+
+        <div class="form-group">
+            <label>
+                Email <span class="asterisk">*</span>
+            </label>
+
+            <input
+                type="email"
+                name="email"
+                required
+            >
+        </div>
+
+
+        <div class="form-group">
+            <label>
+                Phone
+            </label>
+
+            <input
+                type="tel"
+                name="phone"
+                placeholder="+1 555 123 4567"
+            >
+        </div>
+
+    </div>
+
+
+    <div class="consent-group">
+
         <input
-            type="text"
-            name="first_name"
-            placeholder="First"
+            type="checkbox"
+            name="sms_consent"
+            id="mim_sms_consent"
+            value="Yes"
+        >
+
+        <label for="mim_sms_consent">
+            I agree to receive promotional messages from Fortuna Admissions at the phone number provided.
+        </label>
+
+    </div>
+
+
+    <div class="form-group bottom-margin">
+
+        <label>
+            How did you hear about Fortuna? <span class="asterisk">*</span>
+        </label>
+
+        <select name="hear_about_us" required>
+
+            <option value="">Please Select</option>
+            <option value="Personal Recommendation">Personal Recommendation</option>
+            <option value="Search Engine">Search Engine</option>
+            <option value="ChatGPT or other AI">ChatGPT or other AI</option>
+            <option value="Google Ad">Google Ad</option>
+            <option value="YouTube">YouTube</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Instagram">Instagram</option>
+            <option value="Facebook">Facebook</option>
+            <option value="Reddit">Reddit</option>
+            <option value="Career Services at My University">Career Services at My University</option>
+            <option value="Other">Other</option>
+
+        </select>
+
+    </div>
+
+
+    <div class="form-group bottom-margin">
+		<p class="field-note">To help us understand your background, please provide us with your LinkedIn profile or Resume.</p>
+        <label>
+            LinkedIn Profile URL <span class="asterisk">*</span>
+        </label>
+
+        <input
+            type="url"
+            name="linkedin_url"
+            placeholder="https://www.linkedin.com/in/your-profile"
             required
         >
+
     </div>
 
-    <div class="form-group">
-        <label class="last-name-label">Name</label>
-        <input
-            type="text"
-            name="last_name"
-            placeholder="Last"
-            required
-        >
-    </div>
-</div>
 
-<div class="form-row form-row-stacked">
-    <div class="form-group">
+    <div class="form-group bottom-margin">
         <label>
-            Email <span class="asterisk">*</span>
+            Upload your Resume
         </label>
 
         <input
-            type="email"
-            name="email"
-            required
+            type="file"
+            name="resume"
+            accept=".pdf,.doc,.docx"
         >
+
     </div>
 
-    <div class="form-group">
+
+    <div class="form-group bottom-margin">
+
         <label>
-            Phone
+            Please provide any further information that will be helpful context ahead of our free consultation call
         </label>
 
-        <input
-            type="tel"
-            name="phone"
-            placeholder="+1 555 123 4567"
-        >
+        <textarea
+            name="additional_information"
+            rows="5"
+        ></textarea>
+
     </div>
-</div>
 
-<div class="consent-group">
-    <input type="checkbox" name="sms_consent" id="mim_sms_consent" value="Yes">
-    <label for="mim_sms_consent">
-        I agree to receive promotional messages from Fortuna Admissions at the phone number provided.
-    </label>
-</div>
 
-<div class="form-group bottom-margin">
-    <label>
-        How did you hear about Fortuna? <span class="asterisk">*</span>
-    </label>
-
-    <select name="hear_about_us" required>
-        <option value="">Please Select</option>
-        <option value="Personal Recommendation">Personal Recommendation</option>
-        <option value="Search Engine">Search Engine</option>
-        <option value="ChatGPT or other AI">ChatGPT or other AI</option>
-        <option value="Google Ad">Google Ad</option>
-        <option value="YouTube">YouTube</option>
-        <option value="LinkedIn">LinkedIn</option>
-        <option value="Instagram">Instagram</option>
-        <option value="Facebook">Facebook</option>
-        <option value="Reddit">Reddit</option>
-        <option value="Career Services at My University">Career Services at My University</option>
-        <option value="Other">Other</option>
-    </select>
-</div>
-
-<div class="form-group bottom-margin">
-    <label>
-        LinkedIn Profile URL <span class="asterisk">*</span>
-    </label>
+    <input type="hidden" name="code" value="MiMMain">
 
     <input
-        type="url"
-        name="linkedin_url"
-        placeholder="https://www.linkedin.com/in/your-profile"
-        required
+        type="hidden"
+        id="g-recaptcha-response"
+        name="g-recaptcha-response"
     >
-</div>
 
-<div class="form-group bottom-margin">
-    <label>
-        Upload your Resume
-    </label>
 
-    <input
-        type="file"
-        name="resume"
-        accept=".pdf,.doc,.docx"
-    >
-</div>
+    <!-- Honeypot -->
+    <div style="display:none;">
 
-<div class="form-group bottom-margin">
-    <label>
-        Please provide any further information that will be helpful context ahead of our free consultation call
-    </label>
+        <input
+            type="text"
+            name="website"
+            autocomplete="off"
+            tabindex="-1"
+        >
 
-    <textarea
-        name="additional_information"
-        rows="5"
-    ></textarea>
-</div>
-<input type="hidden" name="code" value="MiMMain">
-<input type="hidden" id="g-recaptcha-response" name="g-recaptcha-response">
+    </div>
 
-<!-- Honeypot -->
-<div style="display:none;">
-    <input type="text" name="website" autocomplete="off" tabindex="-1">
-</div>
 
-<button type="submit">
-    Submit
-</button>
+    <button type="submit">
+        Submit
+    </button>
 
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
 
-        const form        = document.querySelector(".mim-consultation-form");
-        const tokenField  = document.getElementById("g-recaptcha-response");
-        const ajaxUrl     = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
+    <script>
+document.addEventListener("DOMContentLoaded", function () {
 
-        if (!form || !tokenField) return;
+    window.dataLayer = window.dataLayer || [];
 
-        form.addEventListener("submit", function (event) {
-            event.preventDefault();
+    const form = document.querySelector(".mim-consultation-form");
 
-            if (!form.checkValidity()) {
-                form.reportValidity();
-                return;
+    if (!form) {
+        return;
+    }
+
+    const tokenField = document.getElementById("g-recaptcha-response");
+    const ajaxUrl = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
+
+    const phoneInput = form.querySelector('input[name="phone"]');
+    const consentCb = document.getElementById("mim_sms_consent");
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    /*
+     * ----------------------------------------------------
+     * SMS CONSENT
+     * ----------------------------------------------------
+     */
+
+    if (phoneInput && consentCb) {
+
+        phoneInput.addEventListener("input", function () {
+
+            if (phoneInput.value.trim().length > 0) {
+                consentCb.checked = true;
             }
 
-            const submitButton = form.querySelector('button[type="submit"]');
-            if (submitButton) {
-                submitButton.disabled    = true;
-                submitButton.textContent = "Submitting...";
-            }
+        });
 
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push({ event: "MIMFormSubmit" });
+    }
 
-            function doFetch(token) {
+
+    /*
+     * ----------------------------------------------------
+     * FORM SUBMISSION
+     * ----------------------------------------------------
+     */
+
+    form.addEventListener("submit", function (event) {
+
+        event.preventDefault();
+
+
+        /*
+         * Validate form
+         */
+
+        if (!form.checkValidity()) {
+
+            form.reportValidity();
+
+            return;
+        }
+
+
+        /*
+         * Disable submit button
+         */
+
+        if (submitButton) {
+
+            submitButton.disabled = true;
+            submitButton.textContent = "Submitting...";
+
+        }
+
+
+        /*
+         * Submit form
+         */
+
+        function submitForm(token) {
+
+            if (tokenField) {
                 tokenField.value = token || "";
+            }
 
-                const formData = new FormData(form);
+            const formData = new FormData(form);
 
-                fetch(ajaxUrl, { method: "POST", body: formData })
-                    .then(function (response) { return response.json(); })
-                    .then(function (result) {
 
-                        if (result.success) {
+            fetch(ajaxUrl, {
+                method: "POST",
+                body: formData
+            })
 
-                            form.innerHTML = `
-                                <div class="mim-consultation-success">
-                                    <p>
-                                        Thanks for sharing this very helpful
-                                        background information, which will be
-                                        invaluable for our call together.
-                                        We will be in touch soon.
-                                    </p>
-                                </div>
-                            `;
+            .then(function (response) {
 
-                        } else {
+                if (!response.ok) {
+                    throw new Error("HTTP error: " + response.status);
+                }
 
-                            if (submitButton) {
-                                submitButton.disabled    = false;
-                                submitButton.textContent = "Submit";
-                            }
+                return response.json();
 
-                            alert(result.data && result.data.message
-                                ? result.data.message
-                                : "Something went wrong. Please try again."
-                            );
-                        }
+            })
 
-                    })
-                    .catch(function () {
+            .then(function (result) {
 
-                        if (submitButton) {
-                            submitButton.disabled    = false;
-                            submitButton.textContent = "Submit";
-                        }
 
-                        alert("Something went wrong while submitting the form. Please try again.");
+                /*
+                 * ------------------------------------------
+                 * SUCCESS
+                 * ------------------------------------------
+                 */
 
+                if (result && result.success) {
+
+
+                    /*
+                     * Push single custom event to GTM dataLayer.
+                     * GTM trigger's Custom Event name must be
+                     * exactly "MIMFormSubmit" to catch this.
+                     */
+
+                    window.dataLayer.push({
+                        event: "MIMFormSubmit",
+                        form_id: "mim_consultation_form",
+                        form_name: "MIM Consultation Form",
+                        form_status: "success"
                     });
+
+
+                    /*
+                     * Show success message.
+                     */
+
+                    form.innerHTML = `
+                        <div class="mim-consultation-success">
+                            <p>
+                                Thanks for sharing this very helpful
+                                background information, which will be
+                                invaluable for our call together.
+                                We will be in touch soon.
+                            </p>
+                        </div>
+                    `;
+
+
+                } else {
+
+
+                    /*
+                     * Backend returned an error.
+                     */
+
+                    if (submitButton) {
+
+                        submitButton.disabled = false;
+                        submitButton.textContent = "Submit";
+
+                    }
+
+
+                    alert(
+                        result &&
+                        result.data &&
+                        result.data.message
+                            ? result.data.message
+                            : "Something went wrong. Please try again."
+                    );
+
+                }
+
+            })
+
+            .catch(function (error) {
+
+                console.error("Form submission error:", error);
+
+
+                if (submitButton) {
+
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Submit";
+
+                }
+
+
+                alert(
+                    "Something went wrong while submitting the form. Please try again."
+                );
+
+            });
+
+        }
+
+
+        /*
+         * ----------------------------------------------------
+         * RECAPTCHA
+         * ----------------------------------------------------
+         */
+
+        if (
+            typeof grecaptcha === "undefined" ||
+            !tokenField
+        ) {
+
+            submitForm("");
+
+            return;
+
+        }
+
+
+        let completed = false;
+
+
+        /*
+         * Fallback if reCAPTCHA takes too long.
+         */
+
+        const fallback = setTimeout(function () {
+
+            if (!completed) {
+
+                completed = true;
+
+                submitForm("");
+
             }
 
-            if (typeof grecaptcha === "undefined") {
-                doFetch("");
-                return;
-            }
+        }, 4000);
 
-            var fallback = setTimeout(function () { doFetch(""); }, 4000);
 
-            grecaptcha.ready(function () {
-                grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
+        grecaptcha.ready(function () {
+
+            grecaptcha.execute(
+                "6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD",
+                {
                     action: "mim_consultation"
-                }).then(function (token) {
-                    clearTimeout(fallback);
-                    doFetch(token);
-                }).catch(function () {
-                    clearTimeout(fallback);
-                    doFetch("");
-                });
+                }
+            )
+
+            .then(function (token) {
+
+                if (completed) {
+                    return;
+                }
+
+                completed = true;
+
+                clearTimeout(fallback);
+
+                submitForm(token);
+
+            })
+
+            .catch(function (error) {
+
+                if (completed) {
+                    return;
+                }
+
+                completed = true;
+
+                clearTimeout(fallback);
+
+                console.warn(
+                    "reCAPTCHA failed:",
+                    error
+                );
+
+                submitForm("");
+
             });
 
         });
 
     });
+
+});
 </script>
 </form>

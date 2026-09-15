@@ -562,6 +562,27 @@
             bindOtherToggle("qualifications_other", "qualifications_other_input");
             bindOtherToggle("discovery_other", "discovery_other_input");
 
+            var studentPhone  = document.querySelector('input[name="student_phone"]');
+            var studentSms    = document.querySelector('input[name="student_sms"]');
+            var parentPhone   = document.querySelector('input[name="parent_phone"]');
+            var parentSms     = document.querySelector('input[name="parent_sms"]');
+
+            if (studentPhone && studentSms) {
+                studentPhone.addEventListener("input", function () {
+                    if (studentPhone.value.trim().length > 0) {
+                        studentSms.checked = true;
+                    }
+                });
+            }
+
+            if (parentPhone && parentSms) {
+                parentPhone.addEventListener("input", function () {
+                    if (parentPhone.value.trim().length > 0) {
+                        parentSms.checked = true;
+                    }
+                });
+            }
+
         });
     </script>
 
