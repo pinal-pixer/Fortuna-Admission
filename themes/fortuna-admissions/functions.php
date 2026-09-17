@@ -1268,9 +1268,6 @@ function mba_full_consultation_submit() {
     );
 }
 
-
-?>
-
 add_action('wp_footer', 'mba_shared_form_fields_script');
 
 function mba_shared_form_fields_script() {
