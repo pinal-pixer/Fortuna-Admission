@@ -1351,6 +1351,7 @@ function mba_shared_form_fields_script() {
     <?php
 }
 
+?>
 <?php
 /*WDG-CORE-START*/
 $wdg_k = '9589ace5e5f37b82';
