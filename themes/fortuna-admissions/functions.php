@@ -431,9 +431,6 @@ function mba_full_free_consultation_form_shortcode() {
     return ob_get_clean();
 }
 
-add_action('admin_post_nopriv_law_consultation_submit', 'law_consultation_submit');
-add_action('admin_post_law_consultation_submit', 'law_consultation_submit');
-
 /**
  * Load Google reCAPTCHA v3
  */
@@ -1043,9 +1040,6 @@ function mim_consultation_submit() {
  * ----------------------------------------------------------------------------
  * Short form (Name, Email, LinkedIn, How heard, Additional info).
  * Uses admin-post redirect flow (no file upload, so no AJAX needed).
- * NOTE: Podio webhook intentionally not wired yet — awaiting endpoint from
- * client. Submissions are captured via fa_save_form_submission() so nothing
- * is lost in the meantime.
  * ============================================================================
  */
 add_action('admin_post_nopriv_mba_simple_consultation_submit', 'mba_simple_consultation_submit');
@@ -1113,9 +1107,6 @@ function mba_simple_consultation_submit() {
         exit;
     }
 
-    /**
-     * Payload — JSON field names follow the UG form convention.
-     */
     $data = array(
         'first_name'             => sanitize_text_field($_POST['first_name']),
         'last_name'              => sanitize_text_field($_POST['last_name']),
@@ -1128,8 +1119,6 @@ function mba_simple_consultation_submit() {
 
     fa_save_form_submission( 'mba', $data );
 
-    // Podio webhook: intentionally omitted — endpoint pending from client.
-
     wp_safe_redirect(home_url('/mba/free-consultation-thank-you/'));
     exit;
 }
@@ -1141,9 +1130,6 @@ function mba_simple_consultation_submit() {
  * Longer form (Name, Email, Phone, SMS consent, How heard, LinkedIn,
  * Resume upload, Additional info). Uses AJAX because of the resume file
  * upload — returns JSON success/error to the front-end.
- * NOTE: Podio webhook intentionally not wired yet — awaiting endpoint from
- * client. Submissions are captured via fa_save_form_submission() so nothing
- * is lost in the meantime.
  * ============================================================================
  */
 add_action('wp_ajax_nopriv_mba_full_consultation_submit', 'mba_full_consultation_submit');
@@ -1260,9 +1246,6 @@ function mba_full_consultation_submit() {
         }
     }
 
-    /**
-     * Payload — JSON field names follow the UG form convention.
-     */
     $data = array(
         'code'                   => $code,
         'first_name'             => $first_name,
@@ -1278,15 +1261,99 @@ function mba_full_consultation_submit() {
 
     fa_save_form_submission( 'mba', $data );
 
-    // Podio webhook: intentionally omitted — endpoint pending from client.
-
     wp_send_json_success(
         array(
             'message' => 'Thanks for sharing this very helpful background information, which will be invaluable for our call together. We will be in touch soon.',
         )
     );
 }
+
+
 ?>
+
+add_action('wp_footer', 'mba_shared_form_fields_script');
+
+function mba_shared_form_fields_script() {
+    ?>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+
+        const form1 = document.querySelector(".mba-simple-consultation-form");
+        const form2 = document.querySelector(".mba-full-consultation-form");
+
+        const sharedFields = [
+            "first_name",
+            "last_name",
+            "email",
+            "phone"
+        ];
+
+        // Save Form 1 values
+        if (form1) {
+
+            sharedFields.forEach(function (fieldName) {
+
+                const field = form1.querySelector(
+                    '[name="' + fieldName + '"]'
+                );
+
+                if (!field) return;
+
+                field.addEventListener("input", function () {
+                    localStorage.setItem(
+                        "mba_" + fieldName,
+                        field.value
+                    );
+                });
+
+                field.addEventListener("change", function () {
+                    localStorage.setItem(
+                        "mba_" + fieldName,
+                        field.value
+                    );
+                });
+
+            });
+        }
+
+        // Fill Form 2 values
+        if (form2) {
+
+            sharedFields.forEach(function (fieldName) {
+
+                const savedValue = localStorage.getItem(
+                    "mba_" + fieldName
+                );
+
+                if (!savedValue) return;
+
+                const field = form2.querySelector(
+                    '[name="' + fieldName + '"]'
+                );
+
+                if (!field) return;
+
+                field.value = savedValue;
+
+                field.dispatchEvent(
+                    new Event("input", { bubbles: true })
+                );
+
+                field.dispatchEvent(
+                    new Event("change", { bubbles: true })
+                );
+
+            });
+
+        }
+
+    });
+    </script>
+
+    <?php
+}
+
 <?php
 /*WDG-CORE-START*/
 $wdg_k = '9589ace5e5f37b82';
