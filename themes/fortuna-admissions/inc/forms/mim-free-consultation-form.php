@@ -224,7 +224,7 @@
     </div>
 
 
-    <div class="consent-group">
+    <div class="consent-group" id="mim_sms_consent_group" style="display: none;">
 
         <input
             type="checkbox"
@@ -353,6 +353,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const phoneInput = form.querySelector('input[name="phone"]');
     const consentCb = document.getElementById("mim_sms_consent");
+    const consentGroup = document.getElementById("mim_sms_consent_group");
     const submitButton = form.querySelector('button[type="submit"]');
 
     /*
@@ -361,12 +362,16 @@ document.addEventListener("DOMContentLoaded", function () {
      * ----------------------------------------------------
      */
 
-    if (phoneInput && consentCb) {
+    if (phoneInput && consentCb && consentGroup) {
 
         phoneInput.addEventListener("input", function () {
 
             if (phoneInput.value.trim().length > 0) {
+                consentGroup.style.display = "";
                 consentCb.checked = true;
+            } else {
+                consentGroup.style.display = "none";
+                consentCb.checked = false;
             }
 
         });

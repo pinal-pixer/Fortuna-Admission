@@ -255,7 +255,7 @@
             </div>
         </div>
 
-        <div class="form-group bottom-margin">
+        <div class="form-group bottom-margin" id="student_sms_group" style="display: none;">
             <label class="radio-label" style="font-weight:400;font-size:14px;align-items: flex-start;">
                 <input type="checkbox" name="student_sms" value="yes" style="margin-top: 4px;">
                 I consent to receive SMS messages from Fortuna Admissions at the student phone number provided.
@@ -309,7 +309,7 @@
             </div>
         </div>
 
-        <div class="form-group bottom-margin">
+        <div class="form-group bottom-margin" id="parent_sms_group" style="display: none;">
             <label class="radio-label" style="font-weight:400;font-size:14px;align-items: flex-start;">
                 <input type="checkbox" name="parent_sms" value="yes" style="margin-top: 4px;">
                 I consent to receive SMS messages from Fortuna Admissions at the parent phone number provided.
@@ -562,23 +562,33 @@
             bindOtherToggle("qualifications_other", "qualifications_other_input");
             bindOtherToggle("discovery_other", "discovery_other_input");
 
-            var studentPhone  = document.querySelector('input[name="student_phone"]');
-            var studentSms    = document.querySelector('input[name="student_sms"]');
-            var parentPhone   = document.querySelector('input[name="parent_phone"]');
-            var parentSms     = document.querySelector('input[name="parent_sms"]');
+            var studentPhone    = document.querySelector('input[name="student_phone"]');
+            var studentSms      = document.querySelector('input[name="student_sms"]');
+            var studentSmsGroup = document.getElementById("student_sms_group");
+            var parentPhone     = document.querySelector('input[name="parent_phone"]');
+            var parentSms       = document.querySelector('input[name="parent_sms"]');
+            var parentSmsGroup  = document.getElementById("parent_sms_group");
 
-            if (studentPhone && studentSms) {
+            if (studentPhone && studentSms && studentSmsGroup) {
                 studentPhone.addEventListener("input", function () {
                     if (studentPhone.value.trim().length > 0) {
+                        studentSmsGroup.style.display = "";
                         studentSms.checked = true;
+                    } else {
+                        studentSmsGroup.style.display = "none";
+                        studentSms.checked = false;
                     }
                 });
             }
 
-            if (parentPhone && parentSms) {
+            if (parentPhone && parentSms && parentSmsGroup) {
                 parentPhone.addEventListener("input", function () {
                     if (parentPhone.value.trim().length > 0) {
+                        parentSmsGroup.style.display = "";
                         parentSms.checked = true;
+                    } else {
+                        parentSmsGroup.style.display = "none";
+                        parentSms.checked = false;
                     }
                 });
             }
