@@ -89,9 +89,13 @@
 }
 
 .mba-simple-consultation-form .intro-text {
-    margin: 0 0 20px;
-    font-style: italic;
-    line-height: 20px;
+    display: block;
+  	margin: 0;
+    margin-bottom: 6px;
+    font-size: 12px;
+    line-height: 16px;
+    color: #555;
+    font-weight: 400;
 }
 
 @media (max-width: 768px) {
@@ -375,10 +379,11 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
-    const form       = document.querySelector(".mba-simple-consultation-form");
-    const tokenField = form ? form.querySelector('input[name="g-recaptcha-response"]') : null;
+    const form = document.querySelector(".mba-simple-consultation-form");
+    if (!form) return;
 
-    if (!form || !tokenField) return;
+    const sharedTextFields = ["first_name", "last_name", "email", "phone"];
+    const redirectTo = "/free-consultation-mba-test-2/";
 
     form.addEventListener("submit", function (e) {
         e.preventDefault();
@@ -392,42 +397,51 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (btn) {
             btn.disabled    = true;
-            btn.textContent = "Submitting...";
+            btn.textContent = "Please wait...";
         }
+
+        // Snapshot shared text fields right before redirect
+        sharedTextFields.forEach(function (fieldName) {
+            const f = form.querySelector('[name="' + fieldName + '"]');
+            if (f) localStorage.setItem("mba_" + fieldName, f.value);
+        });
 
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
             event: "MBASimpleFormSubmit"
         });
 
-        function submitForm(token) {
-            tokenField.value = token || "";
-            form.submit();
-        }
+        // Persist resume (if any) as base64 in sessionStorage, then redirect
+        const resumeInput = form.querySelector('input[name="resume"]');
+        const file = resumeInput && resumeInput.files && resumeInput.files[0];
 
-        if (typeof grecaptcha === "undefined") {
-            submitForm("");
+        if (!file) {
+            sessionStorage.removeItem("mba_resume");
+            window.location.href = redirectTo;
             return;
         }
 
-        var fallback = setTimeout(function () {
-            submitForm("");
-        }, 4000);
+        const reader = new FileReader();
 
-        grecaptcha.ready(function () {
-            grecaptcha.execute(
-                "6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD",
-                {
-                    action: "mba_simple_consultation"
-                }
-            ).then(function (token) {
-                clearTimeout(fallback);
-                submitForm(token);
-            }).catch(function () {
-                clearTimeout(fallback);
-                submitForm("");
-            });
-        });
+        reader.onload = function () {
+            try {
+                sessionStorage.setItem("mba_resume", JSON.stringify({
+                    name: file.name,
+                    type: file.type,
+                    data: reader.result
+                }));
+            } catch (err) {
+                // Storage quota exceeded — proceed without carrying resume
+                sessionStorage.removeItem("mba_resume");
+            }
+            window.location.href = redirectTo;
+        };
+
+        reader.onerror = function () {
+            window.location.href = redirectTo;
+        };
+
+        reader.readAsDataURL(file);
 
     });
 });

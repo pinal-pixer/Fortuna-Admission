@@ -1150,10 +1150,6 @@ function mba_full_consultation_submit() {
         );
     }
 
-    if ( ! empty($_POST['website']) ) {
-        wp_send_json_error( array( 'message' => 'Spam submission detected.' ), 400 );
-    }
-
     $first_name = isset($_POST['first_name'])
         ? sanitize_text_field( wp_unslash($_POST['first_name']) )
         : '';
@@ -1170,34 +1166,7 @@ function mba_full_consultation_submit() {
         ? sanitize_text_field( wp_unslash($_POST['phone']) )
         : '';
 
-    $sms_consent = isset($_POST['sms_consent'])
-        ? sanitize_text_field( wp_unslash($_POST['sms_consent']) )
-        : '';
-
-    $hear_about_us = isset($_POST['hear_about_us'])
-        ? sanitize_text_field( wp_unslash($_POST['hear_about_us']) )
-        : '';
-
-    $linkedin_url = isset($_POST['linkedin_url'])
-        ? esc_url_raw( wp_unslash($_POST['linkedin_url']) )
-        : '';
-
-    $additional_information = isset($_POST['additional_information'])
-        ? sanitize_textarea_field( wp_unslash($_POST['additional_information']) )
-        : '';
-
-    $code = isset($_POST['code'])
-        ? sanitize_text_field( wp_unslash($_POST['code']) )
-        : '';
-
-    if (
-        empty($first_name) ||
-        empty($last_name) ||
-        empty($email) ||
-        empty($hear_about_us) ||
-        empty($linkedin_url) ||
-        empty($code)
-    ) {
+    if ( empty($first_name) || empty($email) ) {
         wp_send_json_error(
             array( 'message' => 'Please complete all required fields.' ),
             400
@@ -1246,17 +1215,107 @@ function mba_full_consultation_submit() {
         }
     }
 
+    $city_of_residence = isset($_POST['city_of_residence'])
+        ? sanitize_text_field( wp_unslash($_POST['city_of_residence']) )
+        : '';
+
+    $current_employer = isset($_POST['current_employer'])
+        ? sanitize_text_field( wp_unslash($_POST['current_employer']) )
+        : '';
+
+    $job_title_function = isset($_POST['job_title_function'])
+        ? sanitize_text_field( wp_unslash($_POST['job_title_function']) )
+        : '';
+
+    $current_industry = isset($_POST['current_industry'])
+        ? sanitize_text_field( wp_unslash($_POST['current_industry']) )
+        : '';
+
+    $undergrad_university = isset($_POST['undergrad_university'])
+        ? sanitize_text_field( wp_unslash($_POST['undergrad_university']) )
+        : '';
+
+    $degree_major = isset($_POST['degree_major'])
+        ? sanitize_text_field( wp_unslash($_POST['degree_major']) )
+        : '';
+
+    $gpa = isset($_POST['gpa'])
+        ? sanitize_text_field( wp_unslash($_POST['gpa']) )
+        : '';
+
+    $graduation_year = isset($_POST['graduation_year'])
+        ? sanitize_text_field( wp_unslash($_POST['graduation_year']) )
+        : '';
+
+    $tests_taken = isset($_POST['tests_taken'])
+        ? sanitize_text_field( wp_unslash($_POST['tests_taken']) )
+        : '';
+
+    $gmat_score = isset($_POST['gmat_score'])
+        ? sanitize_text_field( wp_unslash($_POST['gmat_score']) )
+        : '';
+
+    $gmat_quant = isset($_POST['gmat_quant'])
+        ? sanitize_text_field( wp_unslash($_POST['gmat_quant']) )
+        : '';
+
+    $gmat_verbal = isset($_POST['gmat_verbal'])
+        ? sanitize_text_field( wp_unslash($_POST['gmat_verbal']) )
+        : '';
+
+    $gre_score = isset($_POST['gre_score'])
+        ? sanitize_text_field( wp_unslash($_POST['gre_score']) )
+        : '';
+
+    $gre_quant = isset($_POST['gre_quant'])
+        ? sanitize_text_field( wp_unslash($_POST['gre_quant']) )
+        : '';
+
+    $gre_verbal = isset($_POST['gre_verbal'])
+        ? sanitize_text_field( wp_unslash($_POST['gre_verbal']) )
+        : '';
+
+    $business_schools = isset($_POST['business_schools']) && is_array($_POST['business_schools'])
+        ? array_map( 'sanitize_text_field', wp_unslash($_POST['business_schools']) )
+        : array();
+
+    $mba_start_date = isset($_POST['mba_start_date'])
+        ? sanitize_text_field( wp_unslash($_POST['mba_start_date']) )
+        : '';
+
+    $previously_applied_mba = isset($_POST['previously_applied_mba'])
+        ? sanitize_text_field( wp_unslash($_POST['previously_applied_mba']) )
+        : '';
+
+    $fortuna_service = isset($_POST['fortuna_service'])
+        ? sanitize_text_field( wp_unslash($_POST['fortuna_service']) )
+        : '';
+
     $data = array(
-        'code'                   => $code,
         'first_name'             => $first_name,
         'last_name'              => $last_name,
         'email'                  => $email,
         'phone'                  => $phone,
-        'sms_consent'            => $sms_consent ? 'Yes' : 'No',
-        'how_did_you_hear'       => $hear_about_us,
-        'linkedin_url'           => $linkedin_url,
         'resume_url'             => $resume_url,
-        'additional_information' => $additional_information,
+        'city_of_residence'      => $city_of_residence,
+        'current_employer'       => $current_employer,
+        'job_title_function'     => $job_title_function,
+        'current_industry'       => $current_industry,
+        'undergrad_university'   => $undergrad_university,
+        'degree_major'           => $degree_major,
+        'gpa'                    => $gpa,
+        'graduation_year'        => $graduation_year,
+        'tests_taken'            => $tests_taken,
+        'gmat_score'             => $gmat_score,
+        'gmat_quant'             => $gmat_quant,
+        'gmat_verbal'            => $gmat_verbal,
+        'gre_score'              => $gre_score,
+        'gre_quant'              => $gre_quant,
+        'gre_verbal'             => $gre_verbal,
+        'business_schools'       => implode(', ', $business_schools),
+        'mba_start_date'         => $mba_start_date,
+        'previously_applied_mba' => $previously_applied_mba,
+        'fortuna_service'        => $fortuna_service,
     );
 
     fa_save_form_submission( 'mba', $data );
@@ -1286,7 +1345,7 @@ function mba_shared_form_fields_script() {
             "phone"
         ];
 
-        // Save Form 1 values
+        // Live-save Form 1 values (safety net; Form 1's submit handler also snapshots)
         if (form1) {
 
             sharedFields.forEach(function (fieldName) {
@@ -1297,24 +1356,17 @@ function mba_shared_form_fields_script() {
 
                 if (!field) return;
 
-                field.addEventListener("input", function () {
-                    localStorage.setItem(
-                        "mba_" + fieldName,
-                        field.value
-                    );
-                });
+                const save = function () {
+                    localStorage.setItem("mba_" + fieldName, field.value);
+                };
 
-                field.addEventListener("change", function () {
-                    localStorage.setItem(
-                        "mba_" + fieldName,
-                        field.value
-                    );
-                });
+                field.addEventListener("input", save);
+                field.addEventListener("change", save);
 
             });
         }
 
-        // Fill Form 2 values
+        // Fill Form 2 values (text fields + resume)
         if (form2) {
 
             sharedFields.forEach(function (fieldName) {
@@ -1342,6 +1394,41 @@ function mba_shared_form_fields_script() {
                 );
 
             });
+
+            // Restore resume from sessionStorage via DataTransfer
+            try {
+                const resumeInput = form2.querySelector('input[name="resume"]');
+                const raw = sessionStorage.getItem("mba_resume");
+
+                if (resumeInput && raw && typeof DataTransfer !== "undefined") {
+                    const meta = JSON.parse(raw);
+                    const dataUrl = meta.data || "";
+                    const commaIdx = dataUrl.indexOf(",");
+                    const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : "";
+                    const byteChars = atob(base64);
+                    const bytes = new Uint8Array(byteChars.length);
+
+                    for (let i = 0; i < byteChars.length; i++) {
+                        bytes[i] = byteChars.charCodeAt(i);
+                    }
+
+                    const file = new File(
+                        [bytes],
+                        meta.name || "resume",
+                        { type: meta.type || "application/octet-stream" }
+                    );
+
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    resumeInput.files = dt.files;
+
+                    resumeInput.dispatchEvent(
+                        new Event("change", { bubbles: true })
+                    );
+                }
+            } catch (err) {
+                // If restoration fails, the user will re-attach the file.
+            }
 
         }
 

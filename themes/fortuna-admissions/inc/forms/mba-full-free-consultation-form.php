@@ -150,6 +150,8 @@
       enctype="multipart/form-data">
 
     <input type="hidden" name="g-recaptcha-response" value="">
+    <input type="hidden" name="action" value="mba_full_consultation_submit">
+    <?php wp_nonce_field('mba_full_consultation_nonce', 'mba_full_consultation_nonce_field'); ?>
 
     <!-- Name -->
     <div class="form-row">
@@ -455,10 +457,14 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const form = document.querySelector(".mba-full-consultation-form");
-    const tokenField = form ? form.querySelector('input[name="g-recaptcha-response"]') : null;
-    const tests = form ? form.querySelector("#tests") : null;
-    const gmatFields = form ? form.querySelector("#gmat-fields") : null;
-    const greFields = form ? form.querySelector("#gre-fields") : null;
+    if (!form) return;
+
+    const tokenField = form.querySelector('input[name="g-recaptcha-response"]');
+    const tests = form.querySelector("#tests");
+    const gmatFields = form.querySelector("#gmat-fields");
+    const greFields = form.querySelector("#gre-fields");
+    const ajaxUrl = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
+    const thankYouUrl = "/mba/free-consultation-thank-you/";
 
     function updateTestFields() {
         if (!tests) return;
@@ -478,8 +484,6 @@ document.addEventListener("DOMContentLoaded", function () {
         tests.addEventListener("change", updateTestFields);
         updateTestFields();
     }
-
-    if (!form || !tokenField) return;
 
     form.addEventListener("submit", function (e) {
         e.preventDefault();
@@ -502,8 +506,41 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         function submitForm(token) {
-            tokenField.value = token || "";
-            form.submit();
+            if (tokenField) tokenField.value = token || "";
+
+            const formData = new FormData(form);
+
+            fetch(ajaxUrl, {
+                method: "POST",
+                body: formData
+            })
+            .then(function (response) {
+                return response.json().catch(function () { return null; });
+            })
+            .then(function (result) {
+                if (result && result.success) {
+                    // Clean up any transferred state from Form 1
+                    try { sessionStorage.removeItem("mba_resume"); } catch (err) {}
+                    window.location.href = thankYouUrl;
+                    return;
+                }
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = "Submit";
+                }
+
+                const message = (result && result.data && result.data.message)
+                    || "Sorry, something went wrong. Please try again.";
+                alert(message);
+            })
+            .catch(function () {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = "Submit";
+                }
+                alert("Sorry, something went wrong. Please try again.");
+            });
         }
 
         if (typeof grecaptcha === "undefined") {
