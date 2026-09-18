@@ -127,16 +127,6 @@
     cursor: pointer;
 }
 
-.mim-consultation-form .mim-consultation-success {
-    padding: 20px 0;
-}
-
-.mim-consultation-form .mim-consultation-success p {
-    margin: 0;
-    font-size: 18px;
-    line-height: 28px;
-}
-
 @media (max-width: 768px) {
     .mim-consultation-form .form-row {
         flex-direction: column;
@@ -338,285 +328,72 @@
 
 
     <script>
-document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("DOMContentLoaded", function () {
 
-    window.dataLayer = window.dataLayer || [];
+        const form       = document.querySelector(".mim-consultation-form");
+        const tokenField = document.getElementById("g-recaptcha-response");
 
-    const form = document.querySelector(".mim-consultation-form");
+        if (!form || !tokenField) return;
 
-    if (!form) {
-        return;
-    }
+        const phoneInput   = form.querySelector('input[name="phone"]');
+        const consentCb    = document.getElementById("mim_sms_consent");
+        const consentGroup = document.getElementById("mim_sms_consent_group");
 
-    const tokenField = document.getElementById("g-recaptcha-response");
-    const ajaxUrl = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
-
-    const phoneInput = form.querySelector('input[name="phone"]');
-    const consentCb = document.getElementById("mim_sms_consent");
-    const consentGroup = document.getElementById("mim_sms_consent_group");
-    const submitButton = form.querySelector('button[type="submit"]');
-
-    /*
-     * ----------------------------------------------------
-     * SMS CONSENT
-     * ----------------------------------------------------
-     */
-
-    if (phoneInput && consentCb && consentGroup) {
-
-        phoneInput.addEventListener("input", function () {
-
-            if (phoneInput.value.trim().length > 0) {
-                consentGroup.style.display = "";
-                consentCb.checked = true;
-            } else {
-                consentGroup.style.display = "none";
-                consentCb.checked = false;
-            }
-
-        });
-
-    }
-
-
-    /*
-     * ----------------------------------------------------
-     * FORM SUBMISSION
-     * ----------------------------------------------------
-     */
-
-    form.addEventListener("submit", function (event) {
-
-        event.preventDefault();
-
-
-        /*
-         * Validate form
-         */
-
-        if (!form.checkValidity()) {
-
-            form.reportValidity();
-
-            return;
-        }
-
-
-        /*
-         * Disable submit button
-         */
-
-        if (submitButton) {
-
-            submitButton.disabled = true;
-            submitButton.textContent = "Submitting...";
-
-        }
-
-
-        /*
-         * Submit form
-         */
-
-        function submitForm(token) {
-
-            if (tokenField) {
-                tokenField.value = token || "";
-            }
-
-            const formData = new FormData(form);
-
-
-            fetch(ajaxUrl, {
-                method: "POST",
-                body: formData
-            })
-
-            .then(function (response) {
-
-                if (!response.ok) {
-                    throw new Error("HTTP error: " + response.status);
-                }
-
-                return response.json();
-
-            })
-
-            .then(function (result) {
-
-
-                /*
-                 * ------------------------------------------
-                 * SUCCESS
-                 * ------------------------------------------
-                 */
-
-                if (result && result.success) {
-
-
-                    /*
-                     * Push single custom event to GTM dataLayer.
-                     * GTM trigger's Custom Event name must be
-                     * exactly "MIMFormSubmit" to catch this.
-                     */
-
-                    window.dataLayer.push({
-                        event: "MIMFormSubmit",
-                        form_id: "mim_consultation_form",
-                        form_name: "MIM Consultation Form",
-                        form_status: "success"
-                    });
-
-
-                    /*
-                     * Show success message.
-                     */
-
-                    form.innerHTML = `
-                        <div class="mim-consultation-success">
-                            <p>
-                                Thanks for sharing this very helpful
-                                background information, which will be
-                                invaluable for our call together.
-                                We will be in touch soon.
-                            </p>
-                        </div>
-                    `;
-
-
+        if (phoneInput && consentCb && consentGroup) {
+            phoneInput.addEventListener("input", function () {
+                if (phoneInput.value.trim().length > 0) {
+                    consentGroup.style.display = "";
+                    consentCb.checked = true;
                 } else {
-
-
-                    /*
-                     * Backend returned an error.
-                     */
-
-                    if (submitButton) {
-
-                        submitButton.disabled = false;
-                        submitButton.textContent = "Submit";
-
-                    }
-
-
-                    alert(
-                        result &&
-                        result.data &&
-                        result.data.message
-                            ? result.data.message
-                            : "Something went wrong. Please try again."
-                    );
-
+                    consentGroup.style.display = "none";
+                    consentCb.checked = false;
                 }
-
-            })
-
-            .catch(function (error) {
-
-                console.error("Form submission error:", error);
-
-
-                if (submitButton) {
-
-                    submitButton.disabled = false;
-                    submitButton.textContent = "Submit";
-
-                }
-
-
-                alert(
-                    "Something went wrong while submitting the form. Please try again."
-                );
-
             });
-
         }
 
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
 
-        /*
-         * ----------------------------------------------------
-         * RECAPTCHA
-         * ----------------------------------------------------
-         */
-
-        if (
-            typeof grecaptcha === "undefined" ||
-            !tokenField
-        ) {
-
-            submitForm("");
-
-            return;
-
-        }
-
-
-        let completed = false;
-
-
-        /*
-         * Fallback if reCAPTCHA takes too long.
-         */
-
-        const fallback = setTimeout(function () {
-
-            if (!completed) {
-
-                completed = true;
-
-                submitForm("");
-
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
             }
 
-        }, 4000);
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) {
+                btn.disabled    = true;
+                btn.textContent = "Submitting...";
+            }
 
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({ event: "MIMFormSubmit" });
 
-        grecaptcha.ready(function () {
+            function submitForm(token) {
+                tokenField.value = token || "";
+                form.submit();
+            }
 
-            grecaptcha.execute(
-                "6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD",
-                {
-                    action: "mim_consultation"
-                }
-            )
-
-            .then(function (token) {
-
-                if (completed) {
-                    return;
-                }
-
-                completed = true;
-
-                clearTimeout(fallback);
-
-                submitForm(token);
-
-            })
-
-            .catch(function (error) {
-
-                if (completed) {
-                    return;
-                }
-
-                completed = true;
-
-                clearTimeout(fallback);
-
-                console.warn(
-                    "reCAPTCHA failed:",
-                    error
-                );
-
+            if (typeof grecaptcha === "undefined") {
                 submitForm("");
+                return;
+            }
 
+            var fallback = setTimeout(function () { submitForm(""); }, 4000);
+
+            grecaptcha.ready(function () {
+                grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
+                    action: "mim_consultation"
+                }).then(function (token) {
+                    clearTimeout(fallback);
+                    submitForm(token);
+                }).catch(function () {
+                    clearTimeout(fallback);
+                    submitForm("");
+                });
             });
 
         });
 
     });
-
-});
-</script>
+    </script>
 </form>

@@ -718,16 +718,20 @@ function ug_consultation_submit() {
 }
 
 add_action(
-    'wp_ajax_nopriv_mim_consultation_submit',
+    'admin_post_nopriv_mim_consultation_submit',
     'mim_consultation_submit'
 );
 
 add_action(
-    'wp_ajax_mim_consultation_submit',
+    'admin_post_mim_consultation_submit',
     'mim_consultation_submit'
 );
 
 function mim_consultation_submit() {
+
+    if ( ! isset($_POST['mim_consultation_submit']) ) {
+        return;
+    }
 
     /**
      * ============================================
@@ -743,12 +747,7 @@ function mim_consultation_submit() {
             'mim_consultation_nonce'
         )
     ) {
-        wp_send_json_error(
-            array(
-                'message' => 'Security verification failed. Please refresh the page and try again.',
-            ),
-            403
-        );
+        wp_die('Security verification failed.');
     }
 
     /**
@@ -757,12 +756,7 @@ function mim_consultation_submit() {
      * ============================================
      */
     if ( ! empty($_POST['website']) ) {
-        wp_send_json_error(
-            array(
-                'message' => 'Spam submission detected.',
-            ),
-            400
-        );
+        wp_die('Spam detected.');
     }
 
     /**
@@ -838,12 +832,7 @@ function mim_consultation_submit() {
         empty($linkedin_url) ||
         empty($code)
     ) {
-        wp_send_json_error(
-            array(
-                'message' => 'Please complete all required fields.',
-            ),
-            400
-        );
+        wp_die('Please complete all required fields.');
     }
 
     /**
@@ -852,12 +841,7 @@ function mim_consultation_submit() {
      * ============================================
      */
     if ( ! is_email($email) ) {
-        wp_send_json_error(
-            array(
-                'message' => 'Please enter a valid email address.',
-            ),
-            400
-        );
+        wp_die('Please enter a valid email address.');
     }
 
     /**
@@ -889,12 +873,7 @@ function mim_consultation_submit() {
         );
 
         if ( isset($uploaded_file['error']) ) {
-            wp_send_json_error(
-                array(
-                    'message' => 'Resume upload failed. Please try again.',
-                ),
-                400
-            );
+            wp_die('Resume upload failed. Please try again.');
         }
 
         if ( ! empty($uploaded_file['url']) ) {
@@ -1024,14 +1003,11 @@ function mim_consultation_submit() {
 
     /**
      * ============================================
-     * RETURN SUCCESS TO FRONTEND
+     * REDIRECT TO THANK YOU PAGE
      * ============================================
      */
-    wp_send_json_success(
-        array(
-            'message' => 'Thanks for sharing this very helpful background information, which will be invaluable for our call together. We will be in touch soon.',
-        )
-    );
+    wp_safe_redirect(home_url('/mba/free-consultation-thank-you/'));
+    exit;
 }
 
 /**
