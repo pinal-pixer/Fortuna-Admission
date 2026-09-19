@@ -327,6 +327,10 @@
 
             <option value="">Select an option</option>
 
+            <option value="Personal Recommendation">Personal Recommendation</option>
+
+            <option value="Search Engine">Search Engine</option>
+
             <option value="Google Ad">Google Ad</option>
 
             <option value="ChatGPT or other AI">ChatGPT or other AI</option>
@@ -352,6 +356,8 @@
             <option value="Beat The GMAT">
                 Beat The GMAT
             </option>
+
+            <option value="Other">Other</option>
 
         </select>
 
@@ -382,7 +388,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const form = document.querySelector(".mba-simple-consultation-form");
     if (!form) return;
 
-    const sharedTextFields = ["first_name", "last_name", "email", "phone"];
+    const sharedTextFields = ["first_name", "last_name", "email", "phone", "country"];
     const redirectTo = "/free-consultation-mba-test-2/";
 
     // Build the Form 2 URL with shared field values as query params so the next page

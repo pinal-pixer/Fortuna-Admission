@@ -6,6 +6,32 @@ $fa_prefill = array(
     'last_name'  => isset($_GET['last_name'])  ? sanitize_text_field( wp_unslash($_GET['last_name']) )  : '',
     'email'      => isset($_GET['email'])      ? sanitize_email( wp_unslash($_GET['email']) )           : '',
     'phone'      => isset($_GET['phone'])      ? sanitize_text_field( wp_unslash($_GET['phone']) )      : '',
+    'country'    => isset($_GET['country'])    ? sanitize_text_field( wp_unslash($_GET['country']) )    : '',
+);
+
+$fa_country_options = array(
+    'Afghanistan','Albania','Algeria','Andorra','Angola','Argentina','Armenia','Australia','Austria','Azerbaijan',
+    'Bahrain','Bangladesh','Belgium','Brazil','Bulgaria',
+    'Canada','Chile','China','Colombia','Costa Rica','Croatia','Cyprus','Czech Republic',
+    'Denmark','Dominican Republic',
+    'Ecuador','Egypt','Estonia','Ethiopia',
+    'Finland','France',
+    'Georgia','Germany','Ghana','Greece','Guatemala',
+    'Hong Kong','Hungary',
+    'Iceland','India','Indonesia','Ireland','Israel','Italy',
+    'Japan','Jordan',
+    'Kenya','Kuwait',
+    'Latvia','Lebanon','Lithuania','Luxembourg',
+    'Malaysia','Malta','Mexico','Monaco','Morocco',
+    'Netherlands','New Zealand','Nigeria','Norway',
+    'Pakistan','Panama','Peru','Philippines','Poland','Portugal',
+    'Qatar',
+    'Romania','Russia',
+    'Saudi Arabia','Singapore','Slovakia','Slovenia','South Africa','South Korea','Spain','Sri Lanka','Sweden','Switzerland',
+    'Taiwan','Thailand','Turkey',
+    'Ukraine','United Arab Emirates','United Kingdom','United States','Uruguay',
+    'Venezuela','Vietnam',
+    'Other',
 );
 ?>
 <style>
@@ -204,10 +230,19 @@ $fa_prefill = array(
         >
     </div>
 
-    <!-- City -->
+    <!-- Country -->
     <div class="form-group bottom-margin">
-        <label for="city">City of Residence</label>
-        <input type="text" id="city" name="city_of_residence">
+        <label for="country">
+            Country of Residence <span class="asterisk">*</span>
+        </label>
+        <select id="country" name="country" required>
+            <option value="">Select Country</option>
+            <?php foreach ($fa_country_options as $fa_country_option) : ?>
+                <option value="<?php echo esc_attr($fa_country_option); ?>" <?php selected($fa_prefill['country'], $fa_country_option); ?>>
+                    <?php echo esc_html($fa_country_option); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
     </div>
 
     <!-- Employer / Job -->
@@ -506,7 +541,7 @@ $fa_prefill = array(
     // Clean prefill params from URL so email/phone don't sit in the address bar or history.
     if (window.location.search && window.history && window.history.replaceState) {
         const url = new URL(window.location.href);
-        ["first_name", "last_name", "email", "phone"].forEach(function (k) {
+        ["first_name", "last_name", "email", "phone", "country"].forEach(function (k) {
             url.searchParams.delete(k);
         });
         window.history.replaceState({}, "", url.pathname + (url.search ? url.search : "") + url.hash);

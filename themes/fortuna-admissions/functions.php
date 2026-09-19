@@ -1191,8 +1191,8 @@ function mba_full_consultation_submit() {
         }
     }
 
-    $city_of_residence = isset($_POST['city_of_residence'])
-        ? sanitize_text_field( wp_unslash($_POST['city_of_residence']) )
+    $country = isset($_POST['country'])
+        ? sanitize_text_field( wp_unslash($_POST['country']) )
         : '';
 
     $current_employer = isset($_POST['current_employer'])
@@ -1273,7 +1273,7 @@ function mba_full_consultation_submit() {
         'email'                  => $email,
         'phone'                  => $phone,
         'resume_url'             => $resume_url,
-        'city_of_residence'      => $city_of_residence,
+        'country'                => $country,
         'current_employer'       => $current_employer,
         'job_title_function'     => $job_title_function,
         'current_industry'       => $current_industry,
