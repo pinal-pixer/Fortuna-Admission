@@ -1,3 +1,13 @@
+<?php
+// Prefill shared fields from URL query params (passed by Form 1 on redirect).
+// Rendering server-side means values are in the HTML on first paint — no JS delay.
+$fa_prefill = array(
+    'first_name' => isset($_GET['first_name']) ? sanitize_text_field( wp_unslash($_GET['first_name']) ) : '',
+    'last_name'  => isset($_GET['last_name'])  ? sanitize_text_field( wp_unslash($_GET['last_name']) )  : '',
+    'email'      => isset($_GET['email'])      ? sanitize_email( wp_unslash($_GET['email']) )           : '',
+    'phone'      => isset($_GET['phone'])      ? sanitize_text_field( wp_unslash($_GET['phone']) )      : '',
+);
+?>
 <style>
 .mba-full-consultation-form {
     max-width: 100%;
@@ -159,12 +169,12 @@
             <label for="first-name">
                 Name <span class="asterisk">*</span>
             </label>
-            <input type="text" id="first-name" name="first_name" placeholder="First" required>
+            <input type="text" id="first-name" name="first_name" placeholder="First" required value="<?php echo esc_attr($fa_prefill['first_name']); ?>">
         </div>
 
         <div class="form-group">
             <label for="last-name" class="last-name-label">Name</label>
-            <input type="text" id="last-name" name="last_name" placeholder="Last">
+            <input type="text" id="last-name" name="last_name" placeholder="Last" value="<?php echo esc_attr($fa_prefill['last_name']); ?>">
         </div>
     </div>
 
@@ -174,12 +184,12 @@
             <label for="email">
                 Email <span class="asterisk">*</span>
             </label>
-            <input type="email" id="email" name="email" required>
+            <input type="email" id="email" name="email" required value="<?php echo esc_attr($fa_prefill['email']); ?>">
         </div>
 
         <div class="form-group">
             <label for="phone">Phone</label>
-            <input type="tel" id="phone" name="phone">
+            <input type="tel" id="phone" name="phone" value="<?php echo esc_attr($fa_prefill['phone']); ?>">
         </div>
     </div>
 
@@ -453,6 +463,56 @@
     <button type="submit">Submit</button>
 
 </form>
+
+<script>
+(function () {
+    // Shared text fields (first_name, last_name, email, phone) are prefilled server-side
+    // from URL query params — no JS needed there. We only need to:
+    //   1. Restore resume file from sessionStorage (files can't travel via URL).
+    //   2. Strip the query string from the address bar so PII doesn't linger.
+    const form = document.querySelector(".mba-full-consultation-form");
+    if (!form) return;
+
+    try {
+        const resumeInput = form.querySelector('input[name="resume"]');
+        const raw = sessionStorage.getItem("mba_resume");
+
+        if (resumeInput && raw && typeof DataTransfer !== "undefined") {
+            const meta = JSON.parse(raw);
+            const dataUrl = meta.data || "";
+            const commaIdx = dataUrl.indexOf(",");
+            const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : "";
+            const byteChars = atob(base64);
+            const bytes = new Uint8Array(byteChars.length);
+
+            for (let i = 0; i < byteChars.length; i++) {
+                bytes[i] = byteChars.charCodeAt(i);
+            }
+
+            const file = new File(
+                [bytes],
+                meta.name || "resume",
+                { type: meta.type || "application/octet-stream" }
+            );
+
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            resumeInput.files = dt.files;
+        }
+    } catch (err) {
+        // If restoration fails, the user will re-attach the file.
+    }
+
+    // Clean prefill params from URL so email/phone don't sit in the address bar or history.
+    if (window.location.search && window.history && window.history.replaceState) {
+        const url = new URL(window.location.href);
+        ["first_name", "last_name", "email", "phone"].forEach(function (k) {
+            url.searchParams.delete(k);
+        });
+        window.history.replaceState({}, "", url.pathname + (url.search ? url.search : "") + url.hash);
+    }
+})();
+</script>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {

@@ -385,6 +385,22 @@ document.addEventListener("DOMContentLoaded", function () {
     const sharedTextFields = ["first_name", "last_name", "email", "phone"];
     const redirectTo = "/free-consultation-mba-test-2/";
 
+    // Build the Form 2 URL with shared field values as query params so the next page
+    // can render them server-side into the input `value` attributes — instant fill.
+    function buildRedirectUrl() {
+        const params = new URLSearchParams();
+
+        sharedTextFields.forEach(function (fieldName) {
+            const f = form.querySelector('[name="' + fieldName + '"]');
+            if (f && f.value) {
+                params.set(fieldName, f.value);
+            }
+        });
+
+        const qs = params.toString();
+        return qs ? redirectTo + "?" + qs : redirectTo;
+    }
+
     form.addEventListener("submit", function (e) {
         e.preventDefault();
 
@@ -400,11 +416,7 @@ document.addEventListener("DOMContentLoaded", function () {
             btn.textContent = "Please wait...";
         }
 
-        // Snapshot shared text fields right before redirect
-        sharedTextFields.forEach(function (fieldName) {
-            const f = form.querySelector('[name="' + fieldName + '"]');
-            if (f) localStorage.setItem("mba_" + fieldName, f.value);
-        });
+        const targetUrl = buildRedirectUrl();
 
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
@@ -417,7 +429,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (!file) {
             sessionStorage.removeItem("mba_resume");
-            window.location.href = redirectTo;
+            window.location.href = targetUrl;
             return;
         }
 
@@ -434,11 +446,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 // Storage quota exceeded — proceed without carrying resume
                 sessionStorage.removeItem("mba_resume");
             }
-            window.location.href = redirectTo;
+            window.location.href = targetUrl;
         };
 
         reader.onerror = function () {
-            window.location.href = redirectTo;
+            window.location.href = targetUrl;
         };
 
         reader.readAsDataURL(file);
