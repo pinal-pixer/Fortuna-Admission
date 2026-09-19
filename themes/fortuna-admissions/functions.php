@@ -1294,7 +1294,34 @@ function mba_full_consultation_submit() {
         'fortuna_service'        => $fortuna_service,
     );
 
-    fa_save_form_submission( 'mba', $data );
+    $submission_id = fa_save_form_submission( 'mba', $data );
+
+    /**
+     * Send to Podio
+     */
+    $response = wp_remote_post(
+        'https://workflow-automation.podio.com/catch/y73oog24iwh3c7g',
+        array(
+            'method'  => 'POST',
+            'body'    => $data,
+            'timeout' => 30,
+        )
+    );
+
+    if ( $submission_id ) {
+        if ( is_wp_error( $response ) ) {
+            fa_update_podio_status( $submission_id, 'failed', $response->get_error_message() );
+            error_log( 'MBA Full Consultation: Podio webhook error: ' . $response->get_error_message() );
+        } else {
+            $podio_code = wp_remote_retrieve_response_code( $response );
+            if ( $podio_code >= 200 && $podio_code < 300 ) {
+                fa_update_podio_status( $submission_id, 'success' );
+            } else {
+                fa_update_podio_status( $submission_id, 'failed', 'HTTP ' . $podio_code );
+                error_log( 'MBA Full Consultation: Podio webhook HTTP ' . $podio_code . ' | body: ' . wp_remote_retrieve_body( $response ) );
+            }
+        }
+    }
 
     wp_send_json_success(
         array(
