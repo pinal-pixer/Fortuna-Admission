@@ -2,11 +2,12 @@
 // Prefill shared fields from URL query params (passed by Form 1 on redirect).
 // Rendering server-side means values are in the HTML on first paint — no JS delay.
 $fa_prefill = array(
-    'first_name' => isset($_GET['first_name']) ? sanitize_text_field( wp_unslash($_GET['first_name']) ) : '',
-    'last_name'  => isset($_GET['last_name'])  ? sanitize_text_field( wp_unslash($_GET['last_name']) )  : '',
-    'email'      => isset($_GET['email'])      ? sanitize_email( wp_unslash($_GET['email']) )           : '',
-    'phone'      => isset($_GET['phone'])      ? sanitize_text_field( wp_unslash($_GET['phone']) )      : '',
-    'country'    => isset($_GET['country'])    ? sanitize_text_field( wp_unslash($_GET['country']) )    : '',
+    'first_name'  => isset($_GET['first_name'])  ? sanitize_text_field( wp_unslash($_GET['first_name']) )  : '',
+    'last_name'   => isset($_GET['last_name'])   ? sanitize_text_field( wp_unslash($_GET['last_name']) )   : '',
+    'email'       => isset($_GET['email'])       ? sanitize_email( wp_unslash($_GET['email']) )            : '',
+    'phone'       => isset($_GET['phone'])       ? sanitize_text_field( wp_unslash($_GET['phone']) )       : '',
+    'country'     => isset($_GET['country'])     ? sanitize_text_field( wp_unslash($_GET['country']) )     : '',
+    'sms_consent' => isset($_GET['sms_consent']) ? sanitize_text_field( wp_unslash($_GET['sms_consent']) ) : '',
 );
 
 $fa_country_options = array(
@@ -125,6 +126,29 @@ $fa_country_options = array(
     visibility: hidden;
 }
 
+.mba-full-consultation-form .consent-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: -6px 0 20px;
+}
+
+.mba-full-consultation-form .consent-group input[type="checkbox"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.mba-full-consultation-form .consent-group label {
+    margin-bottom: 0;
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 18px;
+    color: #555;
+    cursor: pointer;
+}
+
 .mba-full-consultation-form .checkbox-group {
     display: flex;
     flex-wrap: wrap;
@@ -217,6 +241,24 @@ $fa_country_options = array(
             <label for="phone">Phone</label>
             <input type="tel" id="phone" name="phone" value="<?php echo esc_attr($fa_prefill['phone']); ?>">
         </div>
+    </div>
+
+    <?php
+    // Show consent up-front when Form 1 pre-filled a phone number; JS keeps it in sync afterwards.
+    $fa_show_consent    = ! empty($fa_prefill['phone']);
+    $fa_consent_checked = ($fa_prefill['sms_consent'] === 'Yes') || ($fa_show_consent && $fa_prefill['sms_consent'] === '');
+    ?>
+    <div class="consent-group" id="mba_full_sms_consent_group" style="<?php echo $fa_show_consent ? '' : 'display: none;'; ?>">
+        <input
+            type="checkbox"
+            name="sms_consent"
+            id="mba_full_sms_consent"
+            value="Yes"
+            <?php checked($fa_consent_checked); ?>
+        >
+        <label for="mba_full_sms_consent">
+            I agree to receive promotional messages from Fortuna Admissions at the phone number provided.
+        </label>
     </div>
 
     <!-- Resume -->
@@ -541,7 +583,7 @@ $fa_country_options = array(
     // Clean prefill params from URL so email/phone don't sit in the address bar or history.
     if (window.location.search && window.history && window.history.replaceState) {
         const url = new URL(window.location.href);
-        ["first_name", "last_name", "email", "phone", "country"].forEach(function (k) {
+        ["first_name", "last_name", "email", "phone", "country", "sms_consent"].forEach(function (k) {
             url.searchParams.delete(k);
         });
         window.history.replaceState({}, "", url.pathname + (url.search ? url.search : "") + url.hash);
@@ -560,6 +602,30 @@ document.addEventListener("DOMContentLoaded", function () {
     const greFields = form.querySelector("#gre-fields");
     const ajaxUrl = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
     const thankYouUrl = "/mba/free-consultation-thank-you/";
+
+    // Show SMS consent when a phone number is entered; auto-check on first entry.
+    const phoneInput   = form.querySelector('input[name="phone"]');
+    const consentCb    = document.getElementById("mba_full_sms_consent");
+    const consentGroup = document.getElementById("mba_full_sms_consent_group");
+
+    if (phoneInput && consentCb && consentGroup) {
+        phoneInput.addEventListener("input", function () {
+            if (phoneInput.value.trim().length > 0) {
+                consentGroup.style.display = "";
+                if (!consentCb.dataset.userTouched) {
+                    consentCb.checked = true;
+                }
+            } else {
+                consentGroup.style.display = "none";
+                consentCb.checked = false;
+                delete consentCb.dataset.userTouched;
+            }
+        });
+
+        consentCb.addEventListener("change", function () {
+            consentCb.dataset.userTouched = "1";
+        });
+    }
 
     function updateTestFields() {
         if (!tests) return;

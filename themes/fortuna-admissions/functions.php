@@ -1156,6 +1156,10 @@ function mba_full_consultation_submit() {
         );
     }
 
+    $sms_consent = isset($_POST['sms_consent']) && $_POST['sms_consent'] === 'Yes'
+        ? 'Yes'
+        : 'No';
+
     $resume_url = '';
 
     if (
@@ -1272,6 +1276,7 @@ function mba_full_consultation_submit() {
         'last_name'              => $last_name,
         'email'                  => $email,
         'phone'                  => $phone,
+        'sms_consent'            => $sms_consent,
         'resume_url'             => $resume_url,
         'country'                => $country,
         'current_employer'       => $current_employer,

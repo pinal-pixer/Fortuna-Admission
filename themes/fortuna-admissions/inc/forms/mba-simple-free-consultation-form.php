@@ -88,6 +88,29 @@
     border-color: #5b9dd9;
 }
 
+.mba-simple-consultation-form .consent-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: -14px 0 20px;
+}
+
+.mba-simple-consultation-form .consent-group input[type="checkbox"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.mba-simple-consultation-form .consent-group label {
+    margin-bottom: 0;
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 18px;
+    color: #555;
+    cursor: pointer;
+}
+
 .mba-simple-consultation-form .intro-text {
     display: block;
   	margin: 0;
@@ -162,6 +185,18 @@
                 name="phone"
             >
         </div>
+    </div>
+
+    <div class="consent-group" id="mba_simple_sms_consent_group" style="display: none;">
+        <input
+            type="checkbox"
+            name="sms_consent"
+            id="mba_simple_sms_consent"
+            value="Yes"
+        >
+        <label for="mba_simple_sms_consent">
+            I agree to receive promotional messages from Fortuna Admissions at the phone number provided.
+        </label>
     </div>
 
     <!-- Intro text -->
@@ -391,6 +426,24 @@ document.addEventListener("DOMContentLoaded", function () {
     const sharedTextFields = ["first_name", "last_name", "email", "phone", "country"];
     const redirectTo = "/free-consultation-mba-test-2/";
 
+    // Show SMS consent when a phone number is entered; auto-check the box so the
+    // user opts in by default (matching MIM/UG behaviour).
+    const phoneInput   = form.querySelector('input[name="phone"]');
+    const consentCb    = document.getElementById("mba_simple_sms_consent");
+    const consentGroup = document.getElementById("mba_simple_sms_consent_group");
+
+    if (phoneInput && consentCb && consentGroup) {
+        phoneInput.addEventListener("input", function () {
+            if (phoneInput.value.trim().length > 0) {
+                consentGroup.style.display = "";
+                consentCb.checked = true;
+            } else {
+                consentGroup.style.display = "none";
+                consentCb.checked = false;
+            }
+        });
+    }
+
     // Build the Form 2 URL with shared field values as query params so the next page
     // can render them server-side into the input `value` attributes — instant fill.
     function buildRedirectUrl() {
@@ -402,6 +455,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 params.set(fieldName, f.value);
             }
         });
+
+        // Persist SMS opt-in choice — checkbox value only sends if checked, so we
+        // read `checked` directly and pass "Yes"/"No" so Form 2 can restore it.
+        if (consentCb) {
+            params.set("sms_consent", consentCb.checked ? "Yes" : "No");
+        }
 
         const qs = params.toString();
         return qs ? redirectTo + "?" + qs : redirectTo;
