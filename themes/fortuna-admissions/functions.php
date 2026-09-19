@@ -1006,7 +1006,7 @@ function mim_consultation_submit() {
      * REDIRECT TO THANK YOU PAGE
      * ============================================
      */
-    wp_safe_redirect(home_url('/mba/free-consultation-thank-you/'));
+    wp_safe_redirect(home_url('/free-consultation-thank-you'));
     exit;
 }
 
