@@ -10,16 +10,20 @@ $fa_prefill = array(
     'sms_consent' => isset($_GET['sms_consent']) ? sanitize_text_field( wp_unslash($_GET['sms_consent']) ) : '',
 );
 
+$fa_country_top = array(
+    'United States','United Kingdom','Canada','China','India',
+);
+
 $fa_country_options = array(
     'Afghanistan','Albania','Algeria','Andorra','Angola','Argentina','Armenia','Australia','Austria','Azerbaijan',
     'Bahrain','Bangladesh','Belgium','Brazil','Bulgaria',
-    'Canada','Chile','China','Colombia','Costa Rica','Croatia','Cyprus','Czech Republic',
+    'Chile','Colombia','Costa Rica','Croatia','Cyprus','Czech Republic',
     'Denmark','Dominican Republic',
     'Ecuador','Egypt','Estonia','Ethiopia',
     'Finland','France',
     'Georgia','Germany','Ghana','Greece','Guatemala',
     'Hong Kong','Hungary',
-    'Iceland','India','Indonesia','Ireland','Israel','Italy',
+    'Iceland','Indonesia','Ireland','Israel','Italy',
     'Japan','Jordan',
     'Kenya','Kuwait',
     'Latvia','Lebanon','Lithuania','Luxembourg',
@@ -30,7 +34,7 @@ $fa_country_options = array(
     'Romania','Russia',
     'Saudi Arabia','Singapore','Slovakia','Slovenia','South Africa','South Korea','Spain','Sri Lanka','Sweden','Switzerland',
     'Taiwan','Thailand','Turkey',
-    'Ukraine','United Arab Emirates','United Kingdom','United States','Uruguay',
+    'Ukraine','United Arab Emirates','Uruguay',
     'Venezuela','Vietnam',
     'Other',
 );
@@ -279,6 +283,12 @@ $fa_country_options = array(
         </label>
         <select id="country" name="country" required>
             <option value="">Select Country</option>
+            <?php foreach ($fa_country_top as $fa_country_option) : ?>
+                <option value="<?php echo esc_attr($fa_country_option); ?>" <?php selected($fa_prefill['country'], $fa_country_option); ?>>
+                    <?php echo esc_html($fa_country_option); ?>
+                </option>
+            <?php endforeach; ?>
+            <option disabled>-----------------------------------</option>
             <?php foreach ($fa_country_options as $fa_country_option) : ?>
                 <option value="<?php echo esc_attr($fa_country_option); ?>" <?php selected($fa_prefill['country'], $fa_country_option); ?>>
                     <?php echo esc_html($fa_country_option); ?>

@@ -235,6 +235,14 @@
 
             <option value="">Select Country</option>
 
+            <option value="United States">United States</option>
+            <option value="United Kingdom">United Kingdom</option>
+            <option value="Canada">Canada</option>
+            <option value="China">China</option>
+            <option value="India">India</option>
+
+            <option disabled>-----------------------------------</option>
+
             <option value="Afghanistan">Afghanistan</option>
             <option value="Albania">Albania</option>
             <option value="Algeria">Algeria</option>
@@ -252,9 +260,7 @@
             <option value="Brazil">Brazil</option>
             <option value="Bulgaria">Bulgaria</option>
 
-            <option value="Canada">Canada</option>
             <option value="Chile">Chile</option>
-            <option value="China">China</option>
             <option value="Colombia">Colombia</option>
             <option value="Costa Rica">Costa Rica</option>
             <option value="Croatia">Croatia</option>
@@ -282,7 +288,6 @@
             <option value="Hungary">Hungary</option>
 
             <option value="Iceland">Iceland</option>
-            <option value="India">India</option>
             <option value="Indonesia">Indonesia</option>
             <option value="Ireland">Ireland</option>
             <option value="Israel">Israel</option>
@@ -339,8 +344,6 @@
 
             <option value="Ukraine">Ukraine</option>
             <option value="United Arab Emirates">United Arab Emirates</option>
-            <option value="United Kingdom">United Kingdom</option>
-            <option value="United States">United States</option>
             <option value="Uruguay">Uruguay</option>
 
             <option value="Venezuela">Venezuela</option>
