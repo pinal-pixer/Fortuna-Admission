@@ -1012,91 +1012,149 @@ function mim_consultation_submit() {
 
 /**
  * ============================================================================
- * MBA — SIMPLE Free Consultation Form
+ * MBA — SIMPLE Free Consultation Form (Form 1 / partial submission)
  * ----------------------------------------------------------------------------
- * Short form (Name, Email, LinkedIn, How heard, Additional info).
- * Uses admin-post redirect flow (no file upload, so no AJAX needed).
+ * Sent via AJAX when the user submits Form 1, before they are redirected to
+ * Form 2. Fires the Podio webhook so we capture the lead even if the user
+ * abandons Form 2. Form 2 will fire another webhook call with the fuller
+ * payload when it is submitted.
  * ============================================================================
  */
-add_action('admin_post_nopriv_mba_simple_consultation_submit', 'mba_simple_consultation_submit');
-add_action('admin_post_mba_simple_consultation_submit', 'mba_simple_consultation_submit');
+add_action('wp_ajax_nopriv_mba_simple_consultation_submit', 'mba_simple_consultation_submit');
+add_action('wp_ajax_mba_simple_consultation_submit', 'mba_simple_consultation_submit');
 
 function mba_simple_consultation_submit() {
-
-    if ( ! isset($_POST['mba_simple_consultation_submit']) ) {
-        return;
-    }
 
     if (
         ! isset($_POST['mba_simple_consultation_nonce_field']) ||
         ! wp_verify_nonce(
-            $_POST['mba_simple_consultation_nonce_field'],
+            sanitize_text_field( wp_unslash($_POST['mba_simple_consultation_nonce_field']) ),
             'mba_simple_consultation_nonce'
         )
     ) {
-        error_log('MBA Simple Consultation: Nonce verification failed. IP: ' . $_SERVER['REMOTE_ADDR']);
-        wp_safe_redirect(home_url('/mba/free-consultation/?error=security'));
-        exit;
+        wp_send_json_error(
+            array( 'message' => 'Security verification failed.' ),
+            403
+        );
     }
 
-    if ( ! empty($_POST['website']) ) {
-        wp_safe_redirect(home_url('/mba/free-consultation/?error=spam'));
-        exit;
-    }
-
-    $recaptcha_secret = '6LevnXYtAAAAABkAIW1joZ1sy2Bw_ieBD6V2Ide4';
-
-    $recaptcha_response = isset($_POST['g-recaptcha-response'])
-        ? sanitize_text_field($_POST['g-recaptcha-response'])
+    $first_name = isset($_POST['first_name'])
+        ? sanitize_text_field( wp_unslash($_POST['first_name']) )
         : '';
 
-    $verify = wp_remote_post(
-        'https://www.google.com/recaptcha/api/siteverify',
-        array(
-            'body' => array(
-                'secret'   => $recaptcha_secret,
-                'response' => $recaptcha_response,
-                'remoteip' => $_SERVER['REMOTE_ADDR'],
+    $last_name = isset($_POST['last_name'])
+        ? sanitize_text_field( wp_unslash($_POST['last_name']) )
+        : '';
+
+    $email = isset($_POST['email'])
+        ? sanitize_email( wp_unslash($_POST['email']) )
+        : '';
+
+    if ( empty($first_name) || empty($email) || ! is_email($email) ) {
+        wp_send_json_error(
+            array( 'message' => 'Missing required fields.' ),
+            400
+        );
+    }
+
+    $phone = isset($_POST['phone'])
+        ? sanitize_text_field( wp_unslash($_POST['phone']) )
+        : '';
+
+    $sms_consent = isset($_POST['sms_consent']) && $_POST['sms_consent'] === 'Yes'
+        ? 'Yes'
+        : 'No';
+
+    $country = isset($_POST['country'])
+        ? sanitize_text_field( wp_unslash($_POST['country']) )
+        : '';
+
+    $linkedin_url = isset($_POST['linkedin'])
+        ? esc_url_raw( wp_unslash($_POST['linkedin']) )
+        : '';
+
+    $hear_about_us = isset($_POST['hear_about_us'])
+        ? sanitize_text_field( wp_unslash($_POST['hear_about_us']) )
+        : '';
+
+    $additional_information = isset($_POST['additional_information'])
+        ? sanitize_textarea_field( wp_unslash($_POST['additional_information']) )
+        : '';
+
+    $resume_url = '';
+
+    if (
+        isset($_FILES['resume']) &&
+        ! empty($_FILES['resume']['name'])
+    ) {
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+
+        $upload_overrides = array(
+            'test_form' => false,
+            'mimes' => array(
+                'pdf'  => 'application/pdf',
+                'doc'  => 'application/msword',
+                'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             ),
+        );
+
+        $uploaded_file = wp_handle_upload(
+            $_FILES['resume'],
+            $upload_overrides
+        );
+
+        if ( empty($uploaded_file['error']) && ! empty($uploaded_file['url']) ) {
+            $resume_url = esc_url_raw( $uploaded_file['url'] );
+        }
+    }
+
+    $data = array(
+        'first_name'             => $first_name,
+        'last_name'              => $last_name,
+        'email'                  => $email,
+        'phone'                  => $phone,
+        'sms_consent'            => $sms_consent,
+        'country'                => $country,
+        'linkedin_url'           => $linkedin_url,
+        'hear_about_us'          => $hear_about_us,
+        'additional_information' => $additional_information,
+        'resume_url'             => $resume_url,
+        'form_stage'             => 'partial',
+    );
+
+    $submission_id = fa_save_form_submission( 'mba', $data );
+
+    /**
+     * Send to Podio
+     */
+    $response = wp_remote_post(
+        'https://workflow-automation.podio.com/catch/y73oog24iwh3c7g',
+        array(
+            'method'  => 'POST',
+            'body'    => $data,
             'timeout' => 30,
         )
     );
 
-    if ( is_wp_error( $verify ) ) {
-        error_log('MBA Simple Consultation: reCAPTCHA API error: ' . $verify->get_error_message());
-        wp_safe_redirect(home_url('/mba/free-consultation/?error=recaptcha'));
-        exit;
+    if ( $submission_id ) {
+        if ( is_wp_error( $response ) ) {
+            fa_update_podio_status( $submission_id, 'failed', $response->get_error_message() );
+            error_log( 'MBA Simple Consultation: Podio webhook error: ' . $response->get_error_message() );
+        } else {
+            $podio_code = wp_remote_retrieve_response_code( $response );
+            if ( $podio_code >= 200 && $podio_code < 300 ) {
+                fa_update_podio_status( $submission_id, 'success' );
+            } else {
+                fa_update_podio_status( $submission_id, 'failed', 'HTTP ' . $podio_code );
+                error_log( 'MBA Simple Consultation: Podio webhook HTTP ' . $podio_code . ' | body: ' . wp_remote_retrieve_body( $response ) );
+            }
+        }
     }
 
-    $result = json_decode(
-        wp_remote_retrieve_body($verify),
-        true
+    wp_send_json_success(
+        array( 'message' => 'Partial submission received.' )
     );
-
-    if (
-        empty($result['success']) ||
-        $result['score'] < 0.5 ||
-        $result['action'] !== 'mba_simple_consultation'
-    ) {
-        error_log('MBA Simple Consultation: reCAPTCHA failed. IP: ' . $_SERVER['REMOTE_ADDR']);
-        wp_safe_redirect(home_url('/mba/free-consultation/?error=recaptcha'));
-        exit;
-    }
-
-    $data = array(
-        'first_name'             => sanitize_text_field($_POST['first_name']),
-        'last_name'              => sanitize_text_field($_POST['last_name']),
-        'email'                  => sanitize_email($_POST['email']),
-        'linkedin_url'           => esc_url_raw($_POST['linkedin_url']),
-        'how_did_you_hear'       => sanitize_text_field($_POST['hear_about_us']),
-        'additional_information' => sanitize_textarea_field($_POST['additional_information']),
-        'code'                   => sanitize_text_field($_POST['code']),
-    );
-
-    fa_save_form_submission( 'mba', $data );
-
-    wp_safe_redirect(home_url('/mba/free-consultation-thank-you/'));
-    exit;
 }
 
 /**

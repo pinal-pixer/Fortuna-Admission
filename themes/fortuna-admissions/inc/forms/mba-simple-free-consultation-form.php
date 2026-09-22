@@ -136,6 +136,8 @@
 <form class="mba-simple-consultation-form" action="#" method="post" enctype="multipart/form-data">
 
     <input type="hidden" name="g-recaptcha-response" value="">
+    <input type="hidden" name="action" value="mba_simple_consultation_submit">
+    <?php wp_nonce_field('mba_simple_consultation_nonce', 'mba_simple_consultation_nonce_field'); ?>
 
     <!-- Name -->
     <div class="form-row">
@@ -428,6 +430,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const sharedTextFields = ["first_name", "last_name", "email", "phone", "country"];
     const redirectTo = "/free-consultation-mba-test-2/";
+    const ajaxUrl = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
+    const tokenField = form.querySelector('input[name="g-recaptcha-response"]');
 
     // Show SMS consent when a phone number is entered; auto-check the box so the
     // user opts in by default (matching MIM/UG behaviour).
@@ -469,29 +473,9 @@ document.addEventListener("DOMContentLoaded", function () {
         return qs ? redirectTo + "?" + qs : redirectTo;
     }
 
-    form.addEventListener("submit", function (e) {
-        e.preventDefault();
-
-        if (!form.checkValidity()) {
-            form.reportValidity();
-            return;
-        }
-
-        const btn = form.querySelector('button[type="submit"]');
-
-        if (btn) {
-            btn.disabled    = true;
-            btn.textContent = "Please wait...";
-        }
-
-        const targetUrl = buildRedirectUrl();
-
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-            event: "MBASimpleFormSubmit"
-        });
-
-        // Persist resume (if any) as base64 in sessionStorage, then redirect
+    // Persist resume (if any) into sessionStorage so Form 2 can restore it,
+    // then continue to Form 2.
+    function persistResumeAndRedirect(targetUrl) {
         const resumeInput = form.querySelector('input[name="resume"]');
         const file = resumeInput && resumeInput.files && resumeInput.files[0];
 
@@ -511,7 +495,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     data: reader.result
                 }));
             } catch (err) {
-                // Storage quota exceeded — proceed without carrying resume
                 sessionStorage.removeItem("mba_resume");
             }
             window.location.href = targetUrl;
@@ -522,7 +505,96 @@ document.addEventListener("DOMContentLoaded", function () {
         };
 
         reader.readAsDataURL(file);
+    }
 
+    // Send Form 1 data to the server so the Podio webhook fires with the
+    // partial submission. We do NOT block the redirect on the response —
+    // `keepalive: true` lets the request survive page navigation.
+    function sendPartialSubmission() {
+        const fd = new FormData(form);
+
+        // FormData omits unchecked checkboxes — send explicit Yes/No so the
+        // server captures the user's consent choice either way.
+        if (consentCb) {
+            fd.set("sms_consent", consentCb.checked ? "Yes" : "No");
+        }
+
+        try {
+            return fetch(ajaxUrl, {
+                method: "POST",
+                body: fd,
+                keepalive: true,
+                credentials: "same-origin"
+            }).catch(function () {});
+        } catch (err) {
+            return Promise.resolve();
+        }
+    }
+
+    function submitAndRedirect(token) {
+        if (tokenField) tokenField.value = token || "";
+
+        const targetUrl = buildRedirectUrl();
+        const partial = sendPartialSubmission();
+
+        // Give the webhook a brief window to complete before we navigate away,
+        // but never block the user for more than 1.5s.
+        var advanced = false;
+        const cont = function () {
+            if (advanced) return;
+            advanced = true;
+            persistResumeAndRedirect(targetUrl);
+        };
+        const guard = setTimeout(cont, 1500);
+
+        if (partial && typeof partial.then === "function") {
+            partial.then(function () {
+                clearTimeout(guard);
+                cont();
+            });
+        }
+    }
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const btn = form.querySelector('button[type="submit"]');
+
+        if (btn) {
+            btn.disabled    = true;
+            btn.textContent = "Please wait...";
+        }
+
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+            event: "MBASimpleFormSubmit"
+        });
+
+        if (typeof grecaptcha === "undefined") {
+            submitAndRedirect("");
+            return;
+        }
+
+        var fallback = setTimeout(function () {
+            submitAndRedirect("");
+        }, 4000);
+
+        grecaptcha.ready(function () {
+            grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
+                action: "mba_simple_consultation"
+            }).then(function (token) {
+                clearTimeout(fallback);
+                submitAndRedirect(token);
+            }).catch(function () {
+                clearTimeout(fallback);
+                submitAndRedirect("");
+            });
+        });
     });
 });
 </script>
