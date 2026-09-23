@@ -215,6 +215,7 @@ $fa_country_options = array(
 
     <input type="hidden" name="g-recaptcha-response" value="">
     <input type="hidden" name="action" value="mba_full_consultation_submit">
+    <input type="hidden" name="completed_full_form" value="True">
     <?php wp_nonce_field('mba_full_consultation_nonce', 'mba_full_consultation_nonce_field'); ?>
 
     <!-- Name -->
