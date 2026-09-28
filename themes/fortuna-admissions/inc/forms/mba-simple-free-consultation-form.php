@@ -151,6 +151,8 @@
                 id="first-name"
                 name="first_name"
                 placeholder="First"
+                autocomplete="given-name"
+                aria-label="First name"
                 required
             >
         </div>
@@ -162,6 +164,8 @@
                 id="last-name"
                 name="last_name"
                 placeholder="Last"
+                autocomplete="family-name"
+                aria-label="Last name"
             >
         </div>
     </div>
@@ -176,6 +180,7 @@
                 type="email"
                 id="email"
                 name="email"
+                autocomplete="email"
                 required
             >
         </div>
@@ -186,6 +191,7 @@
                 type="tel"
                 id="phone"
                 name="phone"
+                autocomplete="tel"
             >
         </div>
     </div>
@@ -234,7 +240,7 @@
         <label for="country">
             Country of Residence <span class="asterisk">*</span>
         </label>
-        <select id="country" name="country" required>
+        <select id="country" name="country" autocomplete="country-name" required>
 
             <option value="">Select Country</option>
 
@@ -535,25 +541,11 @@ document.addEventListener("DOMContentLoaded", function () {
     function submitAndRedirect(token) {
         if (tokenField) tokenField.value = token || "";
 
-        const targetUrl = buildRedirectUrl();
-        const partial = sendPartialSubmission();
+        // Fire the partial submission — `keepalive: true` in sendPartialSubmission()
+        // lets the request finish after we navigate, so we don't wait for the response.
+        sendPartialSubmission();
 
-        // Give the webhook a brief window to complete before we navigate away,
-        // but never block the user for more than 1.5s.
-        var advanced = false;
-        const cont = function () {
-            if (advanced) return;
-            advanced = true;
-            persistResumeAndRedirect(targetUrl);
-        };
-        const guard = setTimeout(cont, 1500);
-
-        if (partial && typeof partial.then === "function") {
-            partial.then(function () {
-                clearTimeout(guard);
-                cont();
-            });
-        }
+        persistResumeAndRedirect(buildRedirectUrl());
     }
 
     form.addEventListener("submit", function (e) {

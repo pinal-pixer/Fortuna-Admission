@@ -1011,6 +1011,48 @@ function mim_consultation_submit() {
 }
 
 /**
+ * Send a JSON response to the browser and close the connection, so any work
+ * that follows (e.g. the Podio webhook call) runs without the user waiting.
+ * On PHP-FPM this uses fastcgi_finish_request(); other SAPIs get a best-effort
+ * flush and still benefit from PHP finishing the request in the background.
+ */
+if ( ! function_exists( 'fa_send_json_and_continue' ) ) {
+    function fa_send_json_and_continue( $success, $payload = array() ) {
+
+        $body = array(
+            'success' => (bool) $success,
+            'data'    => $payload,
+        );
+        $json = wp_json_encode( $body );
+
+        // Drop any existing output buffers so the browser sees the JSON now.
+        while ( ob_get_level() > 0 ) {
+            @ob_end_clean();
+        }
+
+        nocache_headers();
+        header( 'Content-Type: application/json; charset=' . get_option( 'blog_charset' ) );
+        header( 'Content-Length: ' . strlen( $json ) );
+        header( 'Connection: close' );
+        echo $json;
+
+        if ( function_exists( 'fastcgi_finish_request' ) ) {
+            fastcgi_finish_request();
+        } elseif ( function_exists( 'litespeed_finish_request' ) ) {
+            litespeed_finish_request();
+        } else {
+            if ( function_exists( 'session_write_close' ) ) {
+                @session_write_close();
+            }
+            @flush();
+        }
+
+        // Keep processing beyond the client disconnect so the webhook completes.
+        @ignore_user_abort( true );
+    }
+}
+
+/**
  * ============================================================================
  * MBA — SIMPLE Free Consultation Form (Form 1 / partial submission)
  * ----------------------------------------------------------------------------
@@ -1125,8 +1167,13 @@ function mba_simple_consultation_submit() {
 
     $submission_id = fa_save_form_submission( 'mba', $data );
 
+    // Respond to the browser first so the redirect to Form 2 isn't blocked
+    // on the Podio round-trip. The webhook call below runs after the client
+    // is disconnected.
+    fa_send_json_and_continue( true, array( 'message' => 'Partial submission received.' ) );
+
     /**
-     * Send to Podio
+     * Send to Podio (runs after response is sent to the browser)
      */
     $response = wp_remote_post(
         'https://workflow-automation.podio.com/catch/y73oog24iwh3c7g',
@@ -1152,9 +1199,7 @@ function mba_simple_consultation_submit() {
         }
     }
 
-    wp_send_json_success(
-        array( 'message' => 'Partial submission received.' )
-    );
+    exit;
 }
 
 /**
@@ -1359,8 +1404,15 @@ function mba_full_consultation_submit() {
 
     $submission_id = fa_save_form_submission( 'mba', $data );
 
+    // Respond to the browser first so the redirect to the thank-you page
+    // isn't blocked on the Podio round-trip. The webhook call below runs
+    // after the client is disconnected.
+    fa_send_json_and_continue( true, array(
+        'message' => 'Thanks for sharing this very helpful background information, which will be invaluable for our call together. We will be in touch soon.',
+    ) );
+
     /**
-     * Send to Podio
+     * Send to Podio (runs after response is sent to the browser)
      */
     $response = wp_remote_post(
         'https://workflow-automation.podio.com/catch/y73oog24iwh3c7g',
@@ -1386,11 +1438,7 @@ function mba_full_consultation_submit() {
         }
     }
 
-    wp_send_json_success(
-        array(
-            'message' => 'Thanks for sharing this very helpful background information, which will be invaluable for our call together. We will be in touch soon.',
-        )
-    );
+    exit;
 }
 
 ?>

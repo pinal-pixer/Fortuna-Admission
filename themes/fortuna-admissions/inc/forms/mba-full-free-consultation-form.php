@@ -224,12 +224,12 @@ $fa_country_options = array(
             <label for="first-name">
                 Name <span class="asterisk">*</span>
             </label>
-            <input type="text" id="first-name" name="first_name" placeholder="First" required value="<?php echo esc_attr($fa_prefill['first_name']); ?>">
+            <input type="text" id="first-name" name="first_name" placeholder="First" autocomplete="given-name" aria-label="First name" required value="<?php echo esc_attr($fa_prefill['first_name']); ?>">
         </div>
 
         <div class="form-group">
             <label for="last-name" class="last-name-label">Name</label>
-            <input type="text" id="last-name" name="last_name" placeholder="Last" value="<?php echo esc_attr($fa_prefill['last_name']); ?>">
+            <input type="text" id="last-name" name="last_name" placeholder="Last" autocomplete="family-name" aria-label="Last name" value="<?php echo esc_attr($fa_prefill['last_name']); ?>">
         </div>
     </div>
 
@@ -239,12 +239,12 @@ $fa_country_options = array(
             <label for="email">
                 Email <span class="asterisk">*</span>
             </label>
-            <input type="email" id="email" name="email" required value="<?php echo esc_attr($fa_prefill['email']); ?>">
+            <input type="email" id="email" name="email" autocomplete="email" required value="<?php echo esc_attr($fa_prefill['email']); ?>">
         </div>
 
         <div class="form-group">
             <label for="phone">Phone</label>
-            <input type="tel" id="phone" name="phone" value="<?php echo esc_attr($fa_prefill['phone']); ?>">
+            <input type="tel" id="phone" name="phone" autocomplete="tel" value="<?php echo esc_attr($fa_prefill['phone']); ?>">
         </div>
     </div>
 
@@ -282,7 +282,7 @@ $fa_country_options = array(
         <label for="country">
             Country of Residence <span class="asterisk">*</span>
         </label>
-        <select id="country" name="country" required>
+        <select id="country" name="country" autocomplete="country-name" required>
             <option value="">Select Country</option>
             <?php foreach ($fa_country_top as $fa_country_option) : ?>
                 <option value="<?php echo esc_attr($fa_country_option); ?>" <?php selected($fa_prefill['country'], $fa_country_option); ?>>
