@@ -365,8 +365,8 @@ $fa_country_options = array(
         <option value="">Please Select</option>
         <option value="GMAT">GMAT</option>
         <option value="GRE">GRE</option>
-        <option value="Both">Both GMAT and GRE</option>
-        <option value="Neither">Neither GMAT nor GRE</option>
+        <option value="Neither GMAT nor GRE">Neither GMAT nor GRE</option>
+        <option value="Both GMAT and GRE">Both GMAT and GRE</option>
     </select>
 </div>
 
@@ -440,8 +440,8 @@ $fa_country_options = array(
                 Dartmouth Tuck
             </label>
             <label>
-                <input type="checkbox" name="business_schools[]" value="Oxford Said">
-                Oxford Said
+                <input type="checkbox" name="business_schools[]" value="Oxford Saïd">
+                Oxford Saïd
             </label>
             <label>
                 <input type="checkbox" name="business_schools[]" value="Columbia Business School">
@@ -644,11 +644,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const value = tests.value;
 
         if (gmatFields) {
-            gmatFields.style.display = (value === "GMAT" || value === "Both") ? "flex" : "none";
+            gmatFields.style.display = (value === "GMAT" || value === "Both GMAT and GRE") ? "flex" : "none";
         }
 
         if (greFields) {
-            greFields.style.display = (value === "GRE" || value === "Both") ? "flex" : "none";
+            greFields.style.display = (value === "GRE" || value === "Both GMAT and GRE") ? "flex" : "none";
         }
     }
 
