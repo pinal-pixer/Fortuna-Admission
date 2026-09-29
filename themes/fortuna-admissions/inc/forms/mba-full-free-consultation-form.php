@@ -720,9 +720,11 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
+        // Cap the reCAPTCHA wait at 1.5s so a slow Google response can't stall the
+        // user for the old 4s worst-case.
         var fallback = setTimeout(function () {
             submitForm("");
-        }, 4000);
+        }, 1500);
 
         grecaptcha.ready(function () {
             grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {

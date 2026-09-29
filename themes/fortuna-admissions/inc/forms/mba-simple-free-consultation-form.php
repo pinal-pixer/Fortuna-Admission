@@ -568,26 +568,23 @@ document.addEventListener("DOMContentLoaded", function () {
             event: "MBASimpleFormSubmit"
         });
 
-        if (typeof grecaptcha === "undefined") {
-            submitAndRedirect("");
-            return;
+        // Kick off reCAPTCHA in the background but do NOT block the redirect on it.
+        // The partial submission uses `keepalive: true`, so it survives navigation;
+        // if the token resolves before we've navigated it's attached, otherwise the
+        // request goes out without one.
+        if (typeof grecaptcha !== "undefined") {
+            try {
+                grecaptcha.ready(function () {
+                    grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
+                        action: "mba_simple_consultation"
+                    }).then(function (token) {
+                        if (tokenField) tokenField.value = token || "";
+                    }).catch(function () {});
+                });
+            } catch (err) {}
         }
 
-        var fallback = setTimeout(function () {
-            submitAndRedirect("");
-        }, 4000);
-
-        grecaptcha.ready(function () {
-            grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
-                action: "mba_simple_consultation"
-            }).then(function (token) {
-                clearTimeout(fallback);
-                submitAndRedirect(token);
-            }).catch(function () {
-                clearTimeout(fallback);
-                submitAndRedirect("");
-            });
-        });
+        submitAndRedirect("");
     });
 });
 </script>
