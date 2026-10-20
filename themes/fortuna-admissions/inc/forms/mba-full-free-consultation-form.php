@@ -9,35 +9,6 @@ $fa_prefill = array(
     'country'     => isset($_GET['country'])     ? sanitize_text_field( wp_unslash($_GET['country']) )     : '',
     'sms_consent' => isset($_GET['sms_consent']) ? sanitize_text_field( wp_unslash($_GET['sms_consent']) ) : '',
 );
-
-$fa_country_top = array(
-    'United States','United Kingdom','Canada','China','India',
-);
-
-$fa_country_options = array(
-    'Afghanistan','Albania','Algeria','Andorra','Angola','Argentina','Armenia','Australia','Austria','Azerbaijan',
-    'Bahrain','Bangladesh','Belgium','Brazil','Bulgaria',
-    'Chile','Colombia','Costa Rica','Croatia','Cyprus','Czech Republic',
-    'Denmark','Dominican Republic',
-    'Ecuador','Egypt','Estonia','Ethiopia',
-    'Finland','France',
-    'Georgia','Germany','Ghana','Greece','Guatemala',
-    'Hong Kong','Hungary',
-    'Iceland','Indonesia','Ireland','Israel','Italy',
-    'Japan','Jordan',
-    'Kenya','Kuwait',
-    'Latvia','Lebanon','Lithuania','Luxembourg',
-    'Malaysia','Malta','Mexico','Monaco','Morocco',
-    'Netherlands','New Zealand','Nigeria','Norway',
-    'Pakistan','Panama','Peru','Philippines','Poland','Portugal',
-    'Qatar',
-    'Romania','Russia',
-    'Saudi Arabia','Singapore','Slovakia','Slovenia','South Africa','South Korea','Spain','Sri Lanka','Sweden','Switzerland',
-    'Taiwan','Thailand','Turkey',
-    'Ukraine','United Arab Emirates','Uruguay',
-    'Venezuela','Vietnam',
-    'Other',
-);
 ?>
 <style>
 .mba-full-consultation-form {
@@ -219,49 +190,23 @@ $fa_country_options = array(
     <?php wp_nonce_field('mba_full_consultation_nonce', 'mba_full_consultation_nonce_field'); ?>
 
     <!-- Prefilled from Form 1 — passed through as hidden fields so the Podio webhook still receives them -->
-    <input type="hidden" name="first_name" value="<?php echo esc_attr($fa_prefill['first_name']); ?>">
-    <input type="hidden" name="last_name"  value="<?php echo esc_attr($fa_prefill['last_name']); ?>">
-    <input type="hidden" name="email"      value="<?php echo esc_attr($fa_prefill['email']); ?>">
-    <input type="hidden" name="phone"      value="<?php echo esc_attr($fa_prefill['phone']); ?>">
+    <input type="hidden" name="first_name"  value="<?php echo esc_attr($fa_prefill['first_name']); ?>">
+    <input type="hidden" name="last_name"   value="<?php echo esc_attr($fa_prefill['last_name']); ?>">
+    <input type="hidden" name="email"       value="<?php echo esc_attr($fa_prefill['email']); ?>">
+    <input type="hidden" name="phone"       value="<?php echo esc_attr($fa_prefill['phone']); ?>">
     <input type="hidden" name="sms_consent" value="<?php echo esc_attr($fa_prefill['sms_consent']); ?>">
+    <input type="hidden" name="country"     value="<?php echo esc_attr($fa_prefill['country']); ?>">
 
-    <!-- Resume -->
-    <div class="form-group bottom-margin">
-        <label for="resume">Resume</label>
-        <input
-            type="file"
-            id="resume"
-            name="resume"
-            accept=".pdf,.doc,.docx"
-        >
-    </div>
-
-    <!-- Country -->
-    <div class="form-group bottom-margin">
-        <label for="country">
-            Country of Residence <span class="asterisk">*</span>
-        </label>
-        <select id="country" name="country" autocomplete="country-name" required>
-            <option value="">Select Country</option>
-            <?php foreach ($fa_country_top as $fa_country_option) : ?>
-                <option value="<?php echo esc_attr($fa_country_option); ?>" <?php selected($fa_prefill['country'], $fa_country_option); ?>>
-                    <?php echo esc_html($fa_country_option); ?>
-                </option>
-            <?php endforeach; ?>
-            <option disabled>-----------------------------------</option>
-            <?php foreach ($fa_country_options as $fa_country_option) : ?>
-                <option value="<?php echo esc_attr($fa_country_option); ?>" <?php selected($fa_prefill['country'], $fa_country_option); ?>>
-                    <?php echo esc_html($fa_country_option); ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-
-    <!-- Referred by -->
-    <div class="form-group bottom-margin">
-        <label for="referred-by">If you were referred by someone, please enter their name:</label>
-        <input type="text" id="referred-by" name="referred_by_name">
-    </div>
+    <!-- Resume: input kept in DOM (hidden) so the sessionStorage restore from Form 1 still populates it on submit -->
+    <input
+        type="file"
+        id="resume"
+        name="resume"
+        accept=".pdf,.doc,.docx"
+        style="display: none;"
+        tabindex="-1"
+        aria-hidden="true"
+    >
 
     <!-- Employer / Job -->
     <div class="form-row">
@@ -510,6 +455,12 @@ $fa_country_options = array(
             <option value="MBA Interview Prep">MBA Interview Prep</option>
             <option value="Other">Other</option>
         </select>
+    </div>
+
+    <!-- Referred by -->
+    <div class="form-group bottom-margin">
+        <label for="referred-by">If you were referred by someone, please enter their name:</label>
+        <input type="text" id="referred-by" name="referred_by_name">
     </div>
 
     <!-- Submit -->
