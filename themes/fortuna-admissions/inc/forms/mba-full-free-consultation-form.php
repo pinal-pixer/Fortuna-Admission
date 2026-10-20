@@ -218,53 +218,12 @@ $fa_country_options = array(
     <input type="hidden" name="completed_full_form" value="True">
     <?php wp_nonce_field('mba_full_consultation_nonce', 'mba_full_consultation_nonce_field'); ?>
 
-    <!-- Name -->
-    <div class="form-row">
-        <div class="form-group">
-            <label for="first-name">
-                Name <span class="asterisk">*</span>
-            </label>
-            <input type="text" id="first-name" name="first_name" placeholder="First" autocomplete="given-name" aria-label="First name" required value="<?php echo esc_attr($fa_prefill['first_name']); ?>">
-        </div>
-
-        <div class="form-group">
-            <label for="last-name" class="last-name-label">Name</label>
-            <input type="text" id="last-name" name="last_name" placeholder="Last" autocomplete="family-name" aria-label="Last name" value="<?php echo esc_attr($fa_prefill['last_name']); ?>">
-        </div>
-    </div>
-
-    <!-- Email / Phone -->
-    <div class="form-row">
-        <div class="form-group">
-            <label for="email">
-                Email <span class="asterisk">*</span>
-            </label>
-            <input type="email" id="email" name="email" autocomplete="email" required value="<?php echo esc_attr($fa_prefill['email']); ?>">
-        </div>
-
-        <div class="form-group">
-            <label for="phone">Phone</label>
-            <input type="tel" id="phone" name="phone" autocomplete="tel" value="<?php echo esc_attr($fa_prefill['phone']); ?>">
-        </div>
-    </div>
-
-    <?php
-    // Show consent up-front when Form 1 pre-filled a phone number; JS keeps it in sync afterwards.
-    $fa_show_consent    = ! empty($fa_prefill['phone']);
-    $fa_consent_checked = ($fa_prefill['sms_consent'] === 'Yes') || ($fa_show_consent && $fa_prefill['sms_consent'] === '');
-    ?>
-    <div class="consent-group" id="mba_full_sms_consent_group" style="<?php echo $fa_show_consent ? '' : 'display: none;'; ?>">
-        <input
-            type="checkbox"
-            name="sms_consent"
-            id="mba_full_sms_consent"
-            value="Yes"
-            <?php checked($fa_consent_checked); ?>
-        >
-        <label for="mba_full_sms_consent">
-            I agree to receive promotional messages from Fortuna Admissions at the phone number provided.
-        </label>
-    </div>
+    <!-- Prefilled from Form 1 — passed through as hidden fields so the Podio webhook still receives them -->
+    <input type="hidden" name="first_name" value="<?php echo esc_attr($fa_prefill['first_name']); ?>">
+    <input type="hidden" name="last_name"  value="<?php echo esc_attr($fa_prefill['last_name']); ?>">
+    <input type="hidden" name="email"      value="<?php echo esc_attr($fa_prefill['email']); ?>">
+    <input type="hidden" name="phone"      value="<?php echo esc_attr($fa_prefill['phone']); ?>">
+    <input type="hidden" name="sms_consent" value="<?php echo esc_attr($fa_prefill['sms_consent']); ?>">
 
     <!-- Resume -->
     <div class="form-group bottom-margin">
@@ -296,6 +255,12 @@ $fa_country_options = array(
                 </option>
             <?php endforeach; ?>
         </select>
+    </div>
+
+    <!-- Referred by -->
+    <div class="form-group bottom-margin">
+        <label for="referred-by">If you were referred by someone, please enter their name:</label>
+        <input type="text" id="referred-by" name="referred_by_name">
     </div>
 
     <!-- Employer / Job -->
@@ -613,30 +578,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const greFields = form.querySelector("#gre-fields");
     const ajaxUrl = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
     const thankYouUrl = "/mba/free-consultation-thank-you/";
-
-    // Show SMS consent when a phone number is entered; auto-check on first entry.
-    const phoneInput   = form.querySelector('input[name="phone"]');
-    const consentCb    = document.getElementById("mba_full_sms_consent");
-    const consentGroup = document.getElementById("mba_full_sms_consent_group");
-
-    if (phoneInput && consentCb && consentGroup) {
-        phoneInput.addEventListener("input", function () {
-            if (phoneInput.value.trim().length > 0) {
-                consentGroup.style.display = "";
-                if (!consentCb.dataset.userTouched) {
-                    consentCb.checked = true;
-                }
-            } else {
-                consentGroup.style.display = "none";
-                consentCb.checked = false;
-                delete consentCb.dataset.userTouched;
-            }
-        });
-
-        consentCb.addEventListener("change", function () {
-            consentCb.dataset.userTouched = "1";
-        });
-    }
 
     function updateTestFields() {
         if (!tests) return;

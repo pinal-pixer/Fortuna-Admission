@@ -436,7 +436,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!form) return;
 
     const sharedTextFields = ["first_name", "last_name", "email", "phone", "country"];
-    const redirectTo = "/free-consultation-mba-test-2/";
+    const redirectTo = "/mba/free-consultation-step-2/";
     const ajaxUrl = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
     const tokenField = form.querySelector('input[name="g-recaptcha-response"]');
 

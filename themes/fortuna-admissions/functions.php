@@ -1302,6 +1302,10 @@ function mba_full_consultation_submit() {
         ? sanitize_text_field( wp_unslash($_POST['country']) )
         : '';
 
+    $referred_by_name = isset($_POST['referred_by_name'])
+        ? sanitize_text_field( wp_unslash($_POST['referred_by_name']) )
+        : '';
+
     $current_employer = isset($_POST['current_employer'])
         ? sanitize_text_field( wp_unslash($_POST['current_employer']) )
         : '';
@@ -1382,6 +1386,7 @@ function mba_full_consultation_submit() {
         'sms_consent'            => $sms_consent,
         'resume_url'             => $resume_url,
         'country'                => $country,
+        'referred_by_name'       => $referred_by_name,
         'current_employer'       => $current_employer,
         'job_title_function'     => $job_title_function,
         'current_industry'       => $current_industry,
