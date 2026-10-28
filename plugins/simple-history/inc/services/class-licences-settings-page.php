@@ -7,6 +7,7 @@ use Simple_History\Services\AddOns_Licences;
 use Simple_History\AddOn_Plugin;
 use Simple_History\Menu_Manager;
 use Simple_History\Menu_Page;
+use Simple_History\Plugin_Updater;
 use Simple_History\Services\Setup_Settings_Page;
 
 /**
@@ -17,10 +18,10 @@ class Licences_Settings_Page extends Service {
 	/** @var AddOns_Licences $licences_service */
 	private $licences_service;
 
-	private const SETTINGS_SECTION_ID = 'simple_history_settings_section_tab_licenses';
-	private const SETTINGS_PAGE_SLUG = 'simple_history_settings_menu_slug_tab_licenses';
-	private const SETTINGS_OPTION_GROUP = 'simple_history_settings_group_tab_licenses';
-	private const OPTION_NAME_LICENSE_KEY = 'shp_license_key';
+	private const SETTINGS_SECTION_ID    = 'simple_history_settings_section_tab_licenses';
+	private const SETTINGS_PAGE_SLUG     = 'simple_history_settings_menu_slug_tab_licenses';
+	private const SETTINGS_OPTION_GROUP  = 'simple_history_settings_group_tab_licenses';
+	public const OPTION_NAME_LICENSE_KEY = 'shp_license_key';
 	private const OPTION_LICENSE_MESSAGE = 'example_plugin_license_message';
 
 	/** @inheritdoc */
@@ -145,7 +146,7 @@ class Licences_Settings_Page extends Service {
 
 			<p>
 				<?php
-				$link_url = Helpers::get_tracking_url( 'https://simple-history.com/add-ons', 'premium_licences_addons' );
+				$link_url  = Helpers::get_tracking_url( 'https://simple-history.com/add-ons', 'premium_licences_addons' );
 				$link_text = 'simple-history.com/add-ons';
 
 				echo wp_kses(
@@ -160,8 +161,8 @@ class Licences_Settings_Page extends Service {
 					),
 					[
 						'a' => [
-							'href' => [],
-							'class' => [],
+							'href'   => [],
+							'class'  => [],
 							'target' => [],
 						],
 					]
@@ -195,7 +196,7 @@ class Licences_Settings_Page extends Service {
 
 			<p>
 				<?php
-				$install_help_url = Helpers::get_tracking_url( 'https://simple-history.com/support/add-ons/how-to-install/', 'docs_licences_install' );
+				$install_help_url  = Helpers::get_tracking_url( 'https://simple-history.com/support/add-ons/how-to-install/', 'docs_licences_install' );
 				$install_help_text = __( 'How to install an add-on', 'simple-history' );
 				echo wp_kses(
 					sprintf(
@@ -205,8 +206,8 @@ class Licences_Settings_Page extends Service {
 					),
 					[
 						'a' => [
-							'href' => [],
-							'class' => [],
+							'href'   => [],
+							'class'  => [],
 							'target' => [],
 						],
 					]
@@ -231,50 +232,115 @@ class Licences_Settings_Page extends Service {
 	}
 
 	/**
+	 * Build the error message shown when a license could not be activated.
+	 *
+	 * The activation-limit error gets real guidance: it is what users hit
+	 * after restoring a backup or migrating a site, when the key is still
+	 * spent on an install that no longer exists and they cannot free it
+	 * themselves. Other errors keep the generic message with the raw API
+	 * message attached, since support threads rely on it. The activation
+	 * limit notice leaves it out: it would only repeat what the notice says.
+	 *
+	 * @param string $api_message Error message returned by the license API.
+	 * @return string HTML, safe to output through wp_kses() with code, strong, br and a allowed.
+	 */
+	public function get_activation_error_message( $api_message ) {
+		$error_info = sprintf(
+			/* translators: %s: error message from the license server. */
+			__( 'Error info: <code>%s</code>', 'simple-history' ),
+			esc_html( $api_message )
+		);
+
+		if ( stripos( $api_message, 'activation limit' ) === false ) {
+			return __( 'Could not activate license. 😢', 'simple-history' ) . ' ' . $error_info;
+		}
+
+		$my_orders_url = 'https://app.lemonsqueezy.com/my-orders/';
+		$guide_url     = Helpers::get_tracking_url( 'https://simple-history.com/support/license-activation-limit/', 'licences_activation_limit' );
+		$contact_url   = Helpers::get_tracking_url( 'https://simple-history.com/contact/', 'licences_activation_limit' );
+
+		$link_end = '</a>';
+
+		// One short string per line, with the link tags passed in as
+		// placeholders, so translators never have to reproduce markup.
+		$line_what = __( '<strong>This license key is already active on another site</strong>, often an earlier copy of this one such as a backup or staging site.', 'simple-history' );
+
+		$line_fix = sprintf(
+			/* translators: 1: link start tag to the Lemon Squeezy "My orders" page, 2: link end tag. */
+			__( 'Deactivate that site on your %1$sMy orders page%2$s at Lemon Squeezy, then try again.', 'simple-history' ),
+			$this->get_external_link_start( $my_orders_url ),
+			$link_end
+		);
+
+		$line_help = sprintf(
+			/* translators: 1: link start tag to the instructions page, 2: link end tag, 3: link start tag to the contact page, 4: link end tag. */
+			__( 'Stuck? See the %1$sstep-by-step instructions%2$s or %3$scontact support%4$s.', 'simple-history' ),
+			$this->get_external_link_start( $guide_url ),
+			$link_end,
+			$this->get_external_link_start( $contact_url ),
+			$link_end
+		);
+
+		return $line_what . '<br>' . $line_fix . '<br>' . $line_help;
+	}
+
+	/**
+	 * Opening tag for a link that opens in a new tab, for use as a translation placeholder.
+	 *
+	 * @param string $url Link target.
+	 * @return string
+	 */
+	private function get_external_link_start( $url ) {
+		return sprintf( '<a href="%s" class="sh-ExternalLink" target="_blank">', esc_url( $url ) );
+	}
+
+	/**
 	 * Output fields to enter licence key and to activate, deactiave, and show info, for one plus plugin.
 	 *
 	 * @param AddOn_Plugin $plus_plugin One plus plugin.
 	 */
 	private function output_licence_key_fields_for_plugin( $plus_plugin ) {
-		$license_key = $plus_plugin->get_license_key();
+		$license_key   = $plus_plugin->get_license_key();
 		$form_post_url = Menu_Manager::get_admin_url_by_slug( 'general_settings_subtab_licenses' );
 
 		// Check for posted form for this plugin.
 		$form_success_message = null;
-		$form_error_message = null;
-		$nonce_valid = wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) ), 'sh-plugin-keys' ) !== false;
+		$form_error_message   = null;
+		$nonce_valid          = wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) ), 'sh-plugin-keys' ) !== false;
+
+		// Set when this request just ran activate_license() or deactivate_license()
+		// for this plugin, so the on-visit refresh below is skipped: that call
+		// already wrote a fresh option and purged the updater cache.
+		$did_run_activate_or_deactivate = false;
 
 		if ( $nonce_valid && isset( $_POST['plugin_slug'] ) && $_POST['plugin_slug'] === $plus_plugin->slug ) {
-			$action_activate = boolval( $_POST['activate'] ?? false );
+			$action_activate   = boolval( $_POST['activate'] ?? false );
 			$action_deactivate = boolval( $_POST['deactivate'] ?? false );
-			$new_licence_key = trim( sanitize_text_field( wp_unslash( $_POST['licence_key'] ?? '' ) ) );
+			$new_licence_key   = trim( sanitize_text_field( wp_unslash( $_POST['licence_key'] ?? '' ) ) );
+
+			$did_run_activate_or_deactivate = $action_activate || $action_deactivate;
 
 			if ( $action_activate ) {
 				$activation_result = $plus_plugin->activate_license( $new_licence_key );
 
 				if ( $activation_result['success'] === true ) {
-					$form_success_message = 'License activated! 🎉';
+					$form_success_message = __( 'License activated! 🎉', 'simple-history' );
 				} else {
-					$form_error_message = sprintf(
-						'Could not activate license. 😢 Error info: <code>%s</code>',
-						esc_html( $activation_result['message'] )
-					);
+					$form_error_message = $this->get_activation_error_message( (string) $activation_result['message'] );
 				}
-
-				// $licence_message = $plus_plugin->get_license_message( $license_key );
 			} elseif ( $action_deactivate ) {
 				$deactivate_result = $plus_plugin->deactivate_license();
 				if ( $deactivate_result === true ) {
-					$form_success_message = 'License deactivated. 👋';
+					$form_success_message = __( 'License deactivated. 👋', 'simple-history' );
 				} else {
-					$form_error_message = 'Could not deactivate license.';
+					$form_error_message = __( 'Could not deactivate license.', 'simple-history' );
 				}
 			}
 		}
 
 		// Get key and message again, because they may have changed.
 		$licence_message = $plus_plugin->get_license_message();
-		$license_key = $plus_plugin->get_license_key();
+		$license_key     = $plus_plugin->get_license_key();
 
 		?>
 		<div class="sh-LicencesPage-plugin">
@@ -295,24 +361,101 @@ class Licences_Settings_Page extends Service {
 						type="text" class="regular-text" name="licence_key" 
 						value="<?php echo esc_attr( $license_key ); ?>" 
 						placeholder="<?php esc_attr_e( 'Enter license key...', 'simple-history' ); ?>"
-					 />
+					/>
 				</p>
 	
 				<?php
-				// Show deactivate key button if key is activated.
+				// Show license status if key is activated.
 				if ( $licence_message['key_activated'] === true ) {
+					// The Licenses tab is the one place a person expects a fresh
+					// answer, so refresh the cached update-check on every visit.
+					// Skip this when the current request just ran activate_license()
+					// or deactivate_license() for this plugin: that already wrote
+					// a fresh option and purged the cache.
+					if ( ! $did_run_activate_or_deactivate ) {
+						$updater = $this->licences_service->get_updater( $plus_plugin->slug );
+
+						if ( $updater ) {
+							delete_transient( Plugin_Updater::get_cache_key_for_slug( $plus_plugin->slug ) );
+							$updater->request();
+						}
+					}
+
+					$license_state = $plus_plugin->get_license_state();
+
+					// An activation-source state is always "active" (see
+					// AddOn_Plugin::get_license_state()), so a non-active,
+					// non-inactive state here always comes from an
+					// authoritative update check. "inactive" (a valid key not
+					// tied to any site) is not a problem state.
+					$is_problem = ! in_array( $license_state['state'], [ 'active', 'inactive' ], true );
+
+					// Expired keys can be renewed. Disabled (refunded) and unknown keys
+					// cannot, so those get the support page instead of a sales page.
+					if ( $license_state['state'] === 'expired' ) {
+						$help_url   = Helpers::get_tracking_url( 'https://simple-history.com/add-ons/premium/', 'premium_license_renew' );
+						$help_label = __( 'Renew license', 'simple-history' );
+					} else {
+						$help_url   = Helpers::get_tracking_url( 'https://simple-history.com/support/', 'premium_license_help' );
+						$help_label = __( 'Contact support', 'simple-history' );
+					}
+
+					$classes = 'sh-LicencesPage-plugin-active' . ( $is_problem ? ' sh-LicencesPage-plugin-active--problem' : '' );
 					?>
-					<p class="sh-LicencesPage-plugin-active">
+					<p class="<?php echo esc_attr( $classes ); ?>">
 						<?php
-						echo wp_kses(
-							__( 'License key is <strong>active</strong>. ', 'simple-history' ),
-							[
-								'strong' => [],
-							]
-						);
+						if ( $is_problem ) {
+							echo wp_kses(
+								__( 'License key is <strong>not active</strong>.', 'simple-history' ),
+								[ 'strong' => [] ]
+							);
+							echo ' ';
+						} elseif ( $license_state['state'] === 'active' ) {
+							// Keep the trailing space inside this msgid, unlike the
+							// other strings here: it existed before this branch, and
+							// keeping it lets existing translations still match. The
+							// separate echo ' ' used for the other branches is
+							// skipped here so the space is not doubled.
+							echo wp_kses(
+								__( 'License key is <strong>active</strong>. ', 'simple-history' ),
+								[ 'strong' => [] ]
+							);
+						} else {
+							echo wp_kses(
+								__( 'License key is <strong>valid</strong>.', 'simple-history' ),
+								[ 'strong' => [] ]
+							);
+							echo ' ';
+						}
+
+						echo esc_html( $plus_plugin->get_license_state_description( $license_state ) );
+
+						if ( $is_problem ) {
+							echo ' ';
+							printf(
+								'<a href="%s" class="sh-ExternalLink" target="_blank">%s</a>',
+								esc_url( $help_url ),
+								esc_html( $help_label )
+							);
+						}
 						?>
 					</p>
 					<?php
+					if ( $license_state['checked_at'] !== null ) {
+						?>
+						<p class="sh-LicencesPage-plugin-checked description">
+							<?php
+							echo esc_html(
+								sprintf(
+									/* translators: %s: date and time the license was last checked. */
+									__( 'Last checked %s.', 'simple-history' ),
+									wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $license_state['checked_at'] ) )
+								)
+							);
+							?>
+						</p>
+						<?php
+					}
 				}
 				?>
 
@@ -352,7 +495,14 @@ class Licences_Settings_Page extends Service {
 						wp_kses(
 							$form_error_message,
 							[
-								'code' => [],
+								'code'   => [],
+								'strong' => [],
+								'br'     => [],
+								'a'      => [
+									'href'   => [],
+									'class'  => [],
+									'target' => [],
+								],
 							]
 						)
 					);
@@ -362,8 +512,20 @@ class Licences_Settings_Page extends Service {
 					?>
 					<details style="margin-top: 1em;">
 						<summary>Licence message (debug)</summary>
-						<pre><?php echo esc_html( print_r( $licence_message, true ) ); ?></pre>
-						<br />Licence key: <code><?php echo esc_html( $license_key ); ?></code>
+						<p>This is only shown when WP_DEBUG is enabled. It shows the raw message returned from the license server.</p>
+						<p>Licence key: <code><?php echo esc_html( $license_key ); ?></code></p>
+						<?php
+							// <pre> keeps whatever whitespace it wraps, so the tags are
+							// printed with the value rather than written around a PHP
+							// block that has to sit on its own line.
+							// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_print_r
+							printf( '<pre>%s</pre>', esc_html( print_r( $licence_message, true ) ) );
+						?>
+						<p>Derived license state, as read by the rest of the plugin:</p>
+						<?php
+							// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_print_r
+							printf( '<pre>%s</pre>', esc_html( print_r( $plus_plugin->get_license_state(), true ) ) );
+						?>
 					</details>
 					<?php
 				}
@@ -379,10 +541,10 @@ class Licences_Settings_Page extends Service {
 	 */
 	public function activated_sites_settings_output() {
 		$link_my_orders_start = '<a href="https://app.lemonsqueezy.com/my-orders/" class="sh-ExternalLink" target="_blank">';
-		$link_my_orders_end = '</a>';
+		$link_my_orders_end   = '</a>';
 
 		$link_billing_start = '<a href="https://simple-history.lemonsqueezy.com/billing" class="sh-ExternalLink" target="_blank">';
-		$link_billing_end = '</a>';
+		$link_billing_end   = '</a>';
 
 		?>
 		<p>

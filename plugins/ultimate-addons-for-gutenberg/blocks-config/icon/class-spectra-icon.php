@@ -551,7 +551,13 @@ if ( ! class_exists( 'Spectra_Icon' ) ) {
 				<?php if ( $has_margin ) : ?>
 				<div class='uagb-icon-margin-wrapper'>
 				<?php endif; ?>
-					<span class="uagb-svg-wrapper">		
+					<span class="uagb-svg-wrapper" 
+					<?php 
+					if ( $aria_label_attr ) {
+						echo ' aria-label="' . esc_attr( $aria_label_attr ) . '"';
+					} 
+					?>
+					tabindex="0">		
 						<?php echo $iconHtml; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Already escaped & sanitize inside render_svg_html(). ?>
 					</span>
 				<?php if ( $has_margin ) : ?>

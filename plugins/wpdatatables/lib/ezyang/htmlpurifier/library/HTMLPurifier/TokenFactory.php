@@ -1,5 +1,7 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Factory for token generation.
  *
@@ -14,44 +16,37 @@
 class HTMLPurifier_TokenFactory
 {
     // p stands for prototype
-
     /**
      * @type HTMLPurifier_Token_Start
      */
     private $p_start;
-
     /**
      * @type HTMLPurifier_Token_End
      */
     private $p_end;
-
     /**
      * @type HTMLPurifier_Token_Empty
      */
     private $p_empty;
-
     /**
      * @type HTMLPurifier_Token_Text
      */
     private $p_text;
-
     /**
      * @type HTMLPurifier_Token_Comment
      */
     private $p_comment;
-
     /**
      * Generates blank prototypes for cloning.
      */
     public function __construct()
     {
-        $this->p_start = new HTMLPurifier_Token_Start('', array());
-        $this->p_end = new HTMLPurifier_Token_End('');
-        $this->p_empty = new HTMLPurifier_Token_Empty('', array());
-        $this->p_text = new HTMLPurifier_Token_Text('');
-        $this->p_comment = new HTMLPurifier_Token_Comment('');
+        $this->p_start = new \WPDT\HTMLPurifier_Token_Start('', array());
+        $this->p_end = new \WPDT\HTMLPurifier_Token_End('');
+        $this->p_empty = new \WPDT\HTMLPurifier_Token_Empty('', array());
+        $this->p_text = new \WPDT\HTMLPurifier_Token_Text('');
+        $this->p_comment = new \WPDT\HTMLPurifier_Token_Comment('');
     }
-
     /**
      * Creates a HTMLPurifier_Token_Start.
      * @param string $name Tag name
@@ -64,7 +59,6 @@ class HTMLPurifier_TokenFactory
         $p->__construct($name, $attr);
         return $p;
     }
-
     /**
      * Creates a HTMLPurifier_Token_End.
      * @param string $name Tag name
@@ -76,7 +70,6 @@ class HTMLPurifier_TokenFactory
         $p->__construct($name);
         return $p;
     }
-
     /**
      * Creates a HTMLPurifier_Token_Empty.
      * @param string $name Tag name
@@ -89,7 +82,6 @@ class HTMLPurifier_TokenFactory
         $p->__construct($name, $attr);
         return $p;
     }
-
     /**
      * Creates a HTMLPurifier_Token_Text.
      * @param string $data Data of text token
@@ -101,7 +93,6 @@ class HTMLPurifier_TokenFactory
         $p->__construct($data);
         return $p;
     }
-
     /**
      * Creates a HTMLPurifier_Token_Comment.
      * @param string $data Data of comment token
@@ -114,5 +105,4 @@ class HTMLPurifier_TokenFactory
         return $p;
     }
 }
-
 // vim: et sw=4 sts=4

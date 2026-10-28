@@ -1,4 +1,6 @@
 {
+  "$schema": "https://json.schemastore.org/block.json",
+	"apiVersion": 3,
 	"name": "srfm/dropdown",
 	"title": "Dropdown",
 	"description": "Displays a SureForms Dropdown Field",
@@ -77,6 +79,18 @@
 		"slug":{
 			"type":"string",
 			"default":""
+		},
+		"showValues": {
+			"type": "boolean",
+			"default": false
+		},
+		"preselectedOptions": {
+			"type": "array",
+			"default": []
+		},
+		"dynamicDefaultValue": {
+			"type": "string",
+			"default": ""
 		}
 	}
 }

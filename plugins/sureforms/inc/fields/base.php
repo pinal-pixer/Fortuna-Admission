@@ -392,20 +392,24 @@ class Base {
 		$filter_classes  = apply_filters( 'srfm_field_classes', $default_classes, [ 'attributes' => $attributes ] );
 		$field_config    = apply_filters( 'srfm_field_config', [], [ 'attributes' => $attributes ] );
 
-		$this->field_config       = $field_config ? htmlspecialchars( Helper::get_string_value( wp_json_encode( $field_config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ), ENT_QUOTES, 'UTF-8' ) : '';
-		$this->attributes         = $attributes;
-		$this->required           = $attributes['required'] ?? false;
-		$this->field_width        = $attributes['fieldWidth'] ?? '';
-		$this->label              = $attributes['label'] ?? '';
-		$this->help               = $attributes['help'] ?? '';
-		$this->block_id           = isset( $attributes['block_id'] ) ? Helper::get_string_value( $attributes['block_id'] ) : '';
-		$this->form_id            = isset( $attributes['formId'] ) ? Helper::get_string_value( $attributes['formId'] ) : '';
-		$this->block_slug         = $attributes['slug'] ?? '';
-		$this->class_name         = $filter_classes;
-		$this->placeholder        = $attributes['placeholder'] ?? '';
-		$this->default            = $attributes['defaultValue'] ?? '';
-		$this->checked            = $attributes['checked'] ?? '';
-		$this->options            = $attributes['options'] ?? '';
+		$this->field_config = $field_config ? htmlspecialchars( Helper::get_string_value( wp_json_encode( $field_config, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ), ENT_QUOTES, 'UTF-8' ) : '';
+		$this->attributes   = $attributes;
+		$this->required     = $attributes['required'] ?? false;
+		$this->field_width  = $attributes['fieldWidth'] ?? '';
+		$this->label        = $attributes['label'] ?? '';
+		$this->help         = $attributes['help'] ?? '';
+		$this->block_id     = isset( $attributes['block_id'] ) ? Helper::get_string_value( $attributes['block_id'] ) : '';
+		$this->form_id      = isset( $attributes['formId'] ) ? Helper::get_string_value( $attributes['formId'] ) : '';
+		$this->block_slug   = $attributes['slug'] ?? '';
+		$this->class_name   = $filter_classes;
+		$this->placeholder  = $attributes['placeholder'] ?? '';
+		$this->default      = $attributes['defaultValue'] ?? '';
+		$this->checked      = $attributes['checked'] ?? '';
+		// Inject the block type slug (e.g. 'dropdown', 'multi-choice') into the attributes passed to
+		// the filter. The field's `slug` attribute can be prefixed when the block is inside a repeater
+		// (e.g. 'srfm-repeater-srfm-dropdown'), so filter consumers need a reliable block type identifier.
+		$block_args               = [ 'block_args' => [ 'slug' => $this->slug ] ];
+		$this->options            = apply_filters( 'srfm_field_options', $attributes['options'] ?? '', array_merge( $attributes, $block_args ) );
 		$this->is_unique          = $attributes['isUnique'] ?? false;
 		$this->conditional_class  = apply_filters( 'srfm_conditional_logic_classes', $this->form_id, $this->block_id );
 		$this->data_require_attr  = $this->required ? 'true' : 'false';
@@ -437,7 +441,7 @@ class Base {
 	 */
 	protected function set_input_label( $value ) {
 		$this->input_label_fallback = $this->label ? $this->label : $value;
-		$this->input_label          = '-lbl-' . Helper::encrypt( $this->input_label_fallback );
+		$this->input_label          = '-lbl-' . Helper::encode( $this->input_label_fallback );
 		$this->set_field_name( $this->input_label );
 	}
 
@@ -522,6 +526,8 @@ class Base {
 		if ( ! empty( $placeholder ) ) {
 			$this->label_markup     = '';
 			$this->placeholder_attr = ' placeholder="' . esc_attr( $placeholder ) . '" ';
+		} elseif ( '' !== $this->placeholder ) {
+			$this->placeholder_attr = ' placeholder="' . esc_attr( $this->placeholder ) . '" ';
 		}
 	}
 
@@ -532,7 +538,8 @@ class Base {
 	 * @return void
 	 */
 	protected function set_aria_described_by() {
-		$this->aria_described_by .= ' srfm-error-' . esc_attr( $this->block_id );
+		// Only reference elements that exist in the rendered markup. The error message id
+		// is linked by toggleErrorState() in frontend.js on controls marked data-srfm-error-target.
 		$this->aria_described_by .= ! empty( $this->help ) ? ' srfm-description-' . esc_attr( $this->block_id ) : '';
 	}
 }

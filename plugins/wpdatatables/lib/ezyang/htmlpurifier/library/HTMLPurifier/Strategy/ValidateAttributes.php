@@ -1,12 +1,12 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Validate all attributes in the tokens.
  */
-
-class HTMLPurifier_Strategy_ValidateAttributes extends HTMLPurifier_Strategy
+class HTMLPurifier_Strategy_ValidateAttributes extends \WPDT\HTMLPurifier_Strategy
 {
-
     /**
      * @param HTMLPurifier_Token[] $tokens
      * @param HTMLPurifier_Config $config
@@ -16,24 +16,19 @@ class HTMLPurifier_Strategy_ValidateAttributes extends HTMLPurifier_Strategy
     public function execute($tokens, $config, $context)
     {
         // setup validator
-        $validator = new HTMLPurifier_AttrValidator();
-
-        $token = false;
+        $validator = new \WPDT\HTMLPurifier_AttrValidator();
+        $token = \false;
         $context->register('CurrentToken', $token);
-
         foreach ($tokens as $key => $token) {
-
             // only process tokens that have attributes,
             //   namely start and empty tags
-            if (!$token instanceof HTMLPurifier_Token_Start && !$token instanceof HTMLPurifier_Token_Empty) {
+            if (!$token instanceof \WPDT\HTMLPurifier_Token_Start && !$token instanceof \WPDT\HTMLPurifier_Token_Empty) {
                 continue;
             }
-
             // skip tokens that are armored
             if (!empty($token->armor['ValidateAttributes'])) {
                 continue;
             }
-
             // note that we have no facilities here for removing tokens
             $validator->validateToken($token, $config, $context);
         }
@@ -41,5 +36,4 @@ class HTMLPurifier_Strategy_ValidateAttributes extends HTMLPurifier_Strategy
         return $tokens;
     }
 }
-
 // vim: et sw=4 sts=4

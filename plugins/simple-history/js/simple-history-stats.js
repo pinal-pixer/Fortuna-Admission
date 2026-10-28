@@ -1,5 +1,9 @@
 /* global Chart, simpleHistoryStats */
-
+/**
+ * JavaScript for History Insights page.
+ * This is the core stats page for the plugin,
+ * that only target the "demo" page, with blurred stats.
+ */
 jQuery( function () {
 	'use strict';
 
@@ -157,22 +161,37 @@ jQuery( function () {
 			} )
 		);
 
-		const color = getComputedStyle(
+		const baseColor = getComputedStyle(
 			document.documentElement
 		).getPropertyValue( '--sh-color-blue' );
 
+		// Highlight the most recent day with the WP admin accent so the
+		// "current" bar is visually anchored. Falls back to blue if the
+		// CSS variable is not present.
+		const accentColor =
+			getComputedStyle( document.documentElement )
+				.getPropertyValue( '--wp-admin-theme-color' )
+				.trim() || baseColor;
+
+		const lastIndex = data.length - 1;
+		const barColors = data.map( ( _, index ) =>
+			index === lastIndex ? accentColor : baseColor
+		);
+
 		new Chart( ctx, {
-			type: 'line',
+			type: 'bar',
 			data: {
 				labels: data.map( ( item ) => item.date ),
 				datasets: [
 					{
 						label: simpleHistoryStats.strings.events,
 						data: data.map( ( item ) => item.count ),
-						borderColor: color,
-						backgroundColor: color,
-						borderWidth: 3,
-						pointRadius: 0,
+						backgroundColor: barColors,
+						borderColor: barColors,
+						borderWidth: 0,
+						borderRadius: 2,
+						categoryPercentage: 0.9,
+						barPercentage: 0.85,
 					},
 				],
 			},
@@ -211,6 +230,7 @@ jQuery( function () {
 						},
 					},
 					y: {
+						beginAtZero: true,
 						grid: {
 							display: false,
 						},

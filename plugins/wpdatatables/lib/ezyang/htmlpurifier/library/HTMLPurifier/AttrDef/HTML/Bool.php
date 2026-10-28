@@ -1,29 +1,27 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Validates a boolean attribute
  */
-class HTMLPurifier_AttrDef_HTML_Bool extends HTMLPurifier_AttrDef
+class HTMLPurifier_AttrDef_HTML_Bool extends \WPDT\HTMLPurifier_AttrDef
 {
-
     /**
      * @type string
      */
     protected $name;
-
     /**
      * @type bool
      */
-    public $minimized = true;
-
+    public $minimized = \true;
     /**
      * @param bool|string $name
      */
-    public function __construct($name = false)
+    public function __construct($name = \false)
     {
         $this->name = $name;
     }
-
     /**
      * @param string $string
      * @param HTMLPurifier_Config $config
@@ -34,15 +32,13 @@ class HTMLPurifier_AttrDef_HTML_Bool extends HTMLPurifier_AttrDef
     {
         return $this->name;
     }
-
     /**
      * @param string $string Name of attribute
      * @return HTMLPurifier_AttrDef_HTML_Bool
      */
     public function make($string)
     {
-        return new HTMLPurifier_AttrDef_HTML_Bool($string);
+        return new \WPDT\HTMLPurifier_AttrDef_HTML_Bool($string);
     }
 }
-
 // vim: et sw=4 sts=4

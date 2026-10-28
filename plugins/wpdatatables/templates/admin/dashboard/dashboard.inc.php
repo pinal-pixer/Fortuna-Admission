@@ -79,6 +79,7 @@
                 </div>
             </div>
         </div>
+        <?php do_action('wpdatatables_admin_after_dashboard_welcome'); ?>
         <div class="row">
             <div class="col-sm-6 card-columns p-r-12 p-l-0">
                 <div class="card wdt-table-card">
@@ -267,15 +268,34 @@
                                  </span>
                         </p>
                         <p class="wpdt-text wpdt-font m-b-18">
-                            New update with some exciting news:
+                            New update with new features and bug fixes:
                         </p>
                         <div class="alert alert-info m-b-0" role="alert">
                             <i class="wpdt-icon-info-circle-full"></i>
                             <ul>
-                                <li><strong>Integration with IvyForms plugin</strong> for creating tables from form submissions.</li>
-                                <li><strong>Improvement:</strong> Upgraded PHPSpreadsheet library to a security-checked version.</li>
-                                <li><strong>Improvement:</strong> Added Greek and Italian translations.</li>
-                                <li>Other small bug fixes and stability improvements.</li>
+                                <li><strong>Feature:</strong> Added a public REST API for tables and data (Developer licence).</li>
+                                <li><strong>Feature:</strong> Added MCP support so AI assistants can work with wpDataTables using the user permission system.</li>
+                                <li><strong>Feature:</strong> Added role- and user-based permissions for tables and charts.</li>
+                                <li><strong>Feature:</strong> Added Angie AI (Elementor AI Agent) integration.</li>
+                                <li><strong>Feature:</strong> Added AI-powered SQL/query generation and chart suggestions.</li>
+                                <li><strong>Feature:</strong> Added webhooks for table data events.</li>
+                                <li><strong>Feature:</strong> Added server-side support for updating IvyForms entries from wpDataTables.</li>
+                                <li><strong>Feature:</strong> Added the ability to customize the "No matching records found" message per table via the Custom Strings tab in table settings.</li>
+                                <li><strong>BugFix:</strong> Fixed reflected XSS in Browse Tables pagination via an unsanitized search parameter.</li>
+                                <li><strong>BugFix:</strong> Fixed unauthenticated SQL injection via aggregate columns (sum/avg/min/max) in server-side AJAX.</li>
+                                <li><strong>BugFix:</strong> Fixed SQL column aliases breaking filtering on server-side processing tables.</li>
+                                <li><strong>BugFix:</strong> Fixed separate database connection fields not displaying after enabling "Use separate connection".</li>
+                                <li><strong>BugFix:</strong> Fixed a JavaScript error and page freeze with Fixed Header when Excel or Excel+Manual tables are on the same page.</li>
+                                <li><strong>BugFix:</strong> Fixed same-domain URLs being corrupted in the Manual table HTML editor after save.</li>
+                                <li><strong>BugFix:</strong> Fixed placeholder values containing the word "AND" being parsed as a SQL operator and breaking filters.</li>
+                                <li><strong>BugFix:</strong> Fixed an MCP server error (create_server failed / ErrorLogMcpErrorHandler interface mismatch).</li>
+                                <li><strong>BugFix:</strong> Fixed Forminator notice text contrast so the message remains readable.</li>
+                                <li><strong>BugFix:</strong> Fixed a fatal PHP error on table shortcode render caused by incorrect WDTTools class name casing.</li>
+                                <li><strong>BugFix:</strong> Fixed a fatal PHP error when fetching remote data caused by a missing Exception import in the HTTP client.</li>
+                                <li><strong>BugFix:</strong> Fixed fatal PHP errors when loading public Google Sheets and other namespaced data-processing paths.</li>
+                                <li><strong>BugFix:</strong> Fixed derived-table subqueries failing during server-side filtering and row counting.</li>
+                                <li><strong>BugFix:</strong> Fixed own-row editing permissions failing because the database connection class was resolved incorrectly.</li>
+                                <li><strong>BugFix:</strong> Fixed the User ID column selection not displaying after reload and not being possible to clear.</li>
                             </ul>
                         </div>
 
@@ -291,7 +311,7 @@
                         <ul class="actions">
                             <li class="m-b-0">
                                 <button class="wdt-card-header-link">
-                                    <a href="https://store.tms-plugins.com/login" target="_blank">
+                                    <a href="https://store.melograno.io/login" target="_blank">
                                         <?php esc_html_e('Manage your subscriptions', 'wpdatatables'); ?>
                                     </a>
                                 </button>
@@ -302,8 +322,8 @@
                         <h5 class="card-title"><?php esc_html_e('Thank you for choosing wpDataTables Premium', 'wpdatatables'); ?></h5>
                         <p class="card-text m-b-0">
                             <?php esc_html_e('Enjoy using our premium features and professional support that we provide through our ', 'wpdatatables'); ?>
-                            <a href="https://tmsplugins.ticksy.com/"
-                               target="_blank"><?php esc_html_e(' ticketing system.'); ?></a>
+                            <a href="https://store.melograno.io/"
+                               target="_blank"><?php esc_html_e(' store.'); ?></a>
                         </p>
                     </div>
                 </div>
@@ -359,6 +379,20 @@
                                 </span>
                                 <?php
                                 if (extension_loaded('curl')) { ?>
+                                    <i class="wpdt-icon-check-circle-full"></i>
+                                <?php } else { ?>
+                                    <i class="wpdt-icon-times-circle-full"></i>
+                                <?php } ?>
+                            </li>
+                            <li>
+                                <span>
+                                    <?php esc_html_e('Usage tracking', 'wpdatatables'); ?>
+                                </span>
+                                <?php
+                                $wdtUsageTrackingEnabled = \WPDT\Melograno\UsageTracker\Core\UsageTracker::isConsentEnabled(
+                                    new \WPDT\Melograno\UsageTracker\Collectors\Plugin\WpDataTablesCollector()
+                                );
+                                if ($wdtUsageTrackingEnabled) { ?>
                                     <i class="wpdt-icon-check-circle-full"></i>
                                 <?php } else { ?>
                                     <i class="wpdt-icon-times-circle-full"></i>
@@ -777,10 +811,10 @@
         </div>
         <div class="row">
             <h6 class="text-center wdt-footer-title">
-                <?php esc_html_e('Made by', 'wpdatatables'); ?>
-                <a href="https://tmsproducts.io/?utm_source=full&utm_medium=plugin&utm_campaign=wpdtful"
+                <?php esc_html_e('Made by Melograno Venture Studio', 'wpdatatables'); ?>
+                <a href="<?php echo WDT_COMPANY_URL; ?>/?utm_source=full&utm_medium=plugin&utm_campaign=wpdtful"
                    target="_blank">
-                    <img src="<?php echo WDT_ASSETS_PATH; ?>img/TMS-Black.svg" alt="" style="width: 66px">
+                    <img src="<?php echo WDT_ASSETS_PATH; ?>img/Melograno-primary.svg" alt="" style="width: 28px">
                 </a>
             </h6>
             <ul class="wpdt-footer-links text-center">

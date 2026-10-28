@@ -1,9 +1,11 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Implements required attribute stipulation for <script>
  */
-class HTMLPurifier_AttrTransform_ScriptRequired extends HTMLPurifier_AttrTransform
+class HTMLPurifier_AttrTransform_ScriptRequired extends \WPDT\HTMLPurifier_AttrTransform
 {
     /**
      * @param array $attr
@@ -19,5 +21,4 @@ class HTMLPurifier_AttrTransform_ScriptRequired extends HTMLPurifier_AttrTransfo
         return $attr;
     }
 }
-
 // vim: et sw=4 sts=4

@@ -8,6 +8,7 @@
 
 namespace SRFM\Inc;
 
+use SRFM\Inc\Database\Tables\Payments;
 use SRFM\Inc\Lib\Browser\Browser;
 use SRFM\Inc\Traits\Get_Instance;
 
@@ -35,28 +36,27 @@ class Smart_Tags {
 	/**
 	 * Smart Tag Render Function.
 	 *
+	 * Smart tags resolve only in SureForms form content. Any other block is returned as stored.
+	 *
 	 * @param string       $block_content Entire Block Content.
 	 * @param array<mixed> $block Block Properties As An Array.
 	 * @since 0.0.1
 	 * @return string
 	 */
 	public function render_form( $block_content, $block ) {
-		$id = get_the_id();
-
-		// Simulating $form_data required form some of the smart tags.
-		$form_data = [ 'form-id' => $id ];
-
-		if ( self::check_form_by_id( $id ) ) {
-			return Helper::get_string_value( self::process_smart_tags( $block_content, null, $form_data ) );
+		if ( false === strpos( $block_content, '{' ) ) {
+			return $block_content;
 		}
 
-		if ( isset( $block['blockName'] ) && ( 'srfm/form' === $block['blockName'] ) ) {
-			if ( isset( $block['attrs']['id'] ) && $block['attrs']['id'] ) {
-				return Helper::get_string_value( self::process_smart_tags( $block_content, null, $form_data ) );
-			}
+		$form_id = $this->get_block_form_id( $block );
+
+		if ( ! $form_id || ! preg_match( '/\{[^\}]+\}/', $block_content ) ) {
+			return $block_content;
 		}
 
-		return $block_content;
+		return Helper::get_string_value(
+			self::process_smart_tags( $block_content, null, [ 'form-id' => $form_id ] )
+		);
 	}
 
 	/**
@@ -64,10 +64,13 @@ class Smart_Tags {
 	 *
 	 * @param int|false $id Form id.
 	 * @since 0.0.1
+	 * @since 2.12.9 True only for a SureForms form post.
 	 * @return bool
 	 */
 	public function check_form_by_id( $id ) {
-		return get_post_type( Helper::get_integer_value( $id ) ) ? true : false;
+		$id = Helper::get_integer_value( $id );
+
+		return $id > 0 && SRFM_FORMS_POST_TYPE === get_post_type( $id );
 	}
 
 	/**
@@ -99,6 +102,7 @@ class Smart_Tags {
 				'{browser_platform}'       => __( 'Browser Platform', 'sureforms' ),
 				'{embed_post_id}'          => __( 'Embedded Post/Page ID', 'sureforms' ),
 				'{embed_post_title}'       => __( 'Embedded Post/Page Title', 'sureforms' ),
+				'{entry_id}'               => __( 'Entry ID', 'sureforms' ),
 				'{get_input:param}'        => __( 'Populate by GET Param', 'sureforms' ),
 				'{get_cookie:cookie_name}' => __( 'Cookie Value', 'sureforms' ),
 			]
@@ -144,9 +148,26 @@ class Smart_Tags {
 
 		foreach ( $matches[0] as $tag ) {
 			$is_valid_tag = isset( $get_smart_tag_list[ $tag ] ) ||
-			strpos( $tag, 'get_input:' ) ||
-			strpos( $tag, 'get_cookie:' ) ||
-			0 === strpos( $tag, '{form:' );
+			self::is_request_tag( $tag ) ||
+			0 === strpos( $tag, '{form:' ) ||
+			0 === strpos( $tag, '{form-payment:' );
+
+			/**
+			 * Filter whether a smart tag should be treated as valid for processing.
+			 *
+			 * Allows plugins to register dynamic tag prefixes (e.g. {survey_results:field_slug})
+			 * that are not in the static smart tag list.
+			 *
+			 * Note: Plugins that hook this filter to register custom tags must also hook
+			 * 'srfm_parse_smart_tags' to resolve their values. See smart_tags_callback() below.
+			 *
+			 * @since 2.8.0
+			 *
+			 * @param bool            $is_valid_tag Whether the tag passed built-in validation.
+			 * @param string          $tag          The smart tag being validated (e.g. '{survey_results:my-field}').
+			 * @param array<mixed>|null $form_data   The form configuration data.
+			 */
+			$is_valid_tag = apply_filters( 'srfm_is_valid_smart_tag', $is_valid_tag, $tag, $form_data );
 
 			if ( ! $is_valid_tag ) {
 				continue;
@@ -282,10 +303,30 @@ class Smart_Tags {
 			case '{embed_post_title}':
 			case '{embed_post_url}':
 				return self::parse_post_props( $tag );
+			case '{entry_id}':
+				// Check $form_data first (normal submission path).
+				if ( ! empty( $form_data ) && is_array( $form_data ) && ! empty( $form_data['entry_id'] ) ) {
+					return absint( $form_data['entry_id'] );
+				}
+				// Webhooks pass form_data as $submission_data; check there too.
+				if ( ! empty( $submission_data ) && is_array( $submission_data ) && ! empty( $submission_data['entry_id'] ) ) {
+					return absint( $submission_data['entry_id'] );
+				}
+				return '';
+
 			case '{current_page_url}':
 				if ( isset( $form_data['_wp_http_referer'] ) ) {
 					$request_uri = sanitize_text_field( Helper::get_string_value( wp_unslash( $form_data['_wp_http_referer'] ) ) );
 					return esc_url( site_url( $request_uri ) );
+				}
+
+				// During REST API requests (e.g. email notifications triggered by form submission),
+				// REQUEST_URI points to the REST endpoint, not the originating page.
+				// HTTP_REFERER contains the actual page URL the form was submitted from.
+				// Nonce verification is not required here as this is a read-only operation that retrieves the referring page URL from the browser-set HTTP_REFERER header for display purposes in email notifications.
+				if ( defined( 'REST_REQUEST' ) && REST_REQUEST && isset( $_SERVER['HTTP_REFERER'] ) && ! empty( $_SERVER['HTTP_REFERER'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					$referer_url = sanitize_text_field( wp_unslash( $_SERVER['HTTP_REFERER'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+					return esc_url( $referer_url );
 				}
 
 				if ( isset( $_SERVER['REQUEST_URI'] ) ) {
@@ -295,12 +336,16 @@ class Smart_Tags {
 				return '';
 
 			default:
-				if ( strpos( $tag, 'get_input:' ) || strpos( $tag, 'get_cookie:' ) ) {
+				if ( self::is_request_tag( $tag ) ) {
 					return self::parse_request_param( $tag );
 				}
 
 				if ( 0 === strpos( $tag, '{form:' ) ) {
 					return self::parse_form_input( $tag, $submission_data, $form_data );
+				}
+
+				if ( 0 === strpos( $tag, '{form-payment:' ) ) {
+					return self::parse_payment_smart_tag( $tag, $submission_data );
 				}
 				break;
 		}
@@ -341,7 +386,7 @@ class Smart_Tags {
 	 * @return array<mixed>|string
 	 */
 	public static function parse_request_param( $value ) {
-		if ( ! $value ) {
+		if ( ! is_string( $value ) || ! self::is_request_tag( $value ) ) {
 			return '';
 		}
 
@@ -360,11 +405,18 @@ class Smart_Tags {
 				$var = Helper::get_string_value( filter_var( wp_unslash( $_SERVER['QUERY_STRING'] ), FILTER_SANITIZE_URL ) );
 			}
 			parse_str( $var, $parameters );
-			return isset( $parameters[ $param ] ) ? esc_attr( sanitize_text_field( Helper::get_string_value( $parameters[ $param ] ) ) ) : '';
+			return isset( $parameters[ $param ] ) ? self::neutralize_request_value( esc_attr( sanitize_text_field( Helper::get_string_value( $parameters[ $param ] ) ) ) ) : '';
 		}
 
 		if ( $param && strpos( $value, 'get_cookie:' ) !== false ) {
-			return isset( $_COOKIE[ $param ] ) ? esc_attr( sanitize_text_field( wp_unslash( $_COOKIE[ $param ] ) ) ) : '';
+			// WordPress' own cookies carry the session and the comment author identity.
+			// Reading them here would hand them to whoever can place the tag, server
+			// side, which is why being HttpOnly does not protect them.
+			if ( preg_match( '/^(?:wordpress_|wp-|wp_|comment_author)/i', $param ) ) {
+				return '';
+			}
+
+			return isset( $_COOKIE[ $param ] ) ? self::neutralize_request_value( esc_attr( sanitize_text_field( wp_unslash( $_COOKIE[ $param ] ) ) ) ) : '';
 		}
 
 		return '';
@@ -395,8 +447,14 @@ class Smart_Tags {
 			return $replacement_data;
 		}
 		foreach ( $submission_data as $submission_item_key => $submission_item_value ) {
+			// If submission item key has not "-lbl-" then continue.
+			if ( strpos( $submission_item_key, '-lbl-' ) === false ) {
+				continue;
+			}
+
 			$label      = explode( '-lbl-', $submission_item_key )[1];
 			$slug       = implode( '-', array_slice( explode( '-', $label ), 1 ) );
+			$slug       = str_replace( ' ', '_', $slug );
 			$block_type = explode( '-lbl-', $submission_item_key )[0];
 			if ( $slug === $target_slug ) {
 
@@ -442,15 +500,15 @@ class Smart_Tags {
 					// Implemented key upload_format_type to determine what to return for urls.
 					// for raw urls are return as comma separated strings.
 					if ( ! empty( $form_data['upload_format_type'] ) && 'raw' === $form_data['upload_format_type'] ) {
-						$replacement_data = urldecode( implode( ', ', $submission_item_value ) );
+						$replacement_data = implode( ', ', array_map( 'rawurldecode', $submission_item_value ) );
 					} else {
 						if ( count( $submission_item_value ) === 1 ) {
-							$decoded_value    = urldecode( reset( $submission_item_value ) );
+							$decoded_value    = rawurldecode( reset( $submission_item_value ) );
 							$replacement_data = '<a rel="noopener noreferrer" href="' . esc_url( $decoded_value ) . '" target="_blank">' . esc_html( $decoded_value ) . '</a>';
 						} else {
 							$replacement_data = '<ul style="margin: 0;">';
 							foreach ( $submission_item_value as $file_url ) {
-								$decoded_value     = urldecode( $file_url );
+								$decoded_value     = rawurldecode( $file_url );
 								$replacement_data .= '<li><a rel="noopener noreferrer" href="' . esc_url( $decoded_value ) . '" target="_blank">' . esc_html( $decoded_value ) . '</a></li>';
 							}
 							$replacement_data .= '</ul>';
@@ -461,11 +519,15 @@ class Smart_Tags {
 					// Step 1 - Sanitize raw input.
 					$sanitized_content = Helper::sanitize_textarea( Helper::get_string_value( $submission_item_value ) );
 					// Step 2 - Decode HTML entities to preserve formatting.
-					$decoded_content   = html_entity_decode( $sanitized_content );
-					$replacement_data .= $decoded_content;
+					$decoded_content = html_entity_decode( $sanitized_content );
+					// Step 3 - Convert newlines to <br> tags so line breaks render in HTML emails.
+					$replacement_data .= nl2br( $decoded_content );
 				} else {
+					// Check if we should skip auto-linking (e.g., when building redirect URLs with query params).
+					$smart_tag_context = is_array( $form_data ) && ! empty( $form_data['smart_tag_context'] ) ? $form_data['smart_tag_context'] : '';
+
 					// if $submission_item_value is a url then add <a> tag. with view text.
-					if ( is_string( $submission_item_value ) && filter_var( $submission_item_value, FILTER_VALIDATE_URL ) ) {
+					if ( 'redirect' !== $smart_tag_context && is_string( $submission_item_value ) && filter_var( $submission_item_value, FILTER_VALIDATE_URL ) ) {
 						ob_start();
 						?>
 						<a href="<?php echo esc_url( urldecode( $submission_item_value ) ); ?>" target="_blank"><?php echo esc_html( esc_url( $submission_item_value ) ); ?></a>
@@ -489,7 +551,12 @@ class Smart_Tags {
 
 						$replacement_data .= $view_link;
 					} else {
-						$replacement_data .= $submission_item_value;
+						if ( 0 === strpos( $block_type, 'srfm-input-multi-choice' ) && is_string( $submission_item_value ) && strpos( $submission_item_value, '|' ) !== false ) {
+							$options           = array_map( 'trim', explode( '|', $submission_item_value ) );
+							$replacement_data .= implode( '<br>', array_map( 'esc_html', $options ) );
+						} else {
+							$replacement_data .= $submission_item_value;
+						}
 					}
 				}
 
@@ -497,6 +564,243 @@ class Smart_Tags {
 			}
 		}
 		return $replacement_data;
+	}
+
+	/**
+	 * Parse Payment Smart Tag.
+	 *
+	 * Parses payment smart tags in the format: {form-payment:slug:property}
+	 * where property can be: order-id, amount, email, name, status
+	 *
+	 * @param string            $value tag.
+	 * @param array<mixed>|null $submission_data data from submission.
+	 * @since  2.0.0
+	 * @return string
+	 */
+	public static function parse_payment_smart_tag( $value, $submission_data = null ) {
+		if ( ! $submission_data ) {
+			return '';
+		}
+
+		// Extract slug and property from tag: {form-payment:slug:property}.
+		if ( ! preg_match( '/\{form-payment:(.*?):(.*?)}/', $value, $matches ) ) {
+			return '';
+		}
+
+		$target_slug = $matches[1];
+		$property    = $matches[2];
+
+		// Valid properties for payment smart tags.
+		$valid_properties = [ 'order-id', 'amount', 'email', 'name', 'status', 'description' ];
+		if ( ! in_array( $property, $valid_properties, true ) ) {
+			return '';
+		}
+
+		if ( ! is_array( $submission_data ) ) {
+			return '';
+		}
+
+		// Find payment entry ID from submission data.
+		$payment_entry_id = null;
+
+		foreach ( $submission_data as $submission_item_key => $submission_item_value ) {
+			// Check if this is a payment field.
+			if ( strpos( $submission_item_key, '-lbl-' ) === false ) {
+				continue;
+			}
+
+			// Split to get block type and label.
+			$name_parts = explode( '-lbl-', $submission_item_key );
+			if ( count( $name_parts ) < 2 ) {
+				continue;
+			}
+
+			// Check if it's a payment block.
+			if ( strpos( $name_parts[0], 'srfm-payment-' ) !== 0 ) {
+				continue;
+			}
+
+			// Get the slug from the label part.
+			$label = $name_parts[1];
+			$slug  = implode( '-', array_slice( explode( '-', $label ), 1 ) );
+
+			// Check if this is the payment block we're looking for.
+			if ( $slug === $target_slug ) {
+				// The submission value should be the payment entry ID.
+				$payment_entry_id = is_numeric( $submission_item_value ) ? intval( $submission_item_value ) : null;
+				break;
+			}
+		}
+
+		// If no payment entry found, return empty.
+		if ( ! $payment_entry_id ) {
+			return '';
+		}
+
+		// Load the Payments class if not already loaded.
+		if ( ! class_exists( 'SRFM\Inc\Database\Tables\Payments' ) ) {
+			return '';
+		}
+
+		// Get payment entry from database.
+		$payment_entry = Payments::get( $payment_entry_id );
+
+		if ( ! $payment_entry || ! is_array( $payment_entry ) ) {
+			return '';
+		}
+
+		// Return the requested property.
+		switch ( $property ) {
+			case 'order-id':
+				// Return formatted order ID: SF-#{srfm_txn_id} or SF-#{id}.
+				$order_id = ! empty( $payment_entry['srfm_txn_id'] ) ? $payment_entry['srfm_txn_id'] : $payment_entry['id'];
+				$order_id = sanitize_text_field( $order_id );
+				return ! empty( $order_id ) ? 'SF-#' . $order_id : '';
+
+			case 'amount':
+				// Return formatted amount with currency symbol.
+				$amount           = ! empty( $payment_entry['total_amount'] ) ? floatval( $payment_entry['total_amount'] ) : 0;
+				$currency         = ! empty( $payment_entry['currency'] ) ? strtoupper( $payment_entry['currency'] ) : 'USD';
+				$currency_symbol  = \SRFM\Inc\Payments\Stripe\Stripe_Helper::get_currency_symbol( $currency );
+				$formatted_amount = Helper::get_string_value( number_format( $amount, 2 ) );
+				return ! empty( $currency_symbol ) ? $currency_symbol . $formatted_amount : $currency . ' ' . $formatted_amount;
+
+			case 'email':
+				// Return customer email.
+				return ! empty( $payment_entry['customer_email'] ) ? sanitize_email( $payment_entry['customer_email'] ) : '';
+
+			case 'name':
+				// Return customer name.
+				return ! empty( $payment_entry['customer_name'] ) ? sanitize_text_field( $payment_entry['customer_name'] ) : '';
+
+			case 'status':
+				// Return payment status or subscription status based on type.
+				if ( 'subscription' === $payment_entry['type'] && ! empty( $payment_entry['subscription_status'] ) ) {
+					return sanitize_text_field( $payment_entry['subscription_status'] );
+				}
+				return ! empty( $payment_entry['status'] ) ? sanitize_text_field( $payment_entry['status'] ) : '';
+
+			case 'description':
+				// Read paymentDescription from the payment block attribute in form post content.
+				$form_id  = ! empty( $payment_entry['form_id'] ) ? absint( $payment_entry['form_id'] ) : 0;
+				$block_id = ! empty( $payment_entry['block_id'] ) ? sanitize_text_field( $payment_entry['block_id'] ) : '';
+
+				if ( empty( $form_id ) || empty( $block_id ) ) {
+					return '';
+				}
+
+				$form_post = get_post( $form_id );
+				if ( ! $form_post || empty( $form_post->post_content ) ) {
+					return '';
+				}
+
+				$blocks      = parse_blocks( $form_post->post_content );
+				$description = self::find_payment_block_description( $blocks, $block_id );
+				return sanitize_text_field( $description );
+
+			default:
+				return '';
+		}
+	}
+
+	/**
+	 * Get the form a rendered block belongs to.
+	 *
+	 * @param array<mixed> $block Block Properties As An Array.
+	 * @since 2.12.9
+	 * @return int Form ID, or 0 when the block is not form content.
+	 */
+	private function get_block_form_id( $block ) {
+		// Blocks of a form that get_form_markup() is rendering (block, shortcode, page builders).
+		$form_id = Generate_Form_Markup::get_rendering_form_id();
+		if ( $form_id ) {
+			return $form_id;
+		}
+
+		if ( isset( $block['blockName'] ) && 'srfm/form' === $block['blockName'] && ! empty( $block['attrs']['id'] ) ) {
+			// The form block itself, after its markup has rendered.
+			$form_id = Helper::get_integer_value( $block['attrs']['id'] );
+		} elseif ( is_singular( SRFM_FORMS_POST_TYPE ) && get_queried_object_id() === get_the_ID() ) {
+			// The form post's own page, such as the Instant Form page. Tied to the queried
+			// object so that a loop rendering forms inside another post cannot borrow it:
+			// in that case the queried object is the outer post, not the form.
+			$form_id = Helper::get_integer_value( get_the_ID() );
+		}
+
+		return $this->check_form_by_id( $form_id ) ? $form_id : 0;
+	}
+
+	/**
+	 * Whether a tag is a request smart tag: {get_input:name} or {get_cookie:name}, matched in full.
+	 *
+	 * @param string $tag Smart tag.
+	 * @since 2.12.9
+	 * @return bool
+	 */
+	private static function is_request_tag( $tag ) {
+		return 1 === preg_match( '/^\{get_(?:input|cookie):[\p{L}\p{M}\p{N}_-]+\}\z/u', $tag );
+	}
+
+	/**
+	 * Make an escaped request value safe to place in form content.
+	 *
+	 * The value can land in an href or src attribute, where esc_attr() keeps the scheme
+	 * intact. Browsers decode character references, at any code point, and ignore
+	 * whitespace and control characters in a scheme, so the check does the same; a value
+	 * with a script scheme is dropped. Braces are returned as character references so a
+	 * later smart tag pass over the same markup cannot read a tag inside the value.
+	 *
+	 * @param string $value Escaped request value.
+	 * @since 2.12.9
+	 * @return string The value, or an empty string when it carries a script scheme.
+	 */
+	private static function neutralize_request_value( $value ) {
+		$decoded = html_entity_decode( wp_kses_decode_entities( $value ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$scheme  = strtolower( Helper::get_string_value( preg_replace( '/[\t\r\n]+/', '', ltrim( $decoded, "\x00..\x20" ) ) ) );
+
+		if ( preg_match( '/^(?:javascript|vbscript|data):/', $scheme ) ) {
+			return '';
+		}
+
+		return str_replace( [ '{', '}' ], [ '&#123;', '&#125;' ], $value );
+	}
+
+	/**
+	 * Find paymentDescription attribute from a payment block by block_id.
+	 *
+	 * Recursively searches parsed blocks (including innerBlocks) for a
+	 * srfm/payment block matching the given block_id and returns its
+	 * paymentDescription attribute.
+	 *
+	 * @param array<mixed> $blocks   Parsed blocks array from parse_blocks().
+	 * @param string       $block_id The block_id to match.
+	 * @since 2.7.1
+	 * @return string The payment description or empty string.
+	 */
+	private static function find_payment_block_description( $blocks, $block_id ) {
+		foreach ( $blocks as $block ) {
+			if ( ! is_array( $block ) ) {
+				continue;
+			}
+			$attrs = (array) ( $block['attrs'] ?? [] );
+
+			if ( 'srfm/payment' === ( $block['blockName'] ?? '' ) &&
+				isset( $attrs['block_id'] ) &&
+				$attrs['block_id'] === $block_id
+			) {
+				return (string) ( $attrs['paymentDescription'] ?? '' );
+			}
+
+			// Search innerBlocks recursively.
+			if ( ! empty( $block['innerBlocks'] ) ) {
+				$found = self::find_payment_block_description( (array) $block['innerBlocks'], $block_id );
+				if ( '' !== $found ) {
+					return $found;
+				}
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -530,7 +834,22 @@ class Smart_Tags {
 	 * @return mixed
 	 */
 	private static function parse_user_props( $value ) {
-		$user = wp_get_current_user();
+		// Resolved via Helper rather than wp_get_current_user(): these tags are parsed
+		// during submission, on a REST request that carries no nonce, which core
+		// de-authenticates before dispatch. wp_get_current_user() therefore returns the
+		// ID-0 placeholder even for a signed-in submitter, and every tag below would
+		// render empty in notifications.
+		$user_id = Helper::get_submitting_user_id();
+
+		if ( ! $user_id ) {
+			return '';
+		}
+
+		$user = get_userdata( $user_id );
+
+		if ( ! $user instanceof \WP_User ) {
+			return '';
+		}
 
 		$user_info = get_user_meta( $user->ID );
 
@@ -593,7 +912,9 @@ class Smart_Tags {
 		}
 
 		if ( property_exists( $post, $value ) ) {
-			return $post->{$value};
+			// Escaped here because a field default is escaped while it is still the
+			// literal tag, so this value is pasted in after that happened.
+			return esc_attr( Helper::get_string_value( $post->{$value} ) );
 		}
 
 		return '';

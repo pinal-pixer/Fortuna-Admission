@@ -282,7 +282,8 @@ if( ! class_exists('PMUI_Updater') ) {
          *
          * @param array   $args
          * @param string  $url
-         * @return object $array
+         *
+         * @return array|object
          */
         function http_request_args( $args, $url ) {
             // If it is an https request and we are performing a package download, disable ssl verification
@@ -310,7 +311,7 @@ if( ! class_exists('PMUI_Updater') ) {
             $data = array_merge( $this->api_data, $_data );
 
             if ( $data['slug'] != $this->slug )
-                return;
+                return false;
 
             /*if ( empty( $data['license'] ) )
                 return;*/
@@ -322,15 +323,20 @@ if( ! class_exists('PMUI_Updater') ) {
             $api_params = array(
                 'edd_action' => 'get_version',
                 'license'    => false,
-                'item_name'  => isset( $data['item_name'] ) ? $data['item_name'] : false,
-                'item_id'    => isset( $data['item_id'] ) ? $data['item_id'] : false,
+                'item_name'  => $data['item_name'] ?? false,
+                'item_id'    => $data['item_id'] ?? false,
                 'slug'       => $data['slug'],
                 'author'     => $data['author'],
                 'url'        => home_url(),
                 'version'    => $this->version
-            );            
-            
-            $request = wp_remote_post( $this->api_url, array( 'timeout' => 15, 'sslverify' => false, 'body' => $api_params ) );
+            );
+
+            // Send request based on provided API URL.
+            if( strpos($this->api_url, 'update.') !== false){
+                $request = wp_remote_get( esc_url_raw(add_query_arg($api_params, $this->api_url.'check_version/?')), array( 'timeout' => 15, 'sslverify' => true ) );
+            }else{
+                $request = wp_remote_post( $this->api_url, array( 'timeout' => 15, 'sslverify' => true, 'body' => $api_params ) );
+            }
 
             if ( ! is_wp_error( $request ) ) {
                 $request = json_decode( wp_remote_retrieve_body( $request ) );

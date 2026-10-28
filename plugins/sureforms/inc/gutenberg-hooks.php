@@ -7,6 +7,7 @@
 
 namespace SRFM\Inc;
 
+use SRFM\Inc\Email_Delivery\Status as Email_Delivery_Status;
 use SRFM\Inc\Traits\Get_Instance;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -48,7 +49,7 @@ class Gutenberg_Hooks {
 		// Initializing hooks.
 		add_action( 'enqueue_block_editor_assets', [ $this, 'form_editor_screen_assets' ] );
 		add_action( 'enqueue_block_editor_assets', [ $this, 'block_editor_assets' ] );
-		add_filter( 'block_categories_all', [ $this, 'register_block_categories' ], 10, 1 );
+		add_filter( 'block_categories_all', [ $this, 'register_block_categories' ], 10, 2 );
 		add_filter( 'allowed_block_types_all', [ $this, 'disable_forms_wrapper_block' ], 10, 2 );
 		add_action( 'save_post_sureforms_form', [ $this, 'update_field_slug' ], 10, 2 );
 		add_action( 'load-post.php', [ $this, 'maybe_migrate_form_stylings' ] );
@@ -81,6 +82,7 @@ class Gutenberg_Hooks {
 				'srfm/image',
 				'srfm/advanced-heading',
 				'srfm/inline-button',
+				'srfm/payment',
 			];
 			// Apply a filter to the $allow_block_types types array.
 			return apply_filters( 'srfm_allowed_block_types', $allow_block_types, $editor_context );
@@ -93,14 +95,16 @@ class Gutenberg_Hooks {
 	/**
 	 * Register our custom block category.
 	 *
-	 * @param array<mixed> $categories Array of categories.
+	 * @param array<mixed>             $categories Array of categories.
+	 * @param \WP_Block_Editor_Context $block_editor_context The current block editor context.
 	 * @return array<mixed>
 	 * @since 0.0.1
 	 */
-	public function register_block_categories( $categories ) {
-		$screen = get_current_screen();
+	public function register_block_categories( $categories, $block_editor_context ) {
 
-		if ( $screen && SRFM_FORMS_POST_TYPE === $screen->post_type ) {
+		$post_type = $block_editor_context->post->post_type ?? '';
+
+		if ( $post_type && SRFM_FORMS_POST_TYPE === $post_type ) {
 			$title = esc_html__( 'General Fields', 'sureforms' );
 		} else {
 			$title = esc_html__( 'SureForms', 'sureforms' );
@@ -146,6 +150,17 @@ class Gutenberg_Hooks {
 
 		wp_enqueue_script( SRFM_SLUG . $form_editor_script, SRFM_URL . 'assets/build/formEditor.js', $script_info['dependencies'], $script_info['version'], true );
 		wp_localize_script( SRFM_SLUG . $form_editor_script, 'scIcons', [ 'path' => SRFM_URL . 'assets/build/icon-assets' ] );
+
+		// Deep-link (#3030): the "Finish setting up" Thank You notice CTA opens this
+		// editor with ?srfm_focus=… to auto-open a settings tab. Gutenberg strips
+		// unrecognised query args client-side before the editor bundle can read them,
+		// so surface the value from the server — where it is never stripped — as a
+		// global the bundle reads at evaluation time. Validated to a known allowlist.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only deep-link hint on an authenticated editor screen; no state change.
+		$srfm_focus = isset( $_GET['srfm_focus'] ) ? sanitize_key( wp_unslash( $_GET['srfm_focus'] ) ) : '';
+		if ( in_array( $srfm_focus, [ 'thankyou', 'notifications' ], true ) ) {
+			wp_add_inline_script( SRFM_SLUG . $form_editor_script, 'window.srfmDeepLinkFocus = ' . wp_json_encode( $srfm_focus ) . ';', 'before' );
+		}
 
 		// Enqueue the code editor for the Custom CSS Editor in SureForms.
 		wp_enqueue_code_editor( [ 'type' => 'text/css' ] );
@@ -200,14 +215,28 @@ class Gutenberg_Hooks {
 				'current_screen'                    => $screen,
 				'smart_tags_array'                  => Smart_Tags::smart_tag_list(),
 				'smart_tags_array_email'            => Smart_Tags::email_smart_tag_list(),
-				'srfm_form_markup_nonce'            => wp_create_nonce( 'srfm_form_markup' ),
+				// No srfm_form_markup nonce: the generate-form-markup route is gated by a
+				// capability check, not by holding a nonce. It used to be minted here for
+				// every editor user and read from the query string, which is precisely how
+				// that route ended up with no real authorization (#2995).
 				'get_form_markup_url'               => 'sureforms/v1/generate-form-markup',
 				'is_pro_active'                     => Helper::has_pro(),
-				'srfm_default_dynamic_block_option' => get_option( 'srfm_default_dynamic_block_option', Helper::default_dynamic_block_option() ),
+				'srfm_default_dynamic_block_option' => wp_parse_args( Helper::get_array_value( get_option( 'srfm_default_dynamic_block_option', [] ) ), Helper::default_dynamic_block_option() ),
 				'form_selector_nonce'               => Helper::current_user_can( 'edit_posts' ) ? wp_create_nonce( 'wp_rest' ) : '',
 				'is_admin_user'                     => Helper::current_user_can(),
 				'site_url'                          => $site_url,
 				'is_suremails_active'               => is_plugin_active( 'suremails/suremails.php' ),
+				// Only the SureForms form editor shows it, and only to admins: it names
+				// the mailer and SureMail's admin URLs, and building it can write an option.
+				'email_delivery'                    => $screen && SRFM_FORMS_POST_TYPE === $screen->post_type && Helper::current_user_can() ? Email_Delivery_Status::get_status() : null,
+				'upgrade_url'                       => add_query_arg(
+					[ 'utm_medium' => 'embed_styling_upgrade' ],
+					Helper::get_sureforms_website_url( 'pricing' )
+				),
+				'default_translations'              => [
+					'gdpr_label'           => __( 'I consent to have this website store my submitted information so they can respond to my inquiry.', 'sureforms' ),
+					'dropdown_placeholder' => __( 'Select an option', 'sureforms' ),
+				],
 			]
 		);
 
@@ -229,6 +258,7 @@ class Gutenberg_Hooks {
 					'dropdown_preview'     => SRFM_URL . 'images/field-previews/dropdown.svg',
 					'address_preview'      => SRFM_URL . 'images/field-previews/address.svg',
 					'sureforms_preview'    => SRFM_URL . 'images/field-previews/sureforms.svg',
+					'payment_preview'      => SRFM_URL . 'images/field-previews/payment.svg',
 				]
 			)
 		);
@@ -278,12 +308,14 @@ class Gutenberg_Hooks {
 			return;
 		}
 
-		$post_content = addslashes( serialize_blocks( $blocks ) );
+		$post_content = serialize_blocks( $blocks );
 
+		// Use wp_slash() to preserve unicode escapes (like \u003c for <) in block attributes.
+		// Without this, wp_update_post() calls wp_unslash() which corrupts these escapes.
 		wp_update_post(
 			[
 				'ID'           => $post_id,
-				'post_content' => $post_content,
+				'post_content' => wp_slash( $post_content ),
 			]
 		);
 	}

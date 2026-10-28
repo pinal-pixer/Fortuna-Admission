@@ -152,18 +152,21 @@ if ( ! class_exists( 'UAGB_Helper' ) ) {
 		 * Constructor
 		 */
 		public function __construct() {
-			require UAGB_DIR . 'classes/class-uagb-block-helper.php';
-			require UAGB_DIR . 'classes/class-uagb-block-js.php';
+			// Use require_once to make repeat instantiation safe (no "Cannot redeclare class" fatal).
+			require_once UAGB_DIR . 'classes/class-uagb-block-helper.php';
+			require_once UAGB_DIR . 'classes/class-uagb-block-js.php';
 
-			/**
-			 * Add action hook to initialize block list during WordPress initialization.
-			 * This hook is needed to ensure that the block list is populated before any other actions are taken.
-			 * The block list is used to generate the CSS and JS files for the blocks, and is also used to generate the block categories.
-			 */
-			add_action( 'init', array( $this, 'initialize_block_list' ) );
 			self::$file_generation = self::allow_file_generation();
-			// Condition is only needed when we are using block based theme and Reading setting is updated.
-			$this->reading_page();
+
+			// `initialize_block_list` continues to run on `init` (unchanged behaviour).
+			add_action( 'init', array( $this, 'initialize_block_list' ) );
+
+			// `reading_page` previously ran in the constructor and called `UAGB_Admin_Helper::update_admin_settings_option()`
+			// directly. If `UAGB_Helper::get_instance()` was first invoked before `UAGB_Admin_Helper` was loaded
+			// (e.g. on the Settings → Reading save request under a block theme), this produced a fatal
+			// `Class "UAGB_Admin_Helper" not found`. Hooking it to `admin_init` ensures all helper classes are
+			// already loaded before the option write runs.
+			add_action( 'admin_init', array( $this, 'reading_page' ) );
 		}
 
 		/**
@@ -225,16 +228,16 @@ if ( ! class_exists( 'UAGB_Helper' ) ) {
 
 					if ( ! empty( $val ) || ( empty( $val ) && 'content' === $j ) || 0 === $val ) {
 						if ( 'font-family' === $j ) {
-							$css .= $j . ': "' . $val . '";';
+							$css .= $j . ': "' . self::sanitize_css_value( $val ) . '";';
 						} else {
 							if ( is_array( $val ) ) {
 								// Convert $val array property to string.
 								foreach ( $val as $index => $property ) {
 									$properties = is_string( $property ) ? $property : (string) $property;
-									$css       .= $j . ': ' . $properties . ';';
+									$css       .= $j . ': ' . self::sanitize_css_value( $properties ) . ';';
 								}
 							} else {
-								$css .= $j . ': ' . $val . ';';
+								$css .= $j . ': ' . self::sanitize_css_value( $val ) . ';';
 							}
 						}
 					}
@@ -248,6 +251,24 @@ if ( ! class_exists( 'UAGB_Helper' ) ) {
 			}
 
 			return $styling_css;
+		}
+
+		/**
+		 * Sanitize a CSS property value to prevent rule injection.
+		 *
+		 * Strips characters that can break out of a CSS declaration block
+		 * ({ } ;) and HTML angle brackets that could be used for injection.
+		 * Applied centrally so every block style attribute is covered.
+		 *
+		 * @since 2.20.1
+		 * @param mixed $value Raw CSS value from block attributes.
+		 * @return mixed Sanitized value (string stripped; non-strings returned as-is).
+		 */
+		public static function sanitize_css_value( $value ) {
+			if ( ! is_string( $value ) ) {
+				return $value;
+			}
+			return str_replace( array( '{', '}', ';', '<', '>' ), '', $value );
 		}
 
 		/**
@@ -347,7 +368,9 @@ if ( ! class_exists( 'UAGB_Helper' ) ) {
 			$json = self::backend_load_font_awesome_icons();
 
 			if ( ! empty( $json ) ) {
-				if ( empty( $icon_array_merged ) ) {
+				// Previously checked an undefined local `$icon_array_merged`, so the cache was never read
+				// and the full merge loop ran on every call. Use the static property.
+				if ( empty( self::$icon_array_merged ) ) {
 					foreach ( $json as $value ) {
 						self::$icon_array_merged = array_merge( self::$icon_array_merged, $value );
 					}
@@ -398,13 +421,34 @@ if ( ! class_exists( 'UAGB_Helper' ) ) {
 		public static function get_query( $attributes, $block_type ) {
 			$fallback_for_posts_to_show = UAGB_Block_Helper::get_fallback_number( $attributes['postsToShow'], 'postsToShow', $attributes['blockName'] );
 			$fallback_for_offset        = UAGB_Block_Helper::get_fallback_number( $attributes['postsOffset'], 'postsOffset', $attributes['blockName'] );
+
+			// SECURITY: Validate post type against public post types to prevent information disclosure.
+			$post_type     = ( isset( $attributes['postType'] ) ) ? sanitize_text_field( $attributes['postType'] ) : 'post';
+			$allowed_types = get_post_types( array( 'public' => true ) );
+			if ( ! in_array( $post_type, $allowed_types, true ) ) {
+				$post_type = 'post';
+			}
+
+			// SECURITY: Validate orderBy against allowed WP_Query values.
+			$order_by        = ( isset( $attributes['orderBy'] ) ) ? sanitize_text_field( $attributes['orderBy'] ) : 'date';
+			$allowed_orderby = array( 'date', 'modified', 'ID', 'author', 'title', 'rand', 'menu_order', 'comment_count' );
+			if ( ! in_array( $order_by, $allowed_orderby, true ) ) {
+				$order_by = 'date';
+			}
+
+			// SECURITY: Validate order direction.
+			$order = ( isset( $attributes['order'] ) ) ? sanitize_text_field( $attributes['order'] ) : 'desc';
+			if ( ! in_array( strtolower( $order ), array( 'asc', 'desc' ), true ) ) {
+				$order = 'desc';
+			}
+
 			// Block type is grid/masonry/carousel/timeline.
 			$query_args = array(
 				'posts_per_page'      => $fallback_for_posts_to_show,
 				'post_status'         => 'publish',
-				'post_type'           => ( isset( $attributes['postType'] ) ) ? $attributes['postType'] : 'post',
-				'order'               => ( isset( $attributes['order'] ) ) ? $attributes['order'] : 'desc',
-				'orderby'             => ( isset( $attributes['orderBy'] ) ) ? $attributes['orderBy'] : 'date',
+				'post_type'           => $post_type,
+				'order'               => $order,
+				'orderby'             => $order_by,
 				'ignore_sticky_posts' => 1,
 				'paged'               => 1,
 			);
@@ -1403,6 +1447,10 @@ if ( ! class_exists( 'UAGB_Helper' ) ) {
 		 */
 		public static function uagb_get_excerpt( $post_id, $content, $length_fallback ) {
 
+			if ( post_password_required( $post_id ) ) {
+				return __( 'There is no excerpt because this is a protected post.', 'ultimate-addons-for-gutenberg' );
+			}
+
 			// If there's an excerpt provided from meta, use it.
 			$excerpt = get_post_field( 'post_excerpt', $post_id );
 
@@ -1483,6 +1531,12 @@ if ( ! class_exists( 'UAGB_Helper' ) ) {
 		 * @since 1.23.0
 		 */
 		public static function delete_page_assets( $post_id ) {
+			// Autosaves and revisions are not user-facing saves, so skip them to
+			// avoid needless asset regeneration and host cache purges.
+			if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+				return;
+			}
+
 			$current_post_type = get_post_type( $post_id );
 			if ( 'wp_template_part' === $current_post_type || 'wp_template' === $current_post_type ) {
 
@@ -1493,6 +1547,16 @@ if ( ! class_exists( 'UAGB_Helper' ) ) {
 
 				/* Update the asset version */
 				UAGB_Admin_Helper::update_admin_settings_option( '__uagb_asset_version', time() );
+				return;
+			}
+
+			// Bail for post types that never carry Spectra block assets but can
+			// be written many times in a single request. WordPress saves one
+			// nav_menu_item per menu item, so without this a large-menu save
+			// fires a full asset delete and host cache purge once per item and
+			// times out. See #6082. Filterable so other such types can opt out.
+			$skip_post_types = (array) apply_filters( 'uagb_delete_page_assets_skip_post_types', array( 'nav_menu_item' ) );
+			if ( in_array( $current_post_type, $skip_post_types, true ) ) {
 				return;
 			}
 

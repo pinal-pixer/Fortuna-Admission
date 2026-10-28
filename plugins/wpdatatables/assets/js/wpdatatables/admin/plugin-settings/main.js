@@ -192,6 +192,13 @@
         });
 
         /**
+         * Toggle MCP for AI assistants
+         */
+        $('#wdt-mcp-enabled').change(function (e) {
+            wpdatatable_plugin_config.setMcpEnabled($(this).is(':checked') ? 1 : 0);
+        });
+
+        /**
          * Toggle Align numbers
          */
         $('#wdt-numbers-align').change(function (e) {
@@ -247,6 +254,14 @@
         $('#wdt-global-table-loader').change(function (e) {
             wpdatatable_plugin_config.setGlobalTableLoaders($(this).is(':checked') ? 1 : 0);
         });
+
+        /**
+         * Toggle usage tracking
+         */
+        $('#wdt-usage-tracking-enabled').change(function (e) {
+            wpdatatable_plugin_config.setUsageTrackingEnabled($(this).is(':checked') ? 1 : 0);
+        });
+
         /**
          * Toggle chart loaders
          */
@@ -290,13 +305,6 @@
         });
 
         /**
-         * Toggle HighCharts stable version
-         */
-        $('#wdt-use-highcharts-stable-version').on('change', function () {
-            wpdatatable_plugin_config.setHighChartStableVersion($(this).is(':checked') ? 1 : 0);
-        });
-
-        /**
          * Toggle GoogleCharts stable version
          */
         $('#wdt-use-google-stable-version').on('change', function () {
@@ -331,9 +339,13 @@
         wpdatatable_plugin_config.setIncludeBootstrapBackEnd(wdt_current_config.wdtIncludeBootstrapBackEnd == 1 ? 1 : 0);
         wpdatatable_plugin_config.setPreventDeletingTables(wdt_current_config.wdtPreventDeletingTables == 1 ? 1 : 0);
         wpdatatable_plugin_config.setParseShortcodes(wdt_current_config.wdtParseShortcodes == 1 ? 1 : 0);
+        wpdatatable_plugin_config.setMcpEnabled(
+            (typeof wdt_current_config.wdtMcpEnabled === 'undefined' || wdt_current_config.wdtMcpEnabled == 1) ? 1 : 0
+        );
         wpdatatable_plugin_config.setAlignNumber(wdt_current_config.wdtNumbersAlign == 1 ? 1 : 0);
         wpdatatable_plugin_config.setGlobalTableLoaders(wdt_current_config.wdtGlobalTableLoader == 1 ? 1 : 0);
         wpdatatable_plugin_config.setGlobalChartLoaders(wdt_current_config.wdtGlobalChartLoader == 1 ? 1 : 0);
+        wpdatatable_plugin_config.setUsageTrackingEnabled(wdt_current_config.wdtUsageTrackingEnabled == 1 ? 1 : 0);
         wpdatatable_plugin_config.setCustomCss(wdt_current_config.wdtCustomCss);
         wpdatatable_plugin_config.setCustomJs(wdt_current_config.wdtCustomJs);
         wpdatatable_plugin_config.setMinifiedJs(wdt_current_config.wdtMinifiedJs == 1 ? 1 : 0);
@@ -345,7 +357,6 @@
         wpdatatable_plugin_config.setBorderRemovalHeader(wdt_current_config.wdtBorderRemovalHeader == 1 ? 1 : 0);
         wpdatatable_plugin_config.setPurchaseCodeStore(wdt_current_config.wdtPurchaseCodeStore);
         wpdatatable_plugin_config.setGoogleStableVersion(wdt_current_config.wdtGoogleStableVersion == 1 ? 1 : 0);
-        wpdatatable_plugin_config.setHighChartStableVersion(wdt_current_config.wdtHighChartStableVersion == 1 ? 1 : 0);
         wpdatatable_plugin_config.setApexStableVersion(wdt_current_config.wdtApexStableVersion == 1 ? 1 : 0);
         wpdatatable_plugin_config.setGoogleApiMaps(wdt_current_config.wdtGoogleApiMapsValidated == 1 ? 1 : 0);
 
@@ -374,8 +385,11 @@
          */
         $('.wdt-datatables-admin-wrap .plugin-settings .tab-nav:not(.mysql-serverside-settings-block) [data-toggle="tab"]').on('click', function (e) {
             e.preventDefault()
-            $('.wdt-datatables-admin-wrap .tab-content .tab-pane').removeClass('active in')
-            $($(this)[0].hash).addClass('active in')
+            var $targetPane = $($(this)[0].hash)
+            // Only deactivate panes that belong to the same tab-content, so nested
+            // tabs (e.g. the separate connection forms) keep their active pane.
+            $targetPane.closest('.tab-content').children('.tab-pane').removeClass('active in')
+            $targetPane.addClass('active in')
             var scrollmem = $('body').scrollTop();
             window.location.hash = this.hash;
             $('html,body').scrollTop(scrollmem);
@@ -540,7 +554,7 @@
             var navigation = element.find(".tab-nav");
             navigation.find("a").parent().removeClass("active");
 
-            var newConnectionNav = $('<li class="active"><a href="#connection' + count + '" aria-controls="connection-' + count + '" role="tab" data-toggle="tab" style="text-transform: none;">New Connection</a></li>');
+            var newConnectionNav = $('<li class="active"><a href="#connection' + count + '" aria-controls="connection' + count + '" role="tab" data-toggle="tab" style="text-transform: none;">New Connection</a></li>');
             navigation.append(newConnectionNav);
 
             // Content
@@ -1048,7 +1062,7 @@
 
             if (valid !== null && slug === 'wpdatatables') {
 
-                // Remove query parameters sent back from TMS Store
+                // Remove query parameters sent back from Melograno Store
                 let redirectURL = this.removeURLParameter(window.location.href, 'valid');
                 redirectURL = this.removeURLParameter(redirectURL, 'slug');
                 redirectURL = this.removeURLParameter(redirectURL, 'domainRegistered');

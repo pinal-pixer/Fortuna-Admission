@@ -1,0 +1,2746 @@
+/**
+ * GutSlider admin dashboard.
+ *
+ * A small design system: tokens, shell, cards, controls.
+ * Scoped under .gs-app so nothing leaks into wp-admin.
+ */
+
+/* ------------------------------------------------------------------
+ * 1. Tokens
+ * ---------------------------------------------------------------- */
+
+.gs-app {
+    /* Brand */
+    --gs-brand: #5325e8;
+    --gs-brand-hover: #451dcc;
+    --gs-brand-soft: #efebfe;
+    --gs-brand-line: #d9cffb;
+    --gs-brand-ring: rgba(83, 37, 232, 0.28);
+    --gs-brand-grad: linear-gradient(135deg, #6a45f0 0%, #5325e8 55%, #3f1bbd 100%);
+
+    /* Surfaces */
+    --gs-bg: #f4f5f8;
+    --gs-surface: #fff;
+    --gs-surface-2: #fafafc;
+    --gs-surface-sunk: #f1f2f7;
+
+    /* Lines */
+    --gs-line: #e4e6ec;
+    --gs-line-strong: #d3d7e0;
+
+    /* Text */
+    --gs-text: #12141c;
+    --gs-text-2: #5c6275;
+    --gs-text-3: #8a90a2;
+
+    /* Status */
+    --gs-ok: #12855a;
+    --gs-ok-soft: #e4f5ee;
+    --gs-danger: #c0362c;
+    --gs-danger-soft: #fdeceb;
+    --gs-gold: #b45309;
+    --gs-gold-soft: #fdf2e3;
+
+    /* Shape */
+    --gs-r-sm: 8px;
+    --gs-r-md: 10px;
+    --gs-r: 14px;
+    --gs-r-lg: 18px;
+    --gs-r-full: 999px;
+
+    /* Elevation */
+    --gs-shadow-sm: 0 1px 2px rgba(20, 22, 43, 0.05);
+    --gs-shadow: 0 1px 2px rgba(20, 22, 43, 0.05), 0 8px 24px -12px rgba(20, 22, 43, 0.16);
+    --gs-shadow-lg: 0 24px 60px -24px rgba(20, 22, 43, 0.3), 0 2px 6px rgba(20, 22, 43, 0.06);
+
+    /* Motion */
+    --gs-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --gs-fast: 140ms var(--gs-ease);
+    --gs-mid: 240ms var(--gs-ease);
+}
+
+.gs-app[data-gs-theme='dark'],
+.gs-app.gs-dark {
+    --gs-brand: #9b83ff;
+    --gs-brand-hover: #b09dff;
+    --gs-brand-soft: #241f3d;
+    --gs-brand-line: #362f5c;
+    --gs-brand-ring: rgba(155, 131, 255, 0.35);
+    --gs-brand-grad: linear-gradient(135deg, #7a5df0 0%, #5f3fd8 55%, #4529ad 100%);
+
+    --gs-bg: #0e0f1a;
+    --gs-surface: #16182a;
+    --gs-surface-2: #1b1d31;
+    --gs-surface-sunk: #101223;
+
+    --gs-line: #262a44;
+    --gs-line-strong: #343956;
+
+    --gs-text: #f2f3fa;
+    --gs-text-2: #a5a9c4;
+    --gs-text-3: #767b9b;
+
+    --gs-ok: #48d39a;
+    --gs-ok-soft: #12281f;
+    --gs-danger: #ff8079;
+    --gs-danger-soft: #2c1917;
+    --gs-gold: #e0b055;
+    --gs-gold-soft: #2a2113;
+
+    --gs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --gs-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+    --gs-shadow-lg: 0 28px 70px -28px rgba(0, 0, 0, 0.85), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* ------------------------------------------------------------------
+ * 2. wp-admin reset
+ * ---------------------------------------------------------------- */
+
+body.gutslider-admin-page #wpcontent {
+    padding-left: 0;
+}
+
+body.gutslider-admin-page #wpbody-content {
+    padding-bottom: 0;
+}
+
+/* The shell prints its own footer bar, so the wp-admin one is redundant. */
+body.gutslider-admin-page #wpfooter {
+    display: none;
+}
+
+/* Hide third-party nags printed outside our shell. Notices we render
+   inside .gs-app (settings errors, for example) are kept and restyled. */
+body.gutslider-admin-page #wpbody-content > .notice,
+body.gutslider-admin-page #wpbody-content > .update-nag,
+body.gutslider-admin-page #wpbody-content > div.error,
+body.gutslider-admin-page #wpbody-content > div.updated {
+    display: none;
+}
+
+body.gutslider-admin-page #wpbody-content > .notice.gs-keep {
+    display: block;
+}
+
+/* ------------------------------------------------------------------
+ * 3. Shell
+ * ---------------------------------------------------------------- */
+
+.gs-app {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 32px);
+    margin: 0;
+    background: var(--gs-bg);
+    color: var(--gs-text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.gs-app *,
+.gs-app *::before,
+.gs-app *::after {
+    box-sizing: border-box;
+}
+
+.gs-app :focus-visible {
+    outline: 2px solid var(--gs-brand);
+    outline-offset: 2px;
+    border-radius: var(--gs-r-sm);
+}
+
+.gs-app :focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+}
+
+/* Our components set display on a class, which outranks the UA's
+   [hidden] { display: none } attribute rule. Restore it. */
+.gs-app [hidden] {
+    display: none;
+}
+
+.gs-shell {
+    width: 100%;
+    max-width: 1248px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+.gs-main {
+    display: block;
+    flex: 1 0 auto;
+    padding-bottom: 56px;
+}
+
+.gs-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+
+.gs-stack--sm {
+    gap: 12px;
+}
+
+/* ------------------------------------------------------------------
+ * 4. Top bar
+ * ---------------------------------------------------------------- */
+
+.gs-bar {
+    position: sticky;
+    top: 32px;
+    z-index: 40;
+    background: color-mix(in srgb, var(--gs-surface) 82%, transparent);
+    backdrop-filter: saturate(180%) blur(14px);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    border-bottom: 1px solid var(--gs-line);
+}
+
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+    .gs-bar {
+        background: var(--gs-surface);
+    }
+}
+
+/* Three tracks so the nav stays optically centred whatever flanks it. */
+.gs-bar__inner {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 24px;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 0 28px;
+    height: 60px;
+}
+
+.gs-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--gs-text);
+    justify-self: start;
+    min-width: 0;
+}
+
+.gs-brand:hover,
+.gs-brand:focus {
+    color: var(--gs-text);
+}
+
+.gs-brand__mark {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border-radius: var(--gs-r-sm);
+    background: var(--gs-brand);
+    color: #fff;
+}
+
+.gs-brand__mark svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
+
+.gs-brand__name {
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: -0.013em;
+}
+
+.gs-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 550;
+    letter-spacing: 0;
+    background: var(--gs-surface-2);
+    color: var(--gs-text-2);
+    border: 1px solid var(--gs-line);
+}
+
+.gs-chip--pro {
+    padding: 0 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    background: var(--gs-brand-soft);
+    color: var(--gs-brand);
+    border-color: transparent;
+}
+
+/* Nav */
+
+.gs-nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.gs-nav::-webkit-scrollbar {
+    display: none;
+}
+
+.gs-nav__link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: var(--gs-r-sm);
+    font-size: 13.5px;
+    font-weight: 550;
+    text-decoration: none;
+    white-space: nowrap;
+    color: var(--gs-text-2);
+    transition:
+        color var(--gs-fast),
+        background var(--gs-fast);
+}
+
+.gs-nav__link:hover {
+    color: var(--gs-text);
+    background: var(--gs-surface-sunk);
+}
+
+.gs-nav__link.is-active {
+    color: var(--gs-brand);
+    background: var(--gs-brand-soft);
+    font-weight: 600;
+}
+
+.gs-bar__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-self: end;
+}
+
+.gs-icon-btn {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--gs-line);
+    border-radius: var(--gs-r-sm);
+    background: var(--gs-surface);
+    color: var(--gs-text-2);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all var(--gs-fast);
+}
+
+.gs-icon-btn:hover {
+    background: var(--gs-surface-2);
+    border-color: var(--gs-line-strong);
+    color: var(--gs-text);
+}
+
+.gs-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.gs-icon--moon {
+    display: none;
+}
+
+.gs-app[data-gs-theme='dark'] .gs-icon--sun {
+    display: none;
+}
+
+.gs-app[data-gs-theme='dark'] .gs-icon--moon {
+    display: block;
+}
+
+/* ------------------------------------------------------------------
+ * 5. Buttons & links
+ * ---------------------------------------------------------------- */
+
+.gs-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: var(--gs-r-sm);
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+        transform var(--gs-fast),
+        background var(--gs-fast),
+        border-color var(--gs-fast),
+        color var(--gs-fast),
+        box-shadow var(--gs-fast);
+}
+
+.gs-btn:active {
+    transform: translateY(1px);
+}
+
+.gs-btn--sm {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 12.5px;
+}
+
+.gs-btn--primary {
+    background: var(--gs-brand);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(18, 20, 28, 0.08);
+}
+
+.gs-btn--primary:hover,
+.gs-btn--primary:focus {
+    background: var(--gs-brand-hover);
+    color: #fff;
+}
+
+.gs-btn--quiet {
+    background: var(--gs-surface);
+    border-color: var(--gs-line-strong);
+    color: var(--gs-text);
+    box-shadow: var(--gs-shadow-sm);
+}
+
+.gs-btn--quiet:hover,
+.gs-btn--quiet:focus {
+    background: var(--gs-surface-2);
+    border-color: var(--gs-text-3);
+    color: var(--gs-text);
+}
+
+.gs-btn--ghost {
+    background: transparent;
+    color: var(--gs-text-2);
+}
+
+.gs-btn--ghost:hover,
+.gs-btn--ghost:focus {
+    background: var(--gs-surface-sunk);
+    color: var(--gs-text);
+}
+
+.gs-btn--invert {
+    background: #fff;
+    color: #1d1638;
+}
+
+.gs-btn--invert:hover,
+.gs-btn--invert:focus {
+    background: #f1eefc;
+    color: #1d1638;
+}
+
+.gs-btn[disabled],
+.gs-btn.is-busy {
+    pointer-events: none;
+    opacity: 0.65;
+}
+
+.gs-btn__spinner {
+    display: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid currentcolor;
+    border-top-color: transparent;
+    animation: gs-spin 0.6s linear infinite;
+}
+
+.gs-btn.is-busy .gs-btn__spinner {
+    display: block;
+}
+
+.gs-btn.is-busy .gs-kbd {
+    display: none;
+}
+
+@keyframes gs-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.gs-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--gs-brand);
+    font-weight: 600;
+    font-size: 13px;
+    text-decoration: none;
+    transition: opacity var(--gs-fast);
+}
+
+.gs-link:hover,
+.gs-link:focus {
+    color: var(--gs-brand-hover);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.gs-link--sm {
+    font-size: 12.5px;
+    color: var(--gs-text-2);
+    font-weight: 550;
+}
+
+.gs-link--sm:hover {
+    color: var(--gs-brand);
+}
+
+.gs-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+/* ------------------------------------------------------------------
+ * 6. Typography helpers
+ * ---------------------------------------------------------------- */
+
+.gs-app h1,
+.gs-app h2,
+.gs-app h3 {
+    margin: 0;
+    color: var(--gs-text);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+}
+
+.gs-app p {
+    margin: 0;
+}
+
+.gs-eyebrow {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gs-brand);
+}
+
+.gs-page-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding-top: 40px;
+}
+
+.gs-page-head__actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.gs-page-title {
+    font-size: 23px;
+    letter-spacing: -0.026em;
+}
+
+.gs-page-sub {
+    max-width: 68ch;
+    margin-top: 5px;
+    font-size: 13.5px;
+    color: var(--gs-text-2);
+}
+
+/* Status pill — licence state in the page header. */
+
+.gs-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px;
+    border-radius: var(--gs-r-full);
+    font-size: 12.5px;
+    font-weight: 550;
+    background: var(--gs-ok-soft);
+    color: var(--gs-ok);
+}
+
+.gs-pill__dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentcolor;
+}
+
+.gs-pill--expiring {
+    background: var(--gs-gold-soft);
+    color: var(--gs-gold);
+}
+
+.gs-pill--inactive {
+    background: var(--gs-danger-soft);
+    color: var(--gs-danger);
+}
+
+.gs-count {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    border-radius: var(--gs-r-full);
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-line);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--gs-text-2);
+}
+
+/* ------------------------------------------------------------------
+ * 7. Dashboard layout
+ * ---------------------------------------------------------------- */
+
+.gs-page {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+
+    /* Matches the top opening on the blocks and settings screens. */
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+.gs-page .gs-page-head {
+    padding-top: 0;
+}
+
+/* Top banner — licence prompts and similar, supplied by filter. */
+
+.gs-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 16px 18px;
+    border-radius: var(--gs-r);
+    border: 1px solid var(--gs-line);
+    background: var(--gs-surface);
+    box-shadow: var(--gs-shadow-sm);
+}
+
+.gs-banner__icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: var(--gs-r-sm);
+    border: 1px solid var(--gs-line);
+    background: var(--gs-brand-soft);
+    color: var(--gs-brand);
+}
+
+.gs-banner__text {
+    flex: 1;
+    min-width: 220px;
+}
+
+.gs-banner__title {
+    display: block;
+    font-size: 14px;
+    font-weight: 620;
+    color: var(--gs-text);
+}
+
+.gs-banner__sub {
+    margin-top: 2px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--gs-text-2);
+}
+
+/* Toned banners keep a hairline border tinted from their own accent, so the
+   edge reads as intentional rather than as a colour block on the page. */
+
+.gs-banner--warning {
+    border-color: #f0ddc2;
+    border-color: color-mix(in srgb, var(--gs-gold) 20%, transparent);
+    background: var(--gs-gold-soft);
+}
+
+.gs-banner--warning .gs-banner__icon {
+    border-color: #f0ddc2;
+    border-color: color-mix(in srgb, var(--gs-gold) 20%, transparent);
+    background: var(--gs-surface);
+    color: var(--gs-gold);
+}
+
+.gs-banner--error {
+    border-color: #f7d7d4;
+    border-color: color-mix(in srgb, var(--gs-danger) 20%, transparent);
+    background: var(--gs-danger-soft);
+}
+
+.gs-banner--error .gs-banner__icon {
+    border-color: #f7d7d4;
+    border-color: color-mix(in srgb, var(--gs-danger) 20%, transparent);
+    background: var(--gs-surface);
+    color: var(--gs-danger);
+}
+
+.gs-banner--info {
+    border-color: var(--gs-brand-line);
+    background: var(--gs-brand-soft);
+}
+
+.gs-banner--info .gs-banner__icon {
+    border-color: var(--gs-brand-line);
+    background: var(--gs-surface);
+}
+
+/* Metric row */
+
+.gs-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.gs-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px;
+    border-radius: var(--gs-r);
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-line);
+}
+
+.gs-metric__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.gs-metric__label {
+    font-size: 12.5px;
+    font-weight: 550;
+    color: var(--gs-text-2);
+}
+
+.gs-metric__icon {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border-radius: 7px;
+    background: var(--gs-brand-soft);
+    color: var(--gs-brand);
+}
+
+.gs-metric__icon .gs-icon {
+    width: 14px;
+    height: 14px;
+}
+
+.gs-metric__value {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 30px;
+    font-weight: 680;
+    line-height: 1;
+    letter-spacing: -0.033em;
+    font-variant-numeric: tabular-nums;
+}
+
+.gs-metric__unit {
+    font-size: 13px;
+    font-weight: 550;
+    letter-spacing: 0;
+    color: var(--gs-text-3);
+}
+
+.gs-metric__foot {
+    font-size: 12px;
+    color: var(--gs-text-3);
+}
+
+/* Two-column body */
+
+.gs-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 372px;
+    align-items: start;
+    gap: 22px;
+}
+
+.gs-col {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+}
+
+/* ------------------------------------------------------------------
+ * 8. Cards & grids
+ * ---------------------------------------------------------------- */
+
+.gs-shell.gs-stack {
+    padding-top: 40px;
+    padding-bottom: 40px;
+}
+
+/* The stack already opens with 40px, so the head must not add its own. */
+.gs-shell.gs-stack > .gs-page-head {
+    padding-top: 0;
+}
+
+.gs-grid {
+    display: grid;
+    gap: 16px;
+}
+
+.gs-grid--cards {
+    grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+}
+
+/* ------------------------------------------------------------------
+ * 8. Cards
+ * ---------------------------------------------------------------- */
+
+.gs-card {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--gs-r);
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-line);
+    text-decoration: none;
+    color: inherit;
+    transition:
+        border-color var(--gs-mid),
+        box-shadow var(--gs-mid);
+}
+
+/* Flush cards let their header, list and footer own the edges. */
+.gs-card--flush {
+    overflow: hidden;
+}
+
+.gs-card--pad {
+    gap: 16px;
+    padding: 18px;
+}
+
+.gs-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--gs-line);
+}
+
+/* Inside a padded card the header is just the top row, not a band. */
+.gs-card__head--plain {
+    padding: 0;
+    border-bottom: 0;
+}
+
+.gs-card__head--tight {
+    padding: 15px 18px 11px;
+    border-bottom: 0;
+}
+
+.gs-card__heading {
+    font-size: 15px;
+    font-weight: 620;
+    letter-spacing: -0.008em;
+}
+
+.gs-card__sub {
+    margin-top: 3px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--gs-text-3);
+}
+
+.gs-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-start;
+    padding: 16px;
+}
+
+.gs-card__body .gs-card__sub {
+    color: var(--gs-text-2);
+}
+
+.gs-card__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 13px 18px;
+    background: var(--gs-surface-2);
+    border-top: 1px solid var(--gs-line);
+}
+
+.gs-card__summary {
+    font-size: 12.5px;
+    color: var(--gs-text-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.gs-card--link:hover,
+.gs-card--link:focus {
+    border-color: var(--gs-brand);
+    box-shadow: var(--gs-shadow);
+    color: inherit;
+}
+
+/* ------------------------------------------------------------------
+ * 8b. Block rows
+ * ---------------------------------------------------------------- */
+
+.gs-rows {
+    --gs-row-h: 62px;
+    --gs-row-gap: 8px;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--gs-row-gap);
+
+    /* Exactly five rows, then scroll — the card must not run the length
+       of the page. Scroll chaining is left alone so the wheel carries on
+       down the page once the list bottoms out. */
+    max-height: calc((5 * var(--gs-row-h)) + (4 * var(--gs-row-gap)) + 28px);
+    overflow-y: auto;
+    padding: 14px;
+}
+
+.gs-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: var(--gs-r-md);
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-line);
+    transition:
+        border-color var(--gs-fast),
+        background var(--gs-fast);
+}
+
+.gs-row:hover {
+    border-color: var(--gs-line-strong);
+}
+
+.gs-row.is-dirty {
+    border-color: var(--gs-brand);
+    background: var(--gs-brand-soft);
+}
+
+.gs-row.is-hidden {
+    display: none;
+}
+
+.gs-row__icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    background: var(--gs-brand-soft);
+    color: var(--gs-brand);
+}
+
+.gs-row__icon .gs-icon {
+    width: 17px;
+    height: 17px;
+}
+
+.gs-row__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Pinned line heights: the row must measure a predictable --gs-row-h so
+   the list crops to a whole number of rows. */
+.gs-row__name {
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--gs-text);
+}
+
+/* Off and locked blocks recede without disappearing. */
+.gs-row.is-off .gs-row__icon,
+.gs-row.is-locked .gs-row__icon {
+    background: var(--gs-surface-2);
+    color: var(--gs-text-3);
+}
+
+.gs-row.is-off .gs-row__name,
+.gs-row.is-locked .gs-row__name {
+    color: var(--gs-text-2);
+}
+
+.gs-row__desc {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--gs-text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------
+ * 8c. Get started
+ * ---------------------------------------------------------------- */
+
+.gs-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.gs-progress__count {
+    font-size: 12px;
+    font-weight: 550;
+    color: var(--gs-text-2);
+    white-space: nowrap;
+}
+
+.gs-progress__track {
+    display: block;
+    width: 96px;
+    height: 6px;
+    border-radius: var(--gs-r-full);
+    background: var(--gs-line);
+    overflow: hidden;
+}
+
+.gs-progress__fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--gs-brand);
+    transition: width 600ms var(--gs-ease);
+}
+
+.gs-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.gs-step {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 14px;
+    border-radius: var(--gs-r-md);
+    background: var(--gs-surface-2);
+    border: 1px solid var(--gs-line);
+}
+
+.gs-step.is-done {
+    background: var(--gs-brand-soft);
+    border-color: var(--gs-brand-line);
+}
+
+.gs-step__top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gs-step__n {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--gs-text-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.gs-step__check {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--gs-brand);
+    color: #fff;
+}
+
+.gs-step__check .gs-icon {
+    width: 11px;
+    height: 11px;
+    stroke-width: 3;
+}
+
+.gs-step__title {
+    font-size: 13.5px;
+    font-weight: 600;
+}
+
+.gs-step__text {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--gs-text-2);
+}
+
+/* ------------------------------------------------------------------
+ * 8d. Walkthrough
+ * ---------------------------------------------------------------- */
+
+.gs-video {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 196px;
+    padding: 0;
+    border: 0;
+    background: #14152a;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.gs-video__stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background:
+        radial-gradient(ellipse 55% 60% at 50% 15%, rgba(83, 37, 232, 0.9) 0%, rgba(83, 37, 232, 0) 100%);
+}
+
+.gs-video__slides {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 104px;
+}
+
+.gs-video__slide {
+    width: 34px;
+    height: 72px;
+    border-radius: var(--gs-r-sm);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.gs-video__slide--main {
+    width: 150px;
+    height: 104px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.gs-video__dots {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gs-video__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.gs-video__dot.is-active {
+    background: #fff;
+}
+
+.gs-video__play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--gs-brand);
+    box-shadow: 0 6px 20px rgba(11, 11, 20, 0.35);
+    transition: transform var(--gs-mid);
+}
+
+.gs-video__play .gs-icon {
+    width: 19px;
+    height: 19px;
+    margin-left: 2px;
+}
+
+.gs-video:hover .gs-video__play {
+    transform: translate(-50%, -50%) scale(1.06);
+}
+
+.gs-video iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+/* ------------------------------------------------------------------
+ * 8e. What's new
+ * ---------------------------------------------------------------- */
+
+.gs-news {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.gs-news__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+}
+
+.gs-news__text {
+    flex: 1;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--gs-text-2);
+}
+
+/* ------------------------------------------------------------------
+ * 8f. Help & support
+ * ---------------------------------------------------------------- */
+
+.gs-help {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--gs-line);
+    text-decoration: none;
+    color: inherit;
+    transition: background var(--gs-fast);
+}
+
+.gs-help:hover,
+.gs-help:focus {
+    background: var(--gs-surface-2);
+    color: inherit;
+}
+
+.gs-help__icon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: var(--gs-r-sm);
+    background: var(--gs-brand-soft);
+    color: var(--gs-brand);
+}
+
+.gs-help__icon .gs-icon {
+    width: 15px;
+    height: 15px;
+}
+
+.gs-help__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.gs-help__title {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.gs-help__sub {
+    font-size: 12px;
+    color: var(--gs-text-3);
+}
+
+.gs-help__chevron {
+    flex-shrink: 0;
+    color: var(--gs-text-3);
+}
+
+/* ------------------------------------------------------------------
+ * 8g. More from the workshop
+ * ---------------------------------------------------------------- */
+
+.gs-workshop {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-top: 12px;
+}
+
+.gs-workshop__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 16px;
+}
+
+.gs-workshop__grid .gs-card {
+    gap: 8px;
+}
+
+.gs-product__top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gs-product__title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gs-text);
+}
+
+/* ------------------------------------------------------------------
+ * 8h. App footer
+ * ---------------------------------------------------------------- */
+
+.gs-appfoot {
+    flex-shrink: 0;
+    background: var(--gs-surface);
+    border-top: 1px solid var(--gs-line);
+}
+
+.gs-appfoot__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    max-width: 1248px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    font-size: 12.5px;
+    color: var(--gs-text-3);
+}
+
+.gs-appfoot__link {
+    color: var(--gs-text-2);
+}
+
+.gs-appfoot__link:hover {
+    color: var(--gs-brand);
+}
+
+/* ------------------------------------------------------------------
+ * 9. Blocks toolbar
+ * ---------------------------------------------------------------- */
+
+.gs-toolbar {
+    position: sticky;
+    top: 96px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px;
+    margin-top: -16px;
+    border-radius: var(--gs-r);
+    background: color-mix(in srgb, var(--gs-surface) 88%, transparent);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    border: 1px solid var(--gs-line);
+    box-shadow: var(--gs-shadow-sm);
+}
+
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+    .gs-toolbar {
+        background: var(--gs-surface);
+    }
+}
+
+.gs-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1 1 240px;
+    min-width: 200px;
+}
+
+.gs-search .gs-icon {
+    position: absolute;
+    left: 12px;
+    color: var(--gs-text-3);
+    pointer-events: none;
+}
+
+/* Typed selector: wp-admin styles `input[type="search"]`, which would
+   otherwise outrank a bare class and drop the padding for the icon. */
+input.gs-search__input {
+    width: 100%;
+    height: 38px;
+    margin: 0;
+    padding: 0 44px 0 36px;
+    border: 1px solid var(--gs-line-strong);
+    border-radius: var(--gs-r-sm);
+    background: var(--gs-surface);
+    color: var(--gs-text);
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1;
+    box-shadow: none;
+    transition:
+        border-color var(--gs-fast),
+        box-shadow var(--gs-fast);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+input.gs-search__input::placeholder {
+    color: var(--gs-text-3);
+}
+
+input.gs-search__input:focus {
+    outline: none;
+    border-color: var(--gs-brand);
+    box-shadow: 0 0 0 3px var(--gs-brand-ring);
+}
+
+input.gs-search__input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+}
+
+.gs-search__kbd {
+    position: absolute;
+    right: 10px;
+    background: var(--gs-surface-sunk);
+    border-color: var(--gs-line);
+    color: var(--gs-text-3);
+    pointer-events: none;
+    transition: opacity var(--gs-fast);
+}
+
+.gs-search__input:focus ~ .gs-search__kbd,
+.gs-search__input:not(:placeholder-shown) ~ .gs-search__kbd {
+    opacity: 0;
+}
+
+/* Compact variant for card headers, where the field sits beside a title. */
+.gs-search--sm {
+    flex: 0 0 220px;
+    min-width: 0;
+}
+
+.gs-search--sm .gs-icon {
+    left: 10px;
+    width: 14px;
+    height: 14px;
+}
+
+.gs-search--sm input.gs-search__input {
+    height: 34px;
+    padding: 0 12px 0 32px;
+    border-color: var(--gs-line);
+    background: var(--gs-surface-2);
+    font-size: 13px;
+}
+
+.gs-segment {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--gs-r-sm);
+    background: var(--gs-surface-sunk);
+    border: 1px solid var(--gs-line);
+}
+
+.gs-segment__btn {
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--gs-text-2);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background var(--gs-fast),
+        color var(--gs-fast);
+}
+
+.gs-segment__btn:hover {
+    color: var(--gs-text);
+}
+
+.gs-segment__btn.is-active {
+    background: var(--gs-surface);
+    color: var(--gs-text);
+    box-shadow: var(--gs-shadow-sm);
+}
+
+.gs-toolbar__actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+/* ------------------------------------------------------------------
+ * 10. Block cards
+ * ---------------------------------------------------------------- */
+
+.gs-block {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
+    border-radius: var(--gs-r);
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-line);
+    box-shadow: var(--gs-shadow-sm);
+    transition:
+        transform var(--gs-mid),
+        box-shadow var(--gs-mid),
+        border-color var(--gs-mid),
+        opacity var(--gs-mid);
+}
+
+.gs-block::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: var(--gs-brand-grad);
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity var(--gs-mid);
+    pointer-events: none;
+}
+
+.gs-block:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--gs-shadow);
+}
+
+.gs-block:hover::before {
+    opacity: 0.55;
+}
+
+.gs-block.is-off {
+    background: var(--gs-surface-2);
+}
+
+.gs-block.is-off .gs-block__title,
+.gs-block.is-off .gs-block__text {
+    opacity: 0.62;
+}
+
+.gs-block.is-locked {
+    background: var(--gs-surface-2);
+}
+
+.gs-block.is-dirty {
+    border-color: var(--gs-brand);
+    box-shadow: 0 0 0 3px var(--gs-brand-ring);
+}
+
+.gs-block.is-hidden {
+    display: none;
+}
+
+.gs-block__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 7px;
+}
+
+.gs-block__title {
+    font-size: 15px;
+    font-weight: 640;
+}
+
+.gs-block__text {
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--gs-text-2);
+    margin-bottom: 16px;
+}
+
+.gs-block__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 14px;
+    margin-top: 14px;
+    border-top: 1px solid var(--gs-line);
+}
+
+.gs-tag {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: 21px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: var(--gs-surface-2);
+    border: 1px solid var(--gs-line);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--gs-text-2);
+}
+
+.gs-tag--pro {
+    background: var(--gs-brand-soft);
+    border-color: var(--gs-brand-line);
+    color: var(--gs-brand);
+}
+
+/* Release-note tags. */
+
+.gs-tag--new {
+    background: var(--gs-brand-soft);
+    border-color: transparent;
+    color: var(--gs-brand);
+}
+
+.gs-tag--improved {
+    background: var(--gs-ok-soft);
+    border-color: transparent;
+    color: var(--gs-ok);
+}
+
+.gs-tag--fixed {
+    background: var(--gs-gold-soft);
+    border-color: transparent;
+    color: var(--gs-gold);
+}
+
+.gs-lock {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 28px;
+    min-width: 34px;
+    padding: 0 9px;
+    flex-shrink: 0;
+    border-radius: var(--gs-r-full);
+    background: var(--gs-surface-2);
+    border: 1px solid var(--gs-line);
+    color: var(--gs-text-3);
+    font-size: 12px;
+    font-weight: 650;
+    text-decoration: none;
+    transition: all var(--gs-fast);
+}
+
+.gs-lock:hover,
+.gs-lock:focus {
+    background: var(--gs-brand-soft);
+    border-color: var(--gs-brand-line);
+    color: var(--gs-brand);
+}
+
+.gs-lock .gs-icon {
+    width: 13px;
+    height: 13px;
+}
+
+/* ------------------------------------------------------------------
+ * 11. Switch
+ * ---------------------------------------------------------------- */
+
+.gs-switch {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.gs-switch__input {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.gs-switch__track {
+    display: block;
+    width: 34px;
+    height: 20px;
+    padding: 2px;
+    border-radius: var(--gs-r-full);
+    background: var(--gs-line-strong);
+    transition: background var(--gs-mid);
+}
+
+.gs-switch__thumb {
+    display: block;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(18, 20, 28, 0.25);
+    transform: translateX(0);
+    transition: transform var(--gs-mid);
+}
+
+.gs-switch__input:checked ~ .gs-switch__track {
+    background: var(--gs-brand);
+}
+
+.gs-switch__input:checked ~ .gs-switch__track .gs-switch__thumb {
+    transform: translateX(14px);
+}
+
+.gs-switch__input:focus-visible ~ .gs-switch__track {
+    box-shadow: 0 0 0 3px var(--gs-brand-ring);
+}
+
+.gs-switch--lg .gs-switch__track {
+    width: 48px;
+    height: 27px;
+}
+
+.gs-switch--lg .gs-switch__thumb {
+    width: 21px;
+    height: 21px;
+}
+
+.gs-switch--lg .gs-switch__input:checked ~ .gs-switch__track .gs-switch__thumb {
+    transform: translateX(21px);
+}
+
+.gs-switch--danger .gs-switch__input:checked ~ .gs-switch__track {
+    background: var(--gs-danger);
+}
+
+/* ------------------------------------------------------------------
+ * 12. Empty state & notes
+ * ---------------------------------------------------------------- */
+
+.gs-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 56px 24px;
+    border-radius: var(--gs-r);
+    border: 1px dashed var(--gs-line-strong);
+    color: var(--gs-text-3);
+    text-align: center;
+}
+
+.gs-empty .gs-icon {
+    width: 28px;
+    height: 28px;
+}
+
+/* Inside a card the empty state is a quiet strip, not a dashed panel. */
+.gs-empty--sm {
+    gap: 8px;
+    padding: 28px 18px;
+    border: 0;
+    border-radius: 0;
+    font-size: 13px;
+}
+
+.gs-empty--sm .gs-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.gs-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: var(--gs-r);
+    background: var(--gs-surface-2);
+    border: 1px solid var(--gs-line);
+    font-size: 13px;
+    color: var(--gs-text-2);
+}
+
+.gs-note .gs-icon {
+    color: var(--gs-text-3);
+    margin-top: 2px;
+}
+
+.gs-note .gs-link {
+    font-size: inherit;
+}
+
+/* ------------------------------------------------------------------
+ * 13. Settings
+ * ---------------------------------------------------------------- */
+
+.gs-settings {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 32px;
+    align-items: start;
+}
+
+.gs-sidenav {
+    position: sticky;
+    top: 112px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.gs-sidenav__link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--gs-r-sm);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--gs-text-2);
+    text-decoration: none;
+    transition:
+        background var(--gs-fast),
+        color var(--gs-fast);
+}
+
+.gs-sidenav__link:hover {
+    background: var(--gs-surface-sunk);
+    color: var(--gs-text);
+}
+
+.gs-sidenav__link.is-active {
+    background: var(--gs-brand-soft);
+    color: var(--gs-brand);
+}
+
+/* A single full-width column of panels. .gs-settings__body is the same
+   thing sitting in the settings grid's content column. */
+.gs-panels,
+.gs-settings__body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.gs-panel {
+    padding: 24px;
+    border-radius: var(--gs-r);
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-line);
+    box-shadow: var(--gs-shadow-sm);
+    scroll-margin-top: 120px;
+}
+
+.gs-panel__head {
+    margin-bottom: 20px;
+}
+
+.gs-panel__title {
+    font-size: 16px;
+}
+
+.gs-panel__sub {
+    margin-top: 3px;
+    font-size: 13px;
+    color: var(--gs-text-2);
+}
+
+.gs-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 24px;
+    align-items: center;
+    padding: 18px 0;
+    border-top: 1px solid var(--gs-line);
+}
+
+.gs-field:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.gs-field:last-child {
+    padding-bottom: 0;
+}
+
+.gs-field__label label,
+.gs-field__name {
+    display: block;
+    font-size: 14px;
+    font-weight: 620;
+    color: var(--gs-text);
+}
+
+.gs-field__help {
+    max-width: 62ch;
+    margin-top: 4px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--gs-text-2);
+}
+
+.gs-field--danger .gs-field__label label {
+    color: var(--gs-danger);
+}
+
+.gs-radio-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.gs-radio-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 13px 14px;
+    border-radius: var(--gs-r-sm);
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-line-strong);
+    cursor: pointer;
+    transition:
+        border-color var(--gs-fast),
+        background var(--gs-fast),
+        box-shadow var(--gs-fast);
+}
+
+.gs-radio-card input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+}
+
+.gs-radio-card:hover {
+    border-color: var(--gs-text-3);
+}
+
+.gs-radio-card.is-active {
+    border-color: var(--gs-brand);
+    background: var(--gs-brand-soft);
+    box-shadow: 0 0 0 3px var(--gs-brand-ring);
+}
+
+.gs-radio-card__body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.gs-radio-card__title {
+    font-size: 13.5px;
+    font-weight: 620;
+    color: var(--gs-text);
+}
+
+.gs-radio-card__text {
+    font-size: 12px;
+    color: var(--gs-text-2);
+}
+
+.gs-radio-card__mark {
+    width: 16px;
+    height: 16px;
+    margin-left: auto;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--gs-line-strong);
+    transition:
+        border-color var(--gs-fast),
+        box-shadow var(--gs-fast);
+}
+
+.gs-radio-card.is-active .gs-radio-card__mark {
+    border-color: var(--gs-brand);
+    box-shadow:
+        inset 0 0 0 3px var(--gs-surface),
+        inset 0 0 0 10px var(--gs-brand);
+}
+
+.gs-panel--info {
+    background: var(--gs-surface-2);
+}
+
+.gs-defs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin: 0;
+}
+
+.gs-defs > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.gs-defs dt {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gs-text-3);
+}
+
+.gs-defs dd {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 620;
+    font-variant-numeric: tabular-nums;
+    color: var(--gs-text);
+}
+
+/* ------------------------------------------------------------------
+ * 14. Save bar
+ * ---------------------------------------------------------------- */
+
+/* Kept in the layout so the slide-in can animate; visibility (rather than
+   display) keeps it out of the accessibility tree while it is parked. */
+.gs-savebar {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    z-index: 60;
+    transform: translate(-50%, 150%);
+    transition:
+        transform 380ms var(--gs-ease),
+        opacity var(--gs-mid),
+        visibility 0s linear 380ms;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.gs-savebar.is-visible {
+    transform: translate(-50%, 0);
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+}
+
+.gs-savebar__inner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 10px 10px 18px;
+    border-radius: var(--gs-r-full);
+    background: #1a1c30;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: var(--gs-shadow-lg);
+    color: #fff;
+}
+
+.gs-app[data-gs-theme='dark'] .gs-savebar__inner {
+    background: #23263e;
+}
+
+.gs-savebar__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ffc25c;
+    box-shadow: 0 0 0 0 rgba(255, 194, 92, 0.6);
+    animation: gs-pulse 2.2s ease-out infinite;
+}
+
+@keyframes gs-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 194, 92, 0.6);
+    }
+
+    70% {
+        box-shadow: 0 0 0 8px rgba(255, 194, 92, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 194, 92, 0);
+    }
+}
+
+.gs-savebar__text {
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.gs-savebar__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gs-savebar .gs-btn--ghost {
+    color: rgba(255, 255, 255, 0.62);
+    height: 36px;
+}
+
+.gs-savebar .gs-btn--ghost:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.gs-savebar .gs-btn--primary {
+    height: 36px;
+}
+
+/* ------------------------------------------------------------------
+ * 15. Toasts
+ * ---------------------------------------------------------------- */
+
+.gs-toasts {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.gs-toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    border-radius: var(--gs-r-full);
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-line);
+    box-shadow: var(--gs-shadow-lg);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gs-text);
+    pointer-events: auto;
+    animation: gs-toast-in 320ms var(--gs-ease);
+}
+
+.gs-toast.is-out {
+    animation: gs-toast-out 240ms var(--gs-ease) forwards;
+}
+
+.gs-toast__icon {
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--gs-ok-soft);
+    color: var(--gs-ok);
+    flex-shrink: 0;
+}
+
+.gs-toast__icon .gs-icon {
+    width: 11px;
+    height: 11px;
+}
+
+.gs-toast--error .gs-toast__icon {
+    background: var(--gs-danger-soft);
+    color: var(--gs-danger);
+}
+
+@keyframes gs-toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.96);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes gs-toast-out {
+    to {
+        opacity: 0;
+        transform: translateY(6px) scale(0.98);
+    }
+}
+
+/* ------------------------------------------------------------------
+ * 16. Responsive
+ * ---------------------------------------------------------------- */
+
+@media (max-width: 1240px) {
+    .gs-cols {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* The sidebar cards read better side by side once they drop below. */
+    .gs-col--side {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+    }
+}
+
+@media (max-width: 1100px) {
+    .gs-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .gs-workshop__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .gs-settings {
+        grid-template-columns: 1fr;
+    }
+
+    .gs-sidenav {
+        position: static;
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 4px;
+    }
+}
+
+@media (max-width: 782px) {
+    .gs-app {
+        margin-left: -10px;
+        min-height: calc(100vh - 46px);
+    }
+
+    .gs-bar {
+        top: 46px;
+    }
+
+    /* Stack the three bar tracks: brand and actions share a row, the nav
+       runs full width underneath. */
+    .gs-bar__inner {
+        height: auto;
+        min-height: 60px;
+        padding: 10px 16px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+    }
+
+    .gs-nav {
+        order: 3;
+        grid-column: 1 / -1;
+    }
+
+    .gs-shell {
+        padding: 0 16px;
+    }
+
+    .gs-appfoot__inner {
+        padding: 16px;
+    }
+
+    .gs-toolbar {
+        position: static;
+        margin-top: 0;
+    }
+
+    .gs-toolbar__actions {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .gs-toolbar__actions .gs-btn {
+        flex: 1;
+    }
+
+    .gs-metrics,
+    .gs-steps,
+    .gs-workshop__grid,
+    .gs-col--side,
+    .gs-radio-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .gs-card__head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .gs-search--sm {
+        flex: 1 1 auto;
+    }
+
+    .gs-row__desc {
+        white-space: normal;
+    }
+
+    .gs-field {
+        grid-template-columns: 1fr;
+        gap: 14px;
+        align-items: start;
+    }
+
+    .gs-savebar {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+        transform: translateY(150%);
+    }
+
+    .gs-savebar.is-visible {
+        transform: translateY(0);
+    }
+
+    .gs-savebar__inner {
+        justify-content: space-between;
+    }
+
+    .gs-savebar .gs-kbd {
+        display: none;
+    }
+
+    .gs-toasts {
+        left: 16px;
+        right: 16px;
+        bottom: 84px;
+        align-items: center;
+    }
+}
+
+/* ------------------------------------------------------------------
+ * 17. Motion preferences
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .gs-app *,
+    .gs-app *::before,
+    .gs-app *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ------------------------------------------------------------------
+ * 8h. Free vs Pro (dashboard, without Pro)
+ * ---------------------------------------------------------------- */
+
+.gs-compare {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Upgrade banner */
+
+.gs-upsell {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 32px;
+    padding: 32px 36px;
+    overflow: hidden;
+    border-radius: var(--gs-r-lg);
+    background: var(--gs-brand-grad);
+    color: #fff;
+    box-shadow: var(--gs-shadow-lg);
+    isolation: isolate;
+}
+
+.gs-upsell::before,
+.gs-upsell::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.gs-upsell::before {
+    top: -120px;
+    right: -60px;
+    width: 340px;
+    height: 340px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 65%);
+}
+
+.gs-upsell::after {
+    bottom: -160px;
+    left: 30%;
+    width: 420px;
+    height: 420px;
+    background: radial-gradient(circle, rgba(255, 196, 92, 0.18), transparent 65%);
+}
+
+.gs-upsell__text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.gs-upsell__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: var(--gs-r-full);
+    background: rgba(255, 255, 255, 0.12);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.gs-upsell__eyebrow svg {
+    width: 14px;
+    height: 14px;
+    color: #ffd27a;
+}
+
+.gs-app .gs-upsell__title {
+    margin: 4px 0 0;
+    color: #fff;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.gs-upsell__sub {
+    max-width: 520px;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.gs-upsell__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.gs-upsell__actions .gs-btn {
+    height: 40px;
+    padding: 0 18px;
+}
+
+.gs-upsell__ghost {
+    border-color: rgba(255, 255, 255, 0.4);
+    background: transparent;
+    color: #fff;
+}
+
+.gs-upsell__ghost:hover,
+.gs-upsell__ghost:focus {
+    border-color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.gs-upsell__stats {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.gs-upsell__stats li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0;
+    padding: 14px 18px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--gs-r);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(6px);
+}
+
+.gs-upsell__stats strong {
+    min-width: 58px;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.gs-upsell__stats span {
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 13px;
+}
+
+/* Comparison table */
+
+.gs-compare__scroll {
+    position: relative;
+    overflow-x: auto;
+}
+
+.gs-compare__table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 13.5px;
+}
+
+.gs-compare__table th,
+.gs-compare__table td {
+    padding: 12px 20px;
+    border-top: 1px solid var(--gs-line);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.gs-compare__table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-top: 0;
+    background: var(--gs-surface-2);
+    color: var(--gs-text-3);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.gs-compare__table .gs-compare__col {
+    width: 150px;
+    text-align: center;
+}
+
+/* The Pro column is lightly tinted all the way down. */
+.gs-compare__table .gs-compare__col--pro {
+    background: var(--gs-brand-soft);
+    border-left: 1px solid var(--gs-brand-line);
+}
+
+.gs-compare__table thead .gs-compare__col--pro {
+    background: var(--gs-brand-soft);
+}
+
+.gs-compare__badge {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 10px;
+    border-radius: var(--gs-r-full);
+    background: var(--gs-brand);
+    color: #fff;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+}
+
+.gs-compare__group th {
+    padding-top: 18px;
+    padding-bottom: 8px;
+    background: var(--gs-surface);
+    color: var(--gs-brand);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.gs-compare__table th.gs-compare__feature {
+    font-weight: 400;
+}
+
+.gs-compare__label {
+    display: block;
+    color: var(--gs-text);
+    font-weight: 600;
+}
+
+.gs-compare__hint {
+    display: block;
+    margin-top: 3px;
+    color: var(--gs-text-3);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.gs-compare__yes {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--gs-ok-soft);
+    color: var(--gs-ok);
+}
+
+.gs-compare__yes.is-pro {
+    background: var(--gs-brand);
+    color: #fff;
+}
+
+.gs-compare__yes svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 3;
+}
+
+.gs-compare__no {
+    display: inline-block;
+    width: 12px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--gs-line-strong);
+    vertical-align: middle;
+}
+
+.gs-compare__text {
+    color: var(--gs-text-2);
+    font-weight: 600;
+}
+
+.gs-compare__text.is-pro {
+    color: var(--gs-brand);
+}
+
+.gs-compare__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--gs-line);
+    background: var(--gs-surface-2);
+}
+
+.gs-compare__foot .gs-btn--primary {
+    margin-left: auto;
+}
+
+.gs-compare__note {
+    color: var(--gs-text-2);
+    font-size: 13px;
+}
+
+/* "Free vs Pro" in the top bar. */
+.gs-nav__link--upgrade {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gs-brand);
+}
+
+.gs-nav__link--upgrade svg {
+    width: 14px;
+    height: 14px;
+}
+
+@media (max-width: 1100px) {
+    .gs-upsell {
+        grid-template-columns: 1fr;
+        gap: 22px;
+    }
+
+    .gs-upsell__stats {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .gs-upsell__stats li {
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
+@media (max-width: 782px) {
+    .gs-upsell {
+        padding: 24px 20px;
+    }
+
+    .gs-app .gs-upsell__title {
+        font-size: 22px;
+    }
+
+    .gs-upsell__stats {
+        grid-template-columns: 1fr;
+    }
+
+    .gs-upsell__stats li {
+        flex-direction: row;
+    }
+
+    .gs-compare__table th,
+    .gs-compare__table td {
+        padding: 10px 14px;
+    }
+
+    .gs-compare__table .gs-compare__col {
+        width: 96px;
+    }
+}

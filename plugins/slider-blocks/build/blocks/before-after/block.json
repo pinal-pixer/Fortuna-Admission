@@ -1,0 +1,55 @@
+{
+  "apiVersion": 3,
+  "name": "gutsliders/before-after",
+  "version": "3.2.0",
+  "title": "Before After",
+  "category": "slider-blocks",
+  "description": "Showcase Photos Comparison in different styles.",
+  "keywords": [
+    "image",
+    "photo comparison",
+    "compare images",
+    "image compare",
+    "image comparison",
+    "before after slider",
+    "before after"
+  ],
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "align": [
+      "wide",
+      "full"
+    ],
+    "spacing": {
+      "margin": true,
+      "padding": true
+    },
+    "__experimentalBorder": {
+      "radius": true,
+      "color": true,
+      "width": true,
+      "style": true
+    }
+  },
+  "example": {
+    "attributes": {
+      "preview": true
+    },
+    "viewportWidth": 432
+  },
+  "textdomain": "slider-blocks",
+  "editorScript": [
+    "file:./index.js"
+  ],
+  "editorStyle": [
+    "file:./index.css"
+  ],
+  "style": [
+    "file:./style-index.css"
+  ],
+  "viewScript": [
+    "file:./frontend.js"
+  ],
+  "render": "file:./render.php"
+}

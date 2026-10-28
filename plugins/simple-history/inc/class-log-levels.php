@@ -7,13 +7,13 @@ namespace Simple_History;
  */
 class Log_Levels {
 	public const EMERGENCY = 'emergency';
-	public const ALERT = 'alert';
-	public const CRITICAL = 'critical';
-	public const ERROR = 'error';
-	public const WARNING = 'warning';
-	public const NOTICE = 'notice';
-	public const INFO = 'info';
-	public const DEBUG = 'debug';
+	public const ALERT     = 'alert';
+	public const CRITICAL  = 'critical';
+	public const ERROR     = 'error';
+	public const WARNING   = 'warning';
+	public const NOTICE    = 'notice';
+	public const INFO      = 'info';
+	public const DEBUG     = 'debug';
 
 	/**
 	 * Return translated loglevel.
@@ -94,7 +94,7 @@ class Log_Levels {
 
 			default:
 				$str_translated = $loglevel;
-		} // End switch().
+		}
 
 		return $str_translated;
 	}
@@ -119,6 +119,33 @@ class Log_Levels {
 	}
 
 	/**
+	 * Get all log levels ordered by severity, least severe first.
+	 *
+	 * This is PSR-3's order, and it is the order anything that ranks levels
+	 * must use. Levels are stored as varchars, so sorting on the column
+	 * itself sorts alphabetically — which puts emergency between error and
+	 * info and makes "show me the worst first" meaningless.
+	 *
+	 * The array index is the rank, so a caller that needs a number can use
+	 * array_search() or array_flip() rather than repeating the order.
+	 *
+	 * @since 5.34.0
+	 * @return array Log levels, least severe first.
+	 */
+	public static function get_log_levels_by_severity() {
+		return array(
+			self::DEBUG,
+			self::INFO,
+			self::NOTICE,
+			self::WARNING,
+			self::ERROR,
+			self::CRITICAL,
+			self::ALERT,
+			self::EMERGENCY,
+		);
+	}
+
+	/**
 	 * Check if a string is a valid log level.
 	 *
 	 * @since 4.0.0
@@ -127,5 +154,59 @@ class Log_Levels {
 	 */
 	public static function is_valid_level( $level ) {
 		return in_array( strtolower( $level ), self::get_valid_log_levels(), true );
+	}
+
+	/**
+	 * Get the color associated with a log level.
+	 *
+	 * Returns a hex color code suitable for visual indicators in
+	 * notifications, emails, and other external integrations.
+	 *
+	 * @since 5.6.0
+	 * @param string $level The log level (case-insensitive).
+	 * @return string Hex color code (e.g., '#ff0000').
+	 */
+	public static function get_level_color( $level ) {
+		$level = strtolower( $level );
+
+		$colors = [
+			self::EMERGENCY => '#8b0000', // Dark red.
+			self::ALERT     => '#dc143c', // Crimson.
+			self::CRITICAL  => '#ff0000', // Red.
+			self::ERROR     => '#ff4500', // Orange red.
+			self::WARNING   => '#ffa500', // Orange.
+			self::NOTICE    => '#1e90ff', // Dodger blue.
+			self::INFO      => '#32cd32', // Lime green.
+			self::DEBUG     => '#808080', // Gray.
+		];
+
+		return $colors[ $level ] ?? $colors[ self::INFO ];
+	}
+
+	/**
+	 * Get the emoji associated with a log level.
+	 *
+	 * Returns an emoji character for quick visual scanning in
+	 * notifications and messaging platforms.
+	 *
+	 * @since 5.6.0
+	 * @param string $level The log level (case-insensitive).
+	 * @return string Emoji character.
+	 */
+	public static function get_level_emoji( $level ) {
+		$level = strtolower( $level );
+
+		$emojis = [
+			self::EMERGENCY => '🚨',
+			self::ALERT     => '🔔',
+			self::CRITICAL  => '🔴',
+			self::ERROR     => '❌',
+			self::WARNING   => '⚠️',
+			self::NOTICE    => '📢',
+			self::INFO      => '📝',
+			self::DEBUG     => '🔍',
+		];
+
+		return $emojis[ $level ] ?? '📋';
 	}
 }

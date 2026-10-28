@@ -3,7 +3,6 @@
 namespace Simple_History\Services\WP_CLI_Commands;
 
 use Simple_History\Simple_History;
-use Simple_History\Helpers;
 use WP_CLI;
 use WP_CLI_Command;
 use WP_CLI\Utils;
@@ -67,71 +66,22 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 		// Start timing.
 		$start_time = microtime( true );
 
-		global $wp_version;
+		$result = Core_Files_Logger::run_integrity_check();
 
-		// Get official WordPress checksums for current version.
-		$checksums = get_core_checksums( $wp_version, 'en_US' );
-
-		if ( ! is_array( $checksums ) || empty( $checksums ) ) {
-			WP_CLI::error( 'Unable to retrieve WordPress core checksums for version ' . $wp_version );
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
 			return;
 		}
 
-		$modified_files = [];
-		$wp_root = ABSPATH;
-		$total_files_checked = 0;
-
-		// Check each file in the checksums array.
-		foreach ( $checksums as $file => $expected_hash ) {
-			// Skip files which get updated.
-			if ( str_starts_with( $file, 'wp-content' ) ) {
-				continue;
-			}
-
-			$total_files_checked++;
-			$file_path = $wp_root . $file;
-
-			// Check if file doesn't exist (missing core files should be logged).
-			if ( ! file_exists( $file_path ) ) {
-				$modified_files[] = [
-					'file' => $file,
-					'issue' => 'missing',
-					'expected_hash' => $expected_hash,
-					'actual_hash' => null,
-				];
-				continue;
-			}
-
-			// Calculate actual file hash.
-			$actual_hash = md5_file( $file_path );
-
-			if ( $actual_hash === false ) {
-				// File exists but can't be read.
-				$modified_files[] = [
-					'file' => $file,
-					'issue' => 'unreadable',
-					'expected_hash' => $expected_hash,
-					'actual_hash' => null,
-				];
-				continue;
-			}
-
-			// Compare hashes.
-			if ( $actual_hash !== $expected_hash ) {
-				$modified_files[] = [
-					'file' => $file,
-					'issue' => 'modified',
-					'expected_hash' => $expected_hash,
-					'actual_hash' => $actual_hash,
-				];
-			}
-		}
+		$modified_files      = $result['modified_files'];
+		$total_files_checked = $result['files_checked'];
 
 		// End timing.
-		$end_time = microtime( true );
+		$end_time       = microtime( true );
 		$execution_time = round( $end_time - $start_time, 2 );
 
 		WP_CLI::log( sprintf( 'Checked %d core files in %s seconds.', $total_files_checked, $execution_time ) );
+		WP_CLI::log( sprintf( 'Accepted official files for: %s.', implode( ', ', $result['checksum_locales'] ) ) );
 
 		if ( empty( $modified_files ) ) {
 			WP_CLI::success( 'All WordPress core files are intact.' );
@@ -143,7 +93,7 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 		// Format output.
 		$format = $assoc_args['format'] ?? 'table';
 
-		if ( 'count' === $format ) {
+		if ( $format === 'count' ) {
 			WP_CLI::log( count( $modified_files ) );
 			return;
 		}
@@ -152,10 +102,10 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 		$formatted_files = array_map(
 			function ( $file_data ) {
 				return [
-					'file' => $file_data['file'],
-					'issue' => $file_data['issue'],
+					'file'     => $file_data['file'],
+					'issue'    => $file_data['issue'],
 					'expected' => $file_data['expected_hash'],
-					'actual' => $file_data['actual_hash'] ?? 'N/A',
+					'actual'   => $file_data['actual_hash'] ?? 'N/A',
 				];
 			},
 			$modified_files
@@ -207,7 +157,7 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 
 		$format = $assoc_args['format'] ?? 'table';
 
-		if ( 'count' === $format ) {
+		if ( $format === 'count' ) {
 			WP_CLI::log( count( $stored_results ) );
 			return;
 		}
@@ -218,10 +168,10 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 		$formatted_files = [];
 		foreach ( $stored_results as $file => $file_data ) {
 			$formatted_files[] = [
-				'file' => $file,
-				'issue' => $file_data['issue'] ?? 'unknown',
+				'file'     => $file,
+				'issue'    => $file_data['issue'] ?? 'unknown',
 				'expected' => $file_data['expected_hash'] ?? 'N/A',
-				'actual' => $file_data['actual_hash'] ?? 'N/A',
+				'actual'   => $file_data['actual_hash'] ?? 'N/A',
 			];
 		}
 
@@ -262,7 +212,7 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 		$core_logger->perform_integrity_check();
 
 		// End timing.
-		$end_time = microtime( true );
+		$end_time       = microtime( true );
 		$execution_time = round( $end_time - $start_time, 2 );
 
 		WP_CLI::log( sprintf( 'Integrity check completed in %s seconds.', $execution_time ) );
@@ -277,12 +227,12 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 
 			// Show a summary of what was found.
 			$issues_by_type = [];
-			foreach ( $stored_results as $file => $file_data ) {
+			foreach ( $stored_results as $file_data ) {
 				$issue = $file_data['issue'] ?? 'unknown';
 				if ( ! isset( $issues_by_type[ $issue ] ) ) {
 					$issues_by_type[ $issue ] = 0;
 				}
-				$issues_by_type[ $issue ]++;
+				++$issues_by_type[ $issue ];
 			}
 
 			WP_CLI::log( 'Summary by issue type:' );
@@ -328,12 +278,12 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 
 		// Check if the logger is loaded.
 		$core_logger = $this->simple_history->get_instantiated_logger_by_slug( 'CoreFilesLogger' );
-		if ( $core_logger instanceof Core_Files_Logger ) {
-			WP_CLI::success( 'Core Files Integrity Logger is loaded' );
-		} else {
+		if ( ! ( $core_logger instanceof Core_Files_Logger ) ) {
 			WP_CLI::error( 'Core Files Integrity Logger is NOT loaded!' );
 			return;
 		}
+
+		WP_CLI::success( 'Core Files Integrity Logger is loaded' );
 		WP_CLI::log( '' );
 
 		// Check if the cron event is scheduled.
@@ -353,26 +303,30 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 
 		// Show all Simple History related cron events.
 		WP_CLI::log( '=== All Simple History Cron Events ===' );
-		$crons = _get_cron_array();
+		$crons          = _get_cron_array();
 		$found_sh_crons = false;
 
 		foreach ( $crons as $timestamp => $cron ) {
 			foreach ( $cron as $hook => $dings ) {
-				if ( strpos( $hook, 'simple_history' ) !== false ) {
-					$found_sh_crons = true;
-					foreach ( $dings as $sig => $data ) {
-						WP_CLI::log(
-							sprintf(
-								'- %s: %s (%s from now)',
-								$hook,
-								gmdate( 'Y-m-d H:i:s', $timestamp ),
-								human_time_diff( time(), $timestamp )
-							)
-						);
-						if ( ! empty( $data['schedule'] ) ) {
-							WP_CLI::log( '  Schedule: ' . $data['schedule'] );
-						}
+				if ( strpos( $hook, 'simple_history' ) === false ) {
+					continue;
+				}
+
+				$found_sh_crons = true;
+				foreach ( $dings as $data ) {
+					WP_CLI::log(
+						sprintf(
+							'- %s: %s (%s from now)',
+							$hook,
+							gmdate( 'Y-m-d H:i:s', $timestamp ),
+							human_time_diff( time(), $timestamp )
+						)
+					);
+					if ( empty( $data['schedule'] ) ) {
+						continue;
 					}
+
+					WP_CLI::log( '  Schedule: ' . $data['schedule'] );
 				}
 			}
 		}
@@ -402,12 +356,14 @@ class WP_CLI_Core_Files_Command extends WP_CLI_Command {
 		WP_CLI::log( '=== WordPress Information ===' );
 		WP_CLI::log( 'WordPress version: ' . $wp_version );
 		WP_CLI::log( 'Site locale: ' . get_locale() );
-		WP_CLI::log( 'Checksum locale used: en_US (hardcoded)' );
+		global $wp_local_package;
+		$checksum_locale = $wp_local_package ?? 'en_US';
+		WP_CLI::log( 'Checksum locale used: ' . $checksum_locale );
 
 		// Test if checksums can be retrieved.
 		WP_CLI::log( '' );
 		WP_CLI::log( 'Testing checksum retrieval...' );
-		$checksums = get_core_checksums( $wp_version, 'en_US' );
+		$checksums = get_core_checksums( $wp_version, $checksum_locale );
 		if ( is_array( $checksums ) && ! empty( $checksums ) ) {
 			WP_CLI::success( sprintf( 'Successfully retrieved checksums for %d core files', count( $checksums ) ) );
 		} else {

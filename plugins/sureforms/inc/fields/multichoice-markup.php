@@ -10,6 +10,7 @@ namespace SRFM\Inc\Fields;
 
 use Spec_Gb_Helper;
 use SRFM\Inc\Helper;
+use SRFM\Inc\Smart_Tags;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -94,6 +95,14 @@ class Multichoice_Markup extends Base {
 	protected $show_values;
 
 	/**
+	 * Array of preselected option indices.
+	 *
+	 * @var array
+	 * @since 2.3.0
+	 */
+	protected $preselected_options;
+
+	/**
 	 * Initialize the properties based on block attributes.
 	 *
 	 * @param array<mixed> $attributes Block attributes.
@@ -104,15 +113,17 @@ class Multichoice_Markup extends Base {
 		$this->set_properties( $attributes );
 		$this->set_input_label( __( 'Multi Choice', 'sureforms' ) );
 		$this->set_error_msg( $attributes, 'srfm_multi_choice_block_required_text' );
-		$this->single_selection  = $attributes['singleSelection'] ?? false;
-		$this->choice_width      = $attributes['choiceWidth'] ?? '';
-		$this->vertical_layout   = $attributes['verticalLayout'] ?? false;
-		$this->option_type       = ! empty( $attributes['optionType'] ) && in_array( $attributes['optionType'], [ 'icon', 'image' ], true ) ? $attributes['optionType'] : 'icon';
-		$this->type_attr         = $this->single_selection ? 'radio' : 'checkbox';
-		$this->svg_type          = $this->single_selection ? 'circle' : 'square';
-		$this->name_attr         = $this->single_selection ? 'name="srfm-input-' . esc_attr( $this->slug ) . '-' . esc_attr( $this->block_id ) . '"' : '';
-		$this->choice_width_attr = $this->choice_width ? 'srfm-choice-width-' . str_replace( '.', '-', $this->choice_width ) : '';
-		$this->show_values       = apply_filters( 'srfm_show_options_values', false, $attributes['showValues'] ?? false );
+		$this->single_selection    = $attributes['singleSelection'] ?? false;
+		$this->choice_width        = $attributes['choiceWidth'] ?? '';
+		$this->vertical_layout     = $attributes['verticalLayout'] ?? false;
+		$this->option_type         = ! empty( $attributes['optionType'] ) && in_array( $attributes['optionType'], [ 'icon', 'image' ], true ) ? $attributes['optionType'] : 'icon';
+		$this->type_attr           = $this->single_selection ? 'radio' : 'checkbox';
+		$this->svg_type            = $this->single_selection ? 'circle' : 'square';
+		$this->name_attr           = $this->single_selection ? 'name="srfm-input-' . esc_attr( $this->slug ) . '-' . esc_attr( $this->block_id ) . '"' : '';
+		$this->choice_width_attr   = $this->choice_width ? 'srfm-choice-width-' . str_replace( '.', '-', $this->choice_width ) : '';
+		$this->show_values         = apply_filters( 'srfm_show_options_values', false, $attributes['showValues'] ?? false );
+		$this->preselected_options = $attributes['preselectedOptions'] ?? [];
+		$this->resolve_dynamic_default( $attributes );
 		$this->set_markup_properties();
 		$this->set_aria_described_by();
 	}
@@ -147,9 +158,10 @@ class Multichoice_Markup extends Base {
 									<input type="<?php echo esc_attr( $this->type_attr ); ?>"
 										id="srfm-<?php echo esc_attr( $this->slug ); ?>-<?php echo esc_attr( $this->block_id . '-' . $i ); ?>"
 										class="srfm-input-<?php echo esc_attr( $this->slug ); ?>-single" <?php echo wp_kses_post( $this->name_attr ); ?>
-										<?php echo 0 === $i ? 'aria-describedby="' . ( ! empty( $this->aria_described_by ) ? esc_attr( trim( $this->aria_described_by ) ) : '' ) . '"' : ''; ?>
+										<?php echo 0 === $i ? ( ! empty( $this->aria_described_by ) ? 'aria-describedby="' . esc_attr( trim( $this->aria_described_by ) ) . '" ' : '' ) . 'data-srfm-error-target' : ''; ?>
 										<?php echo 0 === $i ? 'aria-required="' . ( ! empty( $this->data_require_attr ) ? esc_attr( $this->data_require_attr ) : '' ) . '"' : ''; ?>
 										<?php echo $this->show_values && isset( $option['value'] ) ? 'option-value="' . esc_attr( $option['value'] ) . '"' : ''; ?>
+										<?php echo is_array( $this->preselected_options ) && in_array( $i, $this->preselected_options, true ) ? 'checked' : ''; ?>
 									/>
 									<div class="srfm-block-content-wrap">
 										<div class="srfm-option-container">
@@ -162,10 +174,10 @@ class Multichoice_Markup extends Base {
 												<img src="<?php echo esc_url( $option['image'] ); ?>"/>
 											</span>
 											<?php } ?>
-											<!-- This label content is used in conditional logic and for storing values in a hidden input field as comma-separated values. 
-											The markup should remain unchanged. 
+											<!-- This label content is used in conditional logic and for storing values in a hidden input field as comma-separated values.
+											The markup should remain unchanged.
 											If you make any changes here, ensure the corresponding JavaScript value functionality and conditional logic are also updated. -->
-											<label for="srfm-<?php echo esc_attr( $this->slug ); ?>-<?php echo esc_attr( $this->block_id . '-' . $i ); ?>"><?php echo isset( $option['optionTitle'] ) ? esc_html( $option['optionTitle'] ) : ''; ?></label>
+											<label for="srfm-<?php echo esc_attr( $this->slug ); ?>-<?php echo esc_attr( $this->block_id . '-' . $i ); ?>" data-option-text="<?php echo isset( $option['optionTitle'] ) ? esc_attr( $option['optionTitle'] ) : ''; ?>"><?php echo isset( $option['optionTitle'] ) ? esc_html( $option['optionTitle'] ) : ''; ?></label>
 										</div>
 										<div class="srfm-icon-container"><?php echo wp_kses( $check_svg, $allowed_tags_svg ) . wp_kses( $unchecked_svg, $allowed_tags_svg ); ?></div>
 									</div>
@@ -189,6 +201,95 @@ class Multichoice_Markup extends Base {
 				'attributes' => $this->attributes,
 			]
 		);
+	}
+
+	/**
+	 * Resolve dynamic default value from smart tags and override preselected options.
+	 *
+	 * Radio (single-selection) mode matches the resolved value as a single
+	 * trimmed string, so option titles that legitimately contain delimiter
+	 * characters (commas, pipes, etc.) still match.
+	 *
+	 * Checkbox mode splits the resolved value on the pipe character (`|`) and
+	 * matches every segment (for example "{get_input:a}|{get_input:b}" resolving
+	 * to "Red|Blue", or a single `{get_input:colors}` with URL
+	 * `?colors=Red|Blue`). The same pipe split applies to multi-character
+	 * resolved values from `{get_input:...}` and `{get_cookie:...}`, so cookie
+	 * payloads that contain pipes are treated as multi-value in checkbox mode.
+	 *
+	 * When the `Add Numeric Values to Options` (showValues) setting is on,
+	 * each segment is also compared against the option's `value`.
+	 *
+	 * @param array<mixed> $attributes Block attributes.
+	 * @since 2.8.1
+	 * @since 2.10.0 Added checkbox (pipe-delimited) multi-value matching.
+	 * @return void
+	 */
+	protected function resolve_dynamic_default( $attributes ) {
+		// Coalesce first so blocks saved before this attribute existed (pre-2.10.0)
+		// don't trigger an "Undefined array key" warning on every frontend render.
+		$raw_default     = $attributes['dynamicDefaultValue'] ?? '';
+		$dynamic_default = is_string( $raw_default ) ? $raw_default : '';
+		if ( empty( $dynamic_default ) ) {
+			return;
+		}
+
+		$smart_tags = Smart_Tags::get_instance();
+		$resolved   = $smart_tags->process_smart_tags( $dynamic_default );
+
+		if ( empty( $resolved ) || ! is_string( $resolved ) || ! is_array( $this->options ) ) {
+			return;
+		}
+
+		// START: multi-value dynamic default resolution.
+		if ( ! $this->single_selection ) {
+			$segments = array_filter(
+				array_map( 'trim', explode( '|', $resolved ) ),
+				static function ( $segment ) {
+					return '' !== $segment;
+				}
+			);
+			// Cap segments to avoid pathological URLs (e.g. ?colors=|||||...) producing thousands of comparisons.
+			$segments = array_slice( $segments, 0, 50 );
+		} else {
+			$trimmed  = trim( $resolved );
+			$segments = '' === $trimmed ? [] : [ $trimmed ];
+		}
+
+		if ( empty( $segments ) ) {
+			return;
+		}
+
+		$match_value_too  = ! empty( $attributes['showValues'] );
+		$matching_indices = [];
+
+		foreach ( $segments as $segment ) {
+			foreach ( $this->options as $i => $option ) {
+				if ( ! is_array( $option ) || in_array( $i, $matching_indices, true ) ) {
+					continue;
+				}
+
+				$option_title = isset( $option['optionTitle'] ) && is_scalar( $option['optionTitle'] ) ? (string) $option['optionTitle'] : '';
+				$raw_value    = $option['value'] ?? '';
+				$option_value = $match_value_too && is_scalar( $raw_value ) ? (string) $raw_value : '';
+
+				$is_match = ( '' !== $option_title && strcasecmp( $option_title, $segment ) === 0 )
+					|| ( $match_value_too && '' !== $option_value && strcasecmp( $option_value, $segment ) === 0 );
+
+				if ( $is_match ) {
+					$matching_indices[] = $i;
+					if ( $this->single_selection ) {
+						break 2;
+					}
+					break;
+				}
+			}
+		}
+
+		if ( ! empty( $matching_indices ) ) {
+			$this->preselected_options = $this->single_selection ? [ $matching_indices[0] ] : $matching_indices;
+		}
+		// END: multi-value dynamic default resolution.
 	}
 
 	/**

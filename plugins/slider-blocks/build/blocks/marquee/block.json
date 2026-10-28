@@ -1,0 +1,41 @@
+{
+  "apiVersion": 3,
+  "name": "gutsliders/marquee",
+  "version": "3.2.0",
+  "title": "Marquee",
+  "category": "slider-blocks",
+  "description": "Create amazing marquee with any type of content.",
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "example": {
+    "attributes": {
+      "preview": true
+    },
+    "viewportWidth": 432
+  },
+  "textdomain": "slider-blocks",
+  "editorScript": [
+    "file:./index.js",
+    "gutslider-swiper-script",
+    "gutslider-blocks-global-script"
+  ],
+  "editorStyle": [
+    "file:./index.css",
+    "gutslider-swiper-style",
+    "gutslider-blocks-global-style"
+  ],
+  "style": [
+    "file:./style-index.css",
+    "gutslider-swiper-style"
+  ],
+  "viewScript": [
+    "file:./frontend.js"
+  ],
+  "render": "file:./render.php"
+}

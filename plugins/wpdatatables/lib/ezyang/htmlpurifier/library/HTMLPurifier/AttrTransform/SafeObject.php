@@ -1,15 +1,16 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Writes default type for all objects. Currently only supports flash.
  */
-class HTMLPurifier_AttrTransform_SafeObject extends HTMLPurifier_AttrTransform
+class HTMLPurifier_AttrTransform_SafeObject extends \WPDT\HTMLPurifier_AttrTransform
 {
     /**
      * @type string
      */
     public $name = "SafeObject";
-
     /**
      * @param array $attr
      * @param HTMLPurifier_Config $config
@@ -24,5 +25,4 @@ class HTMLPurifier_AttrTransform_SafeObject extends HTMLPurifier_AttrTransform
         return $attr;
     }
 }
-
 // vim: et sw=4 sts=4

@@ -1,9 +1,11 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Pre-transform that changes proprietary background attribute to CSS.
  */
-class HTMLPurifier_AttrTransform_Background extends HTMLPurifier_AttrTransform
+class HTMLPurifier_AttrTransform_Background extends \WPDT\HTMLPurifier_AttrTransform
 {
     /**
      * @param array $attr
@@ -16,13 +18,10 @@ class HTMLPurifier_AttrTransform_Background extends HTMLPurifier_AttrTransform
         if (!isset($attr['background'])) {
             return $attr;
         }
-
         $background = $this->confiscateAttr($attr, 'background');
         // some validation should happen here
-
-        $this->prependCSS($attr, "background-image:url($background);");
+        $this->prependCSS($attr, "background-image:url({$background});");
         return $attr;
     }
 }
-
 // vim: et sw=4 sts=4

@@ -1,7 +1,8 @@
 <?php
 
-// must be called POST validation
+namespace WPDT;
 
+// must be called POST validation
 /**
  * Adds rel="noopener" to any links which target a different window
  * than the current one.  This is used to prevent malicious websites
@@ -9,7 +10,7 @@
  * to do phishing.
  * This transform is controlled by %HTML.TargetNoopener.
  */
-class HTMLPurifier_AttrTransform_TargetNoopener extends HTMLPurifier_AttrTransform
+class HTMLPurifier_AttrTransform_TargetNoopener extends \WPDT\HTMLPurifier_AttrTransform
 {
     /**
      * @param array $attr
@@ -20,18 +21,16 @@ class HTMLPurifier_AttrTransform_TargetNoopener extends HTMLPurifier_AttrTransfo
     public function transform($attr, $config, $context)
     {
         if (isset($attr['rel'])) {
-            $rels = explode(' ', $attr['rel']);
+            $rels = \explode(' ', $attr['rel']);
         } else {
             $rels = array();
         }
-        if (isset($attr['target']) && !in_array('noopener', $rels)) {
+        if (isset($attr['target']) && !\in_array('noopener', $rels)) {
             $rels[] = 'noopener';
         }
         if (!empty($rels) || isset($attr['rel'])) {
-            $attr['rel'] = implode(' ', $rels);
+            $attr['rel'] = \implode(' ', $rels);
         }
-
         return $attr;
     }
 }
-

@@ -102,9 +102,9 @@ class Number_Markup extends Base {
 		$this->min_value      = $attributes['minValue'] ?? '';
 		$this->max_value      = $attributes['maxValue'] ?? '';
 		$this->format_type    = $attributes['formatType'] ?? '';
-		$this->format_attr    = $this->format_type ? ' format-type="' . $this->format_type . '" ' : '';
-		$this->min_value_attr = $this->min_value ? ' min="' . $this->min_value . '" ' : '';
-		$this->max_value_attr = $this->max_value ? ' max="' . $this->max_value . '" ' : '';
+		$this->format_attr    = $this->format_type ? ' format-type="' . esc_attr( $this->format_type ) . '" ' : '';
+		$this->min_value_attr = $this->min_value ? ' min="' . esc_attr( $this->min_value ) . '" ' : '';
+		$this->max_value_attr = $this->max_value ? ' max="' . esc_attr( $this->max_value ) . '" ' : '';
 		$this->prefix         = $attributes['prefix'] ?? '';
 		$this->suffix         = $attributes['suffix'] ?? '';
 		$this->read_only      = ! empty( trim( $this->default ) ) && $attributes['readOnly'];
@@ -137,7 +137,7 @@ class Number_Markup extends Base {
 							<span class="srfm-number-prefix" aria-hidden="true"><?php echo esc_html( $this->prefix ); ?></span>
 						<?php } ?>
 						<input class="srfm-input-common srfm-input-<?php echo esc_attr( $this->slug ); ?>" type="text" name="<?php echo esc_attr( $this->field_name ); ?>" id="<?php echo esc_attr( $this->unique_slug ); ?>"
-						<?php echo ! empty( $this->aria_described_by ) ? "aria-describedby='" . esc_attr( trim( $this->aria_described_by ) ) . "'" : ''; ?>
+						<?php echo ! empty( $this->aria_described_by ) ? "aria-describedby='" . esc_attr( trim( $this->aria_described_by ) ) . "'" : ''; ?> data-srfm-error-target
 						data-required="<?php echo esc_attr( $this->data_require_attr ); ?>" aria-required="<?php echo esc_attr( $this->data_require_attr ); ?>" <?php echo wp_kses_post( $this->placeholder_attr . '' . $this->default_value_attr . '' . $this->format_attr . '' . $this->min_value_attr . '' . $this->max_value_attr ); ?> <?php echo $this->read_only ? 'readonly' : ''; ?> />
 						<?php if ( ! empty( $this->suffix ) ) { ?>
 							<span class="srfm-number-suffix" aria-hidden="true"><?php echo esc_html( $this->suffix ); ?></span>

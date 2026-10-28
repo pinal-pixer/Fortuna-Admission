@@ -58,7 +58,6 @@ class Admin_Helper {
 
 		$options = array(
 			'rollback_to_previous_version'       => isset( $uag_versions[0]['value'] ) ? $uag_versions[0]['value'] : '',
-			'enable_beta_updates'                => \UAGB_Admin_Helper::get_admin_settings_option( 'uagb_beta', 'no' ),
 			'enable_file_generation'             => \UAGB_Admin_Helper::get_admin_settings_option( '_uagb_allow_file_generation', 'enabled' ),
 			'blocks_activation_and_deactivation' => self::get_blocks(),
 			'enable_templates_button'            => \UAGB_Admin_Helper::get_admin_settings_option( 'uag_enable_templates_button', 'yes' ),
@@ -98,7 +97,7 @@ class Admin_Helper {
 			'recaptcha_secret_key_v2'            => \UAGB_Admin_Helper::get_admin_settings_option( 'uag_recaptcha_secret_key_v2', '' ),
 			'recaptcha_site_key_v3'              => \UAGB_Admin_Helper::get_admin_settings_option( 'uag_recaptcha_site_key_v3', '' ),
 			'recaptcha_secret_key_v3'            => \UAGB_Admin_Helper::get_admin_settings_option( 'uag_recaptcha_secret_key_v3', '' ),
-			'insta_linked_accounts'              => \UAGB_Admin_Helper::get_admin_settings_option( 'uag_insta_linked_accounts', array() ),
+			'insta_linked_accounts'              => current_user_can( 'manage_options' ) ? \UAGB_Admin_Helper::get_admin_settings_option( 'uag_insta_linked_accounts', array() ) : array(),
 			'spectra_global_fse_fonts'           => \UAGB_Admin_Helper::get_admin_settings_option( 'spectra_global_fse_fonts', array() ),
 			'theme_fonts'                        => $theme_font_families,
 			'zip_ai_modules'                     => $zip_ai_modules,

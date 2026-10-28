@@ -3,7 +3,7 @@
 Plugin Name: WP All Import - User Import Add-On Pro
 Plugin URI: http://www.wpallimport.com/
 Description: Import Users & User metadata to WordPress. Requires WP All Import.
-Version: 1.1.8
+Version: 1.1.10
 Author: Soflyy
 */
 /**
@@ -24,7 +24,7 @@ define('PMUI_ROOT_URL', rtrim(plugin_dir_url(__FILE__), '/'));
  */
 define('PMUI_PREFIX', 'pmui_');
 
-define('PMUI_VERSION', '1.1.8');
+define('PMUI_VERSION', '1.1.10');
 
 if ( class_exists('PMUI_Plugin') and PMUI_EDITION == "free"){
 
@@ -483,9 +483,18 @@ else {
 	// retrieve our license key from the DB
 	$wpai_user_addon_options = get_option('PMXI_Plugin_Options');
 
-	if (!empty($wpai_user_addon_options['info_api_url'])){
+    // Favor new API URL, but fallback to old if needed.
+    if( !empty($wpai_user_addon_options['info_api_url_new'])){
+        $api_url = $wpai_user_addon_options['info_api_url_new'];
+    }elseif( !empty($wpai_user_addon_options['info_api_url'])){
+        $api_url = $wpai_user_addon_options['info_api_url'];
+    }else{
+        $api_url = null;
+    }
+
+    if (!empty($api_url)){
 		// setup the updater
-		$updater = new PMUI_Updater( $wpai_user_addon_options['info_api_url'], __FILE__, array(
+		$updater = new PMUI_Updater( $api_url, __FILE__, array(
 				'version' 	=> PMUI_VERSION,		// current version number
 				'license' 	=> false, // license key (used get_option above to retrieve from DB)
 				'item_name' => PMUI_Plugin::getEddName(), 	// name of this plugin

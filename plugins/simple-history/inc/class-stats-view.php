@@ -16,7 +16,7 @@ class Stats_View {
 	 * @return int Random number between min and max.
 	 */
 	private static function get_random_stat( $min, $max ) {
-		return rand( $min, $max );
+		return wp_rand( $min, $max );
 	}
 
 	/**
@@ -68,18 +68,27 @@ class Stats_View {
 
 			<div class="sh-StatsDashboard-dateRangeControls">
 				<select>
-					<option disabled>Today</option>
-					<option disabled>Last 7 days</option>
-					<option selected>Last 30 days</option>
-					<option disabled>Last 3 months</option>
-					<option disabled>Last 6 months</option>
-					<option disabled>Last year</option>
-					<option disabled>All time</option>
+					<option disabled><?php esc_html_e( 'Today', 'simple-history' ); ?></option>
+					<option disabled><?php esc_html_e( 'Last 7 days', 'simple-history' ); ?></option>
+					<option selected><?php esc_html_e( 'Last 30 days', 'simple-history' ); ?></option>
+					<option disabled><?php esc_html_e( 'Last 3 months', 'simple-history' ); ?></option>
+					<option disabled><?php esc_html_e( 'Last 6 months', 'simple-history' ); ?></option>
+					<option disabled><?php esc_html_e( 'Last year', 'simple-history' ); ?></option>
+					<option disabled><?php esc_html_e( 'All time', 'simple-history' ); ?></option>
 				</select>
 
 				<div class="sh-StatsDashboard-dateRangeControls-description">
 					<span class="sh-Icon sh-Icon-lock"></span>
-					<span><a target="_blank" rel="noopener noreferrer" href="<?php echo esc_url( Helpers::get_tracking_url( 'https://simple-history.com/add-ons/premium/', 'premium_stats_daterange' ) ); ?>">Upgrade to Premium</a> to get access to more date ranges.</span>
+					<span>
+						<?php
+							printf(
+								/* translators: 1: opening link tag, 2: closing link tag */
+								esc_html__( '%1$sUpgrade to Premium%2$s to get access to more date ranges.', 'simple-history' ),
+								'<a target="_blank" rel="noopener noreferrer" href="' . esc_url( Helpers::get_tracking_url( 'https://simple-history.com/add-ons/premium/', 'premium_stats_daterange' ) ) . '">', // 1
+								'</a>', // 2
+							);
+						?>
+					</span>
 				</div>
 			</div>
 
@@ -100,9 +109,9 @@ class Stats_View {
 	 * @param int   $date_to   End date as Unix timestamp.
 	 */
 	public static function output_events_overview( $data, $date_from, $date_to ) {
-		$total_events = $data['overview_total_events'];
-		$user_stats = $data['user_stats'];
-		$top_users = $data['user_rankings'];
+		$total_events     = $data['overview_total_events'];
+		$user_stats       = $data['user_stats'];
+		$top_users        = $data['user_rankings'];
 		$user_total_count = $data['user_total_count'];
 
 		$sitename = get_bloginfo( 'name' );
@@ -136,8 +145,8 @@ class Stats_View {
 					<span class="sh-StatsDashboard-statLabel"><?php esc_html_e( 'Users with most events', 'simple-history' ); ?></span>
 					<span class="sh-StatsDashboard-statValue"><?php self::output_top_users_avatar_list( $top_users ); ?></span>
 				</div>
-			</div>		
-			
+			</div>
+
 			<div class="sh-flex sh-justify-between sh-mb-large">
 				<?php
 				/*
@@ -160,6 +169,10 @@ class Stats_View {
 						'label' => __( 'Media actions', 'simple-history' ),
 						'value' => number_format_i18n( $data['media_stats']['total_count'] ),
 					),
+					array(
+						'label' => __( 'Notes actions', 'simple-history' ),
+						'value' => number_format_i18n( $data['notes_stats']['total_count'] ?? 0 ),
+					),
 				);
 
 				foreach ( $categories as $category ) {
@@ -172,7 +185,7 @@ class Stats_View {
 				}
 				?>
 			</div>
-	
+
 			<div class="sh-StatsDashboard-stat">
 				<div class="sh-StatsDashboard-statLabel">
 					<?php esc_html_e( 'Activity by date', 'simple-history' ); ?>
@@ -241,9 +254,13 @@ class Stats_View {
 											?>
 										</span>
 
-										<?php if ( ! empty( $user_data['sessions'] ) ) : ?>
+										<?php
+										if ( ! empty( $user_data['sessions'] ) ) {
+											?>
 											<div class="sh-StatsDashboard-userSessions-details">
-												<?php foreach ( $user_data['sessions'] as $session ) : ?>
+												<?php
+												foreach ( $user_data['sessions'] as $session ) {
+													?>
 													<div class="sh-StatsDashboard-userSession">
 														<span class="sh-StatsDashboard-userLastLogin">
 															<?php
@@ -255,7 +272,7 @@ class Stats_View {
 															);
 															?>
 														</span>
-														
+
 														<span class="sh-StatsDashboard-userExpiration">
 															<?php
 															$expiration_time = date_i18n( 'F d, Y H:i A', $session['expiration'] );
@@ -266,8 +283,10 @@ class Stats_View {
 															);
 															?>
 														</span>
-														
-														<?php if ( ! empty( $session['ip'] ) ) : ?>
+
+														<?php
+														if ( ! empty( $session['ip'] ) ) {
+															?>
 															<span class="sh-StatsDashboard-userIP">
 																<?php
 																printf(
@@ -277,11 +296,13 @@ class Stats_View {
 																);
 																?>
 															</span>
-														<?php endif; ?>
+															<?php
+														}
+														?>
 													</div>
-												<?php endforeach; ?>
+												<?php } ?>
 											</div>
-										<?php endif; ?>
+										<?php } ?>
 									</div>
 								</li>
 								<?php
@@ -315,7 +336,7 @@ class Stats_View {
 				<?php echo esc_html_x( 'Most edited posts and pages', 'stats section title', 'simple-history' ); ?>
 			</h2>
 
-			<p>Events can be page created, updated, deleted, trashed or restored.</p>
+			<p><?php esc_html_e( 'Events can be page created, updated, deleted, trashed or restored.', 'simple-history' ); ?></p>
 
 			<div class="sh-StatsDashboard-content">
 				<?php
@@ -331,7 +352,7 @@ class Stats_View {
 	/**
 	 * Output the table of top posts and pages.
 	 *
-	 * @param object $top_posts_and_pages Array of top posts and pages data.
+	 * @param array $top_posts_and_pages Array of top posts and pages data.
 	 */
 	public static function output_top_posts_and_pages_table( $top_posts_and_pages ) {
 		?>
@@ -344,7 +365,9 @@ class Stats_View {
 					</tr>
 				</thead>
 				<tbody>
-					<?php foreach ( $top_posts_and_pages as $post ) { ?>
+					<?php
+					foreach ( $top_posts_and_pages as $post ) {
+						?>
 						<tr>
 							<td>
 								<span class="dashicons dashicons-admin-page"></span>
@@ -354,7 +377,9 @@ class Stats_View {
 								<?php echo esc_html( $post->edit_count ); ?>
 							</td>
 						</tr>
-					<?php } ?>
+						<?php
+					}
+					?>
 				</tbody>
 			</table>
 		</div>
@@ -391,10 +416,11 @@ class Stats_View {
 			$loop_count = 0;
 			foreach ( $top_users as $user ) {
 				// Set z-index to reverse order, so first user is on top.
-				$style = 'z-index: ' . ( $user_count - $loop_count ) . ';';
+				$style    = 'z-index: ' . ( $user_count - $loop_count ) . ';';
 				$user_url = Helpers::get_filtered_events_url(
 					[
 						'users' => $user,
+						'date'  => 'lastdays:30',
 					]
 				);
 				?>
@@ -407,13 +433,21 @@ class Stats_View {
 						>
 						<span class="sh-StatsDashboard-userData">
 							<span class="sh-StatsDashboard-userName"><?php echo esc_html( $user['display_name'] ); ?></span>
-							<span class="sh-StatsDashboard-userActions"><?php echo esc_html( number_format_i18n( $user['count'] ) ); ?> events</span>
+							<span class="sh-StatsDashboard-userActions">
+								<?php
+									printf(
+										/* translators: %d: number of events */
+										esc_html( _n( '%d event', '%d events', $user['count'], 'simple-history' ) ),
+										esc_html( number_format_i18n( $user['count'] ) )
+									);
+								?>
+							</span>
 						</span>
 					</a>
 				</li>
 				<?php
 
-				$loop_count++;
+				++$loop_count;
 			}
 			?>
 		</ul>
@@ -430,6 +464,7 @@ class Stats_View {
 					$url = Helpers::get_filtered_events_url(
 						[
 							'users' => $user,
+							'date'  => 'lastdays:30',
 						]
 					);
 
@@ -462,12 +497,14 @@ class Stats_View {
 					</tr>
 				</thead>
 				<tbody>
-					<?php foreach ( $top_users as $user ) { ?>
+					<?php
+					foreach ( $top_users as $user ) {
+						?>
 						<tr>
 							<td>
-								<img 
-										src="<?php echo esc_url( $user['avatar'] ); ?>" 
-										alt="<?php echo esc_attr( $user['display_name'] ); ?>" 
+								<img
+										src="<?php echo esc_url( $user['avatar'] ); ?>"
+										alt="<?php echo esc_attr( $user['display_name'] ); ?>"
 										class="sh-StatsDashboard-userAvatar"
 									>
 								<?php
@@ -479,7 +516,9 @@ class Stats_View {
 								<?php echo esc_html( number_format_i18n( $user['count'] ) ); ?>
 							</td>
 						</tr>
-					<?php } ?>
+						<?php
+					}
+					?>
 				</tbody>
 			</table>
 		</div>
@@ -507,7 +546,7 @@ class Stats_View {
 			</h2>
 
 			<p class="sh-mt-0">
-				Premium users get access to charts with detailed stats.
+				<?php esc_html_e( 'Premium users get access to charts with detailed stats.', 'simple-history' ); ?>
 				<a href="<?php echo esc_url( Helpers::get_tracking_url( 'https://simple-history.com/add-ons/premium/#stats-and-summaries', 'premium_stats_charts' ) ); ?>" class="sh-ml-1" target="_blank"><?php esc_html_e( 'View more details', 'simple-history' ); ?></a>.
 			</p>
 
@@ -531,7 +570,7 @@ class Stats_View {
 			<?php
 			// Get the first and last day of the date range.
 			$start_date = new \DateTime( gmdate( 'Y-m-d', $date_from ) );
-			$end_date = new \DateTime( gmdate( 'Y-m-d', $date_to ) );
+			$end_date   = new \DateTime( gmdate( 'Y-m-d', $date_to ) );
 
 			// Get the first and last day of the month.
 			$first_day_of_month = clone $start_date;
@@ -539,7 +578,7 @@ class Stats_View {
 			$last_day_of_month = clone $start_date;
 			$last_day_of_month->modify( 'last day of this month' );
 
-			$current_date = clone $first_day_of_month;
+			$current_date  = clone $first_day_of_month;
 			$start_weekday = (int) $first_day_of_month->format( 'w' );
 
 			// Create array of dates with their event counts.
@@ -576,8 +615,8 @@ class Stats_View {
 
 					// Output calendar days.
 					while ( $current_date <= $last_day_of_month ) {
-						$date_str = $current_date->format( 'Y-m-d' );
-						$count = isset( $date_counts[ $date_str ] ) ? $date_counts[ $date_str ] : 0;
+						$date_str    = $current_date->format( 'Y-m-d' );
+						$count       = $date_counts[ $date_str ] ?? 0;
 						$is_in_range = $current_date >= $start_date && $current_date <= $end_date;
 
 						$classes = array( 'sh-StatsDashboard-calendarDay' );
@@ -599,19 +638,23 @@ class Stats_View {
 							sprintf( _n( '%d event', '%d events', $count, 'simple-history' ), $count ) :
 							__( 'Outside selected date range', 'simple-history' );
 						?>
-						<div class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>" 
+						<div class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>"
 							title="<?php echo esc_attr( $title ); ?>">
 							<span class="sh-StatsDashboard-calendarDayNumber"><?php echo esc_html( $current_date->format( 'j' ) ); ?></span>
-							<?php if ( $is_in_range ) { ?>
+							<?php
+							if ( $is_in_range ) {
+								?>
 								<span class="sh-StatsDashboard-calendarDayCount"><?php echo esc_html( number_format_i18n( $count ) ); ?></span>
-							<?php } ?>
+								<?php
+							}
+							?>
 						</div>
 						<?php
 						$current_date->modify( '+1 day' );
 					}
 
 					// Add empty cells for days after the end of the month to complete the grid.
-					$end_weekday = (int) $last_day_of_month->format( 'w' );
+					$end_weekday    = (int) $last_day_of_month->format( 'w' );
 					$remaining_days = 6 - $end_weekday;
 					for ( $i = 0; $i < $remaining_days; $i++ ) {
 						echo '<div class="sh-StatsDashboard-calendarDay sh-StatsDashboard-calendarDay--empty"></div>';
@@ -655,15 +698,19 @@ class Stats_View {
 				<?php
 			}
 			?>
-			
+
 			<div class="sh-StatsDashboard-content">
 				<div class="sh-StatsDashboard-stats is-blurred">
-					<?php foreach ( $stats as $stat ) { ?>
+					<?php
+					foreach ( $stats as $stat ) {
+						?>
 						<div class="sh-StatsDashboard-stat">
 							<span class="sh-StatsDashboard-statLabel"><?php echo esc_html( $stat['label'] ); ?></span>
 							<span class="sh-StatsDashboard-statValue"><?php echo esc_html( number_format_i18n( $stat['value'] ) ); ?></span>
 						</div>
-					<?php } ?>
+						<?php
+					}
+					?>
 				</div>
 			</div>
 		</div>
@@ -705,7 +752,7 @@ class Stats_View {
 			__( 'Plugins', 'simple-history' ),
 			$stats_data,
 			'--sh-color-green-mint',
-			'Premium users get quick overview of vital plugin numbers, like installations, activations, updates, deactivations and deletions.'
+			__( 'Premium users get quick overview of vital plugin numbers, like installations, activations, updates, deactivations and deletions.', 'simple-history' )
 		);
 	}
 
@@ -740,7 +787,7 @@ class Stats_View {
 			_x( 'User profile activity', 'stats section title', 'simple-history' ),
 			$stats_data,
 			'--sh-color-pink',
-			'Premium users get detailed stats on user profile activity, like successful logins, failed logins, profile updates, added users and removed users.'
+			__( 'Premium users get detailed stats on user profile activity, like successful logins, failed logins, profile updates, added users and removed users.', 'simple-history' )
 		);
 	}
 
@@ -771,7 +818,7 @@ class Stats_View {
 			_x( 'Posts & pages activity', 'stats section title', 'simple-history' ),
 			$stats_data,
 			'--sh-color-yellow',
-			'Premium users get detailed stats on posts and pages activity, like created, updated, trashed and deleted.'
+			__( 'Premium users get detailed stats on posts and pages activity, like created, updated, trashed and deleted.', 'simple-history' )
 		);
 	}
 
@@ -798,7 +845,31 @@ class Stats_View {
 			_x( 'Media', 'stats section title', 'simple-history' ),
 			$stats_data,
 			'--sh-color-green-light',
-			'Premium users get detailed stats on media activity, like uploads, edits and deletions.'
+			__( 'Premium users get detailed stats on media activity, like uploads, edits and deletions.', 'simple-history' )
+		);
+	}
+
+	/**
+	 * Output the notes statistics section.
+	 * Shows WordPress 6.9+ collaborative Notes activity.
+	 */
+	public static function output_notes_stats_section() {
+		$stats_data = [
+			[
+				'label' => __( 'Notes added', 'simple-history' ),
+				'value' => self::get_random_stat( 5, 20 ),
+			],
+			[
+				'label' => __( 'Notes resolved', 'simple-history' ),
+				'value' => self::get_random_stat( 2, 10 ),
+			],
+		];
+
+		self::output_stats_box_section(
+			_x( 'Notes', 'stats section title', 'simple-history' ),
+			$stats_data,
+			'--sh-color-blue',
+			__( 'Premium users get detailed stats on collaborative notes activity from the block editor.', 'simple-history' )
 		);
 	}
 
@@ -837,6 +908,7 @@ class Stats_View {
 			self::output_user_stats_section();
 			self::output_posts_pages_stats_section();
 			self::output_media_stats_section();
+			self::output_notes_stats_section();
 			?>
 		</div>
 		<?php

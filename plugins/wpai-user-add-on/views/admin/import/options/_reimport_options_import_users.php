@@ -1,25 +1,39 @@
-<h4><?php _e('When WP All Import finds new or changed data...', 'wp_all_import_user_add_on'); ?></h4>
+<?php
+// Check if $isWizard is defined
+$isWizard = isset($isWizard) ? $isWizard : false;
+
+if ( ! $isWizard  or ! empty(PMXI_Plugin::$session->deligate) and PMXI_Plugin::$session->deligate == 'wpallexport' or $isWizard and "new" != $post['wizard_type']): ?>
+<h4><?php _e('For each record in this import file, every time this import is run...', 'wp_all_import_user_add_on'); ?></h4>
+<?php else: ?>
+<h4><?php _e('If this import is run again and WP All Import finds new or changed data...', 'wp_all_import_user_add_on'); ?></h4>
+<?php endif; ?>
+<?php
+    $post_type = $post['custom_type'];
+    $cpt_name = 'WordPress users';
+?>
 <div class="input">
 	<input type="hidden" name="create_new_records" value="0" />
 	<input type="checkbox" id="create_new_records" name="create_new_records" value="1" <?php echo $post['create_new_records'] ? 'checked="checked"' : '' ?> />
-	<label for="create_new_records"><?php _e('Create new users from records newly present in your file', 'wp_all_import_user_add_on') ?></label>
+	<label for="create_new_records"><?php printf(__('Create new %s from records newly present in this import file', 'wp_all_import_user_add_on'), $cpt_name); ?></label>
+	<?php if ( ! empty(PMXI_Plugin::$session->deligate) and PMXI_Plugin::$session->deligate == 'wpallexport' ): ?>
+	<a href="#help" class="wpallimport-help" title="<?php printf(__('New %s will only be created when ID column is present and value in ID column is unique.', 'wp_all_import_user_add_on'), $cpt_name) ?>" style="top: -1px;">?</a>
+	<?php endif; ?>
 </div>
-<?php
-    $post_type = $post['custom_type'];
-    $cpt_name = 'users';
-?>
 <div class="input">
 	<input type="hidden" id="is_keep_former_posts" name="is_keep_former_posts" value="yes" />
 	<input type="checkbox" id="is_not_keep_former_posts" name="is_keep_former_posts" value="no" <?php echo "yes" != $post['is_keep_former_posts'] ? 'checked="checked"': '' ?> class="switcher" />
-	<label for="is_not_keep_former_posts"><?php _e('Update existing users with changed data in your file', 'wp_all_import_user_add_on') ?></label>
+	<label for="is_not_keep_former_posts"><?php printf(__('Update existing %s with the data in this import file', 'wp_all_import_user_add_on'), $cpt_name); ?></label>
+	<?php if ( $isWizard and "new" == $post['wizard_type'] and empty(PMXI_Plugin::$session->deligate)): ?>
+	<a href="#help" class="wpallimport-help" style="position: relative; top: -2px;" title="<?php _e('These options will only be used if you run this import again later. All data is imported the first time you run an import.', 'wp_all_import_user_add_on') ?>">?</a>
+	<?php endif; ?>
 
 	<div class="switcher-target-is_not_keep_former_posts" style="padding-left:17px;">
 
         <div class="input" style="margin-left: 4px;">
             <input type="hidden" name="is_selective_hashing" value="0" />
             <input type="checkbox" id="is_selective_hashing" name="is_selective_hashing" value="1" <?php echo $post['is_selective_hashing'] ? 'checked="checked"': '' ?> />
-            <label for="is_selective_hashing"><?php printf(__('Skip users if their data in your file has not changed', 'wp_all_import_plugin'), $custom_type->labels->name); ?></label>
-            <a href="#help" class="wpallimport-help" style="position: relative; top: -2px;" title="<?php _e('When enabled, WP All Import will keep track of every user\'s data as it is imported. When the import is run again, posts will be skipped if their data in the import file has not changed since the last run.<br/><br/>Users will not be skipped if the import template or settings change, or if you make changes to the custom code in the Function Editor.', 'wp_all_import_plugin') ?>">?</a>
+            <label for="is_selective_hashing"><?php printf(__('Skip %s if their data in this import file has not changed', 'wp_all_import_user_add_on'), $cpt_name); ?></label>
+            <a href="#help" class="wpallimport-help" style="position: relative; top: -2px;" title="<?php _e('When enabled, WP All Import will keep track of every user\'s data as it is imported. When the import is run again, users will be skipped if their data in the import file has not changed since the last run.<br/><br/>Users will not be skipped if the import template or settings change, or if you make changes to the custom code in the Function Editor.', 'wp_all_import_user_add_on') ?>">?</a>
         </div>
 
 		<input type="radio" id="update_all_data" class="switcher" name="update_all_data" value="yes" <?php echo 'no' != $post['update_all_data'] ? 'checked="checked"': '' ?>/>

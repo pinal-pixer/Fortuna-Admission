@@ -1,14 +1,15 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Validates a MultiLength as defined by the HTML spec.
  *
  * A multilength is either a integer (pixel count), a percentage, or
  * a relative number.
  */
-class HTMLPurifier_AttrDef_HTML_MultiLength extends HTMLPurifier_AttrDef_HTML_Length
+class HTMLPurifier_AttrDef_HTML_MultiLength extends \WPDT\HTMLPurifier_AttrDef_HTML_Length
 {
-
     /**
      * @param string $string
      * @param HTMLPurifier_Config $config
@@ -17,35 +18,29 @@ class HTMLPurifier_AttrDef_HTML_MultiLength extends HTMLPurifier_AttrDef_HTML_Le
      */
     public function validate($string, $config, $context)
     {
-        $string = trim($string);
+        $string = \trim($string);
         if ($string === '') {
-            return false;
+            return \false;
         }
-
         $parent_result = parent::validate($string, $config, $context);
-        if ($parent_result !== false) {
+        if ($parent_result !== \false) {
             return $parent_result;
         }
-
-        $length = strlen($string);
+        $length = \strlen($string);
         $last_char = $string[$length - 1];
-
         if ($last_char !== '*') {
-            return false;
+            return \false;
         }
-
-        $int = substr($string, 0, $length - 1);
-
+        $int = \substr($string, 0, $length - 1);
         if ($int == '') {
             return '*';
         }
-        if (!is_numeric($int)) {
-            return false;
+        if (!\is_numeric($int)) {
+            return \false;
         }
-
-        $int = (int)$int;
+        $int = (int) $int;
         if ($int < 0) {
-            return false;
+            return \false;
         }
         if ($int == 0) {
             return '0';
@@ -53,8 +48,7 @@ class HTMLPurifier_AttrDef_HTML_MultiLength extends HTMLPurifier_AttrDef_HTML_Le
         if ($int == 1) {
             return '*';
         }
-        return ((string)$int) . '*';
+        return (string) $int . '*';
     }
 }
-
 // vim: et sw=4 sts=4

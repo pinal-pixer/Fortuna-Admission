@@ -4,7 +4,6 @@ namespace Simple_History\Services\WP_CLI_Commands;
 
 use Simple_History\Event;
 use Simple_History\Helpers;
-use Simple_History\Simple_History;
 use WP_CLI;
 use WP_CLI_Command;
 
@@ -197,9 +196,9 @@ class WP_CLI_Sticky_Command extends WP_CLI_Command {
 		);
 
 		$is_sticky = $event->is_sticky();
-		$status = $is_sticky ? 'sticky' : 'not sticky';
+		$status    = $is_sticky ? 'sticky' : 'not sticky';
 
-		if ( 'table' === $assoc_args['format'] ) {
+		if ( $assoc_args['format'] === 'table' ) {
 			if ( $is_sticky ) {
 				WP_CLI::success( "Event $event_id is sticky." );
 			} else {
@@ -208,9 +207,9 @@ class WP_CLI_Sticky_Command extends WP_CLI_Command {
 		} else {
 			$output = [
 				[
-					'event_id' => $event_id,
+					'event_id'  => $event_id,
 					'is_sticky' => $is_sticky,
-					'status' => $status,
+					'status'    => $status,
 				],
 			];
 

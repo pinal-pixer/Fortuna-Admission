@@ -4,7 +4,6 @@ namespace Simple_History;
 
 use Simple_History\Loggers;
 use Simple_History\Loggers\Logger;
-use Simple_History\Dropins;
 use Simple_History\Dropins\Dropin;
 use Simple_History\Event_Details\Event_Details_Container;
 use Simple_History\Helpers;
@@ -14,7 +13,6 @@ use Simple_History\Event_Details\Event_Details_Simple_Container;
 use Simple_History\Event_Details\Event_Details_Container_Interface;
 use Simple_History\Event_Details\Event_Details_Group;
 use Simple_History\Services\Setup_Settings_Page;
-use Simple_History\Services\Email_Report_Service;
 use Simple_History\Date_Helper;
 
 /**
@@ -57,7 +55,10 @@ class Simple_History {
 	/** @var array<int,mixed>  Registered settings tabs. */
 	private array $arr_settings_tabs = [];
 
-	public const DBTABLE = 'simple_history';
+	/** @var \Simple_History\Channels\Channels_Manager|null The integrations manager instance. */
+	public $integrations_manager = null;
+
+	public const DBTABLE          = 'simple_history';
 	public const DBTABLE_CONTEXTS = 'simple_history_contexts';
 
 	/** @var string $dbtable Full database name with prefix, i.e. wp_simple_history */
@@ -136,37 +137,63 @@ class Simple_History {
 	}
 
 	/**
-	 * Return array with classnames core services classnames.
+	 * Get array with classnames of all core (built-in) services.
 	 *
 	 * @return array<string> Array with classnames.
 	 */
 	private function get_services() {
-		$services = [];
-		$services_dir = SIMPLE_HISTORY_PATH . 'inc/services';
-		$service_files = glob( $services_dir . '/*.php' );
-
-		foreach ( $service_files as $file ) {
-			// Skip service main class that other classes depend on.
-			if ( basename( $file ) === 'class-service.php' ) {
-				continue;
-			}
-
-			// Skip non-class files.
-			if ( strpos( basename( $file ), 'class-' ) !== 0 ) {
-				continue;
-			}
-
-			// Convert filename to class name.
-			// e.g. class-admin-pages.php -> Admin_Pages.
-			$class_name = str_replace( 'class-', '', basename( $file, '.php' ) );
-			$class_name = str_replace( '-', '_', $class_name );
-			$class_name = ucwords( $class_name, '_' );
-
-			// Add full namespace.
-			$class_name = "Simple_History\\Services\\{$class_name}";
-
-			$services[] = $class_name;
-		}
+		$services = array(
+			Services\Abilities_Service::class,
+			Services\Action_Scheduler_Tracker::class,
+			Services\AddOns_Licences::class,
+			Services\Admin_Page_Premium_Promo::class,
+			Services\Admin_Pages::class,
+			Services\AI_Initiator_Detector::class,
+			Services\Alerts_Settings_Page_Teaser::class,
+			Services\Auto_Backfill_Service::class,
+			Services\Channels_Service::class,
+			Services\Channels_Settings_Page::class,
+			Services\CLI_Origin_Detector::class,
+			Services\Command_Palette::class,
+			Services\Dashboard_Widget::class,
+			Services\Dropins_Loader::class,
+			Services\Email_Report_Service::class,
+			Services\Experimental_Features_Page::class,
+			Services\Failed_Login_Limit_Service::class,
+			Services\Failed_Logins_Settings_Page_Teaser::class,
+			Services\First_Purge_Notice_Service::class,
+			Services\History_Insights_Sidebar_Service::class,
+			Services\Import_Handler::class,
+			Services\License_Reminder_Service::class,
+			Services\Mail_Failure_Tracker::class,
+			Services\Licences_Settings_Page::class,
+			Services\Loggers_Loader::class,
+			Services\Menu_Service::class,
+			Services\Message_Control_Settings_Page_Teaser::class,
+			Services\Network_Menu_Items::class,
+			Services\Notification_Bar::class,
+			Services\Plugin_List_Info::class,
+			Services\Plugin_List_Link::class,
+			Services\Post_History_Column::class,
+			Services\Post_Row_Actions::class,
+			Services\Privacy_Data_Handler::class,
+			Services\Privacy_Settings_Page::class,
+			Services\REST_API::class,
+			Services\Review_Reminder_Service::class,
+			Services\Scripts_And_Templates::class,
+			Services\Setup_Database::class,
+			Services\Setup_Log_Filters::class,
+			Services\Setup_Pause_Resume_Actions::class,
+			Services\Setup_Purge_DB_Cron::class,
+			Services\Setup_Settings_Page::class,
+			Services\Tips_Service::class,
+			Services\Simple_History_Updates::class,
+			Services\Stats_Service::class,
+			Services\Status_Box_Service::class,
+			Services\Stealth_Mode::class,
+			Services\Welcome_Message_Service::class,
+			Services\WP_CLI_Commands::class,
+		);
 
 		/**
 		 * Filter the array with class names of core services.
@@ -300,15 +327,17 @@ class Simple_History {
 	 * @return void
 	 */
 	public function on_admin_head() {
-		if ( Helpers::is_on_our_own_pages() ) {
-			/**
-			 * Similar to action WordPress action `admin_head`,
-			 * but only fired from pages with Simple History.
-			 *
-			 * @param Simple_History $instance This class.
-			 */
-			do_action( 'simple_history/admin_head', $this );
+		if ( ! Helpers::is_on_our_own_pages() ) {
+			return;
 		}
+
+		/**
+		 * Similar to action WordPress action `admin_head`,
+		 * but only fired from pages with Simple History.
+		 *
+		 * @param Simple_History $instance This class.
+		 */
+		do_action( 'simple_history/admin_head', $this );
 	}
 
 	/**
@@ -317,15 +346,17 @@ class Simple_History {
 	 * @return void
 	 */
 	public function on_admin_footer() {
-		if ( Helpers::is_on_our_own_pages() ) {
-			/**
-			 * Similar to action WordPress action `admin_footer`,
-			 * but only fired from pages with Simple History.
-			 *
-			 * @param Simple_History $instance This class.
-			 */
-			do_action( 'simple_history/admin_footer', $this );
+		if ( ! Helpers::is_on_our_own_pages() ) {
+			return;
 		}
+
+		/**
+		 * Similar to action WordPress action `admin_footer`,
+		 * but only fired from pages with Simple History.
+		 *
+		 * @param Simple_History $instance This class.
+		 */
+		do_action( 'simple_history/admin_footer', $this );
 	}
 
 	/**
@@ -334,7 +365,7 @@ class Simple_History {
 	private function setup_db_variables() {
 		global $wpdb;
 
-		$this::$dbtable = $wpdb->prefix . self::DBTABLE;
+		$this::$dbtable          = $wpdb->prefix . self::DBTABLE;
 		$this::$dbtable_contexts = $wpdb->prefix . self::DBTABLE_CONTEXTS;
 
 		/**
@@ -479,6 +510,7 @@ class Simple_History {
 	public function get_core_loggers() {
 		$loggers = array(
 			Loggers\Available_Updates_Logger::class,
+			Loggers\Site_Health_Logger::class,
 			Loggers\File_Edits_Logger::class,
 			Loggers\Plugin_ACF_Logger::class,
 			Loggers\Plugin_Beaver_Builder_Logger::class,
@@ -486,13 +518,18 @@ class Simple_History {
 			Loggers\Plugin_Limit_Login_Attempts_Logger::class,
 			Loggers\Plugin_Redirection_Logger::class,
 			Loggers\Plugin_Enable_Media_Replace_Logger::class,
+			Loggers\Plugin_Two_Factor_Logger::class,
 			Loggers\Plugin_User_Switching_Logger::class,
+			Loggers\Plugin_Wordfence_Logger::class,
 			Loggers\Plugin_WP_Crontrol_Logger::class,
 			Loggers\Plugin_Jetpack_Logger::class,
+			Loggers\Plugin_WP_AI_Logger::class,
 			Loggers\Privacy_Logger::class,
 			Loggers\Translations_Logger::class,
 			Loggers\Categories_Logger::class,
 			Loggers\Comments_Logger::class,
+			Loggers\Connectors_Logger::class,
+			Loggers\Notes_Logger::class,
 			Loggers\Core_Updates_Logger::class,
 			Loggers\Core_Files_Logger::class,
 			Loggers\Export_Logger::class,
@@ -502,11 +539,18 @@ class Simple_History {
 			Loggers\Options_Logger::class,
 			Loggers\Plugin_Logger::class,
 			Loggers\Post_Logger::class,
+			Loggers\Site_Editor_Logger::class,
 			Loggers\Theme_Logger::class,
 			Loggers\User_Logger::class,
 			Loggers\Simple_History_Logger::class,
 			Loggers\Custom_Entry_Logger::class,
 		);
+
+		// Experimental loggers, only loaded when experimental features are enabled.
+		if ( Helpers::experimental_features_is_enabled() ) {
+			$loggers[] = Loggers\Role_Capability_Logger::class;
+			$loggers[] = Loggers\Mail_Failure_Logger::class;
+		}
 
 		/**
 		 * Filter the array with class names of core loggers.
@@ -526,40 +570,33 @@ class Simple_History {
 	 * @return array
 	 */
 	public function get_core_dropins() {
-		$dropins = [];
-		$dropins_dir = SIMPLE_HISTORY_PATH . 'dropins';
-		$dropin_files = glob( $dropins_dir . '/*.php' );
-
-		foreach ( $dropin_files as $file ) {
-			// Skip dropin main class that other classes depend on.
-			if ( basename( $file ) === 'class-dropin.php' ) {
-				continue;
-			}
-
-			// Skip non-class files.
-			if ( strpos( basename( $file ), 'class-' ) !== 0 ) {
-				continue;
-			}
-
-			// Convert filename to class name.
-			// e.g. class-quick-stats.php -> Quick_Stats.
-			$class_name = str_replace( 'class-', '', basename( $file, '.php' ) );
-			$class_name = str_replace( '-', '_', $class_name );
-			$class_name = str_replace( 'dropin', 'Dropin', $class_name );
-			$class_name = ucwords( $class_name, '_' );
-
-			// Add full namespace.
-			$class_name = "Simple_History\\Dropins\\{$class_name}";
-
-			$dropins[] = $class_name;
-		}
+		$dropins = array(
+			Dropins\Action_Links_Dropin::class,
+			Dropins\Detective_Mode_Dropin::class,
+			Dropins\Donate_Dropin::class,
+			Dropins\Experimental_Features_Dropin::class,
+			Dropins\Export_Dropin::class,
+			Dropins\Import_Dropin::class,
+			Dropins\IP_Info_Dropin::class,
+			Dropins\Plugin_Patches_Dropin::class,
+			Dropins\Quick_View_Dropin::class,
+			Dropins\React_Dropin::class,
+			Dropins\Reactions_Dropin::class,
+			Dropins\RSS_Dropin::class,
+			Dropins\Settings_Help_Support_Dropin::class,
+			Dropins\Sidebar_Add_Ons_Dropin::class,
+			Dropins\Sidebar_Dropin::class,
+			Dropins\Sidebar_Email_Promo_Dropin::class,
+			Dropins\Sidebar_Mail_Failures_Dropin::class,
+			Dropins\Tools_Menu_Dropin::class,
+		);
 
 		/**
 		 * Filter the array with class names of core dropins.
 		 *
 		 * @since 4.0
 		 *
-		 * @param array $logger Array with class names.
+		 * @param array $dropins Array with class names.
 		 */
 		$dropins = apply_filters( 'simple_history/core_dropins', $dropins );
 
@@ -711,7 +748,9 @@ class Simple_History {
 			function ( $tab ) use ( $type ) {
 				if ( $type === 'top' ) {
 					return empty( $tab['parent_slug'] );
-				} elseif ( $type === 'sub' ) {
+				}
+
+				if ( $type === 'sub' ) {
 					return ! empty( $tab['parent_slug'] );
 				}
 				return false;
@@ -791,7 +830,7 @@ class Simple_History {
 	 */
 	public function get_log_row_plain_text_output( $row ) {
 		$row_logger_slug = $row->logger;
-		$row->context = isset( $row->context ) && is_array( $row->context ) ? $row->context : array();
+		$row->context    = isset( $row->context ) && is_array( $row->context ) ? $row->context : array();
 
 		if ( ! isset( $row->context['_message_key'] ) ) {
 			$row->context['_message_key'] = null;
@@ -818,14 +857,12 @@ class Simple_History {
 		 * @param object $row Log row object.
 		 * @param Logger $logger Logger instance.
 		 */
-		$output = apply_filters(
+		return apply_filters(
 			'simple_history/get_log_row_plain_text_output/output',
 			$logger->get_log_row_plain_text_output( $row ),
 			$row,
 			$logger
 		);
-
-		return $output;
 	}
 
 	/**
@@ -841,7 +878,7 @@ class Simple_History {
 	 * @return string
 	 */
 	public function get_log_row_header_output( $row ) {
-		$row_logger = $row->logger;
+		$row_logger   = $row->logger;
 		$row->context = isset( $row->context ) && is_array( $row->context ) ? $row->context : array();
 
 		// Fallback to SimpleLogger if no logger exists for row.
@@ -861,8 +898,8 @@ class Simple_History {
 	 * @return string
 	 */
 	public function get_log_row_sender_image_output( $row ) {
-		/** @var Loggers\Logger $row_logger */
-		$row_logger = $row->logger;
+		/** @var string $row_logger */
+		$row_logger   = $row->logger;
 		$row->context = isset( $row->context ) && is_array( $row->context ) ? $row->context : array();
 
 		// Fallback to SimpleLogger if no logger exists for row.
@@ -882,7 +919,7 @@ class Simple_History {
 	 * @return string|Event_Details_Container_Interface|Event_Details_Group
 	 */
 	public function get_log_row_details_output( $row ) {
-		$row_logger = $row->logger;
+		$row_logger   = $row->logger;
 		$row->context = isset( $row->context ) && is_array( $row->context ) ? $row->context : array();
 
 		// Get logger for row.
@@ -902,7 +939,9 @@ class Simple_History {
 
 		if ( $logger_details_output instanceof Event_Details_Container_Interface ) {
 			return $logger_details_output;
-		} else if ( $logger_details_output instanceof Event_Details_Group ) {
+		}
+
+		if ( $logger_details_output instanceof Event_Details_Group ) {
 			/**
 			 * Filter the event details group output for a logger
 			 * that has returned an Event_Details_Group.
@@ -913,9 +952,59 @@ class Simple_History {
 			 */
 			$logger_details_output = apply_filters( 'simple_history/log_row_details_output-' . $logger->get_slug(), $logger_details_output, $row );
 			return new Event_Details_Container( $logger_details_output, $row->context );
-		} else {
-			return new Event_Details_Simple_Container( $logger_details_output );
 		}
+
+		return new Event_Details_Simple_Container( $logger_details_output );
+	}
+
+	/**
+	 * Get structured action links for a log row.
+	 *
+	 * Returns an array of action links (each with url, label, action)
+	 * for the given log row. Only active when experimental features are enabled.
+	 *
+	 * @since 5.24.0
+	 *
+	 * @param object $row Log row object.
+	 * @return array Array of action link arrays.
+	 */
+	public function get_action_links( $row ) {
+		$row_logger = $row->logger;
+
+		$logger = $this->get_instantiated_logger_by_slug( $row_logger );
+
+		if ( $logger === false ) {
+			return [];
+		}
+
+		$action_links = $logger->get_action_links( $row );
+
+		// Append a "Show details" link when the logger flags the event as
+		// having additional context worth inspecting in the modal. The
+		// logger returns the label so it can name the actual payload
+		// ("Show error message", etc.) rather than a generic phrase. The
+		// URL fragment is picked up by EventsModalIfFragment.jsx.
+		$more_details_label = $logger->event_has_more_details( $row );
+		if ( is_string( $more_details_label ) && $more_details_label !== '' ) {
+			$action_links[] = array(
+				'url'         => '#simple-history/event/' . (int) $row->id,
+				'label'       => $more_details_label,
+				'action'      => 'details',
+				'description' => __( 'Opens the event details with the full context.', 'simple-history' ),
+			);
+		}
+
+		/**
+		 * Filter the action links for a log row.
+		 *
+		 * @since 5.24.0
+		 *
+		 * @param array  $action_links Array of action link arrays.
+		 * @param object $row          Log row object.
+		 */
+		$action_links = apply_filters( 'simple_history/get_action_links', $action_links, $row );
+
+		return $action_links;
 	}
 
 	/**
@@ -933,11 +1022,11 @@ class Simple_History {
 
 		$args = wp_parse_args( $args, $defaults );
 
-		$context = $one_log_row->context ?? [];
+		$context     = $one_log_row->context ?? [];
 		$message_key = $context['_message_key'] ?? null;
 
-		$header_html = $this->get_log_row_header_output( $one_log_row );
-		$plain_text_html = $this->get_log_row_plain_text_output( $one_log_row );
+		$header_html       = $this->get_log_row_header_output( $one_log_row );
+		$plain_text_html   = $this->get_log_row_plain_text_output( $one_log_row );
 		$sender_image_html = $this->get_log_row_sender_image_output( $one_log_row );
 
 		// Details = for example thumbnail of media.
@@ -949,7 +1038,7 @@ class Simple_History {
 		// subsequentOccasions = including the current one.
 		// phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
 		$occasions_count = $one_log_row->subsequentOccasions - 1;
-		$occasions_html = '';
+		$occasions_html  = '';
 
 		// Add markup for occasions.
 		if ( $occasions_count > 0 ) {
@@ -980,9 +1069,9 @@ class Simple_History {
 			$logger = $one_log_row->logger;
 
 			$is_simple_history_extended_settings_active = Helpers::is_extended_settings_add_on_active();
-			$is_simple_history_premium_active = Helpers::is_premium_add_on_active();
+			$is_simple_history_premium_active           = Helpers::is_premium_add_on_active();
 
-			if ( $logger === 'SimpleUserLogger' && in_array( $message_key, [ 'user_login_failed', 'user_unknown_login_failed' ], true ) ) {
+			if ( $logger === 'SimpleUserLogger' && in_array( $message_key, Loggers\User_Logger::get_failed_login_message_keys(), true ) ) {
 
 				$ƒailed_login_attempts_settings_page_url = Helpers::get_settings_page_tab_url( 'failed-login-attempts' );
 
@@ -1020,7 +1109,7 @@ class Simple_History {
 		}
 
 		// Add data attributes to log row, so plugins can do stuff.
-		$data_attrs = '';
+		$data_attrs  = '';
 		$data_attrs .= sprintf( ' data-row-id="%1$d" ', $one_log_row->id );
 		$data_attrs .= sprintf( ' data-occasions-count="%1$d" ', $occasions_count );
 
@@ -1028,11 +1117,13 @@ class Simple_History {
 		$data_attrs .= sprintf( ' data-occasions-id="%1$s" ', esc_attr( $one_log_row->occasionsID ) );
 
 		// Add data attributes for remote address and other ip number headers.
-		if ( isset( $one_log_row->context['_server_remote_addr'] ) ) {
+		$can_view_ip_addresses = Helpers::current_user_can_view_ip_addresses();
+
+		if ( $can_view_ip_addresses && isset( $one_log_row->context['_server_remote_addr'] ) ) {
 			$data_attrs .= sprintf( ' data-ip-address="%1$s" ', esc_attr( $one_log_row->context['_server_remote_addr'] ) );
 		}
 
-		$arr_found_additional_ip_headers = Helpers::get_event_ip_number_headers( $one_log_row );
+		$arr_found_additional_ip_headers = $can_view_ip_addresses ? Helpers::get_event_ip_number_headers( $one_log_row ) : [];
 
 		if ( $arr_found_additional_ip_headers !== [] ) {
 			$data_attrs .= ' data-ip-address-multiple="1" ';
@@ -1051,7 +1142,7 @@ class Simple_History {
 		// If type is single then include more details.
 		// This is typically shown in the modal window when clicking the event date and time.
 		$more_details_html = '';
-		if ( $args['type'] == 'single' ) {
+		if ( $args['type'] === 'single' ) {
 			$more_details_html = apply_filters(
 				'simple_history/log_html_output_details_single/html_before_context_table',
 				$more_details_html,
@@ -1232,7 +1323,7 @@ class Simple_History {
 				'<div class="SimpleHistoryLogitem__moreDetails">%1$s</div>',
 				$more_details_html
 			);
-		} // End if().
+		}
 
 		// Classes to add to log item li element.
 		$classes = array(
@@ -1400,6 +1491,7 @@ class Simple_History {
 		foreach ( $loggers as $one_logger ) {
 			$logger_capability = $one_logger['instance']->get_capability();
 
+			// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability from logger, filterable, defaults to 'read'.
 			$user_can_read_logger = user_can( $user_id, $logger_capability );
 
 			/**
@@ -1439,9 +1531,11 @@ class Simple_History {
 				$user_id
 			);
 
-			if ( $user_can_read_logger ) {
-				$arr_loggers_user_can_view[] = $one_logger;
+			if ( ! $user_can_read_logger ) {
+				continue;
 			}
+
+			$arr_loggers_user_can_view[] = $one_logger;
 		}
 
 		/**
@@ -1467,7 +1561,7 @@ class Simple_History {
 		);
 
 		// just return array with slugs in parenthesis suitable for sql-where.
-		if ( 'sql' == $format ) {
+		if ( $format === 'sql' ) {
 			$str_return = '(';
 
 			if ( count( $arr_loggers_user_can_view ) ) {
@@ -1484,15 +1578,13 @@ class Simple_History {
 			$str_return .= ')';
 
 			return $str_return;
-		} elseif ( 'slugs' == $format ) {
-			$logger_slugs = array_map(
+		} elseif ( $format === 'slugs' ) {
+			return array_map(
 				function ( $logger ) {
 					return $logger['instance']->get_slug();
 				},
 				$arr_loggers_user_can_view
 			);
-
-			return $logger_slugs;
 		}
 
 		// Return array with loggers that user can read.
@@ -1573,30 +1665,20 @@ class Simple_History {
 
 		$methods_mapping = array(
 			'registerSettingsTab' => 'register_settings_tab',
-			'get_avatar' => 'get_avatar',
+			'get_avatar'          => 'get_avatar',
 		);
 
 		// Bail if method name is nothing to act on.
 		if ( ! isset( $methods_mapping[ $name ] ) ) {
-			if ( function_exists( 'wp_trigger_error' ) ) {
-				wp_trigger_error(
-					$name,
-					sprintf(
-						'Call to undefined or deprecated method %s::%s(). This indicates a bug in the calling code.',
-						__CLASS__,
-						$name
-					),
-				);
-			} else {
-				// Fallback for WordPress versions before 6.4.0.
-				error_log(
-					sprintf(
-						'Call to undefined or deprecated method %s::%s(). This indicates a bug in the calling code.',
-						__CLASS__,
-						$name
-					)
-				);
-			}
+			_doing_it_wrong(
+				__CLASS__ . '::' . esc_html( $name ),
+				sprintf(
+					'Call to undefined or deprecated method %s::%s(). This indicates a bug in the calling code.',
+					__CLASS__,
+					esc_html( $name )
+				),
+				'5.19.0'
+			);
 
 			return false;
 		}

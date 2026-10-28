@@ -55,10 +55,7 @@ class Common_Settings extends Ajax_Base {
 	public function register_ajax_events() {
 
 		$ajax_events = array(
-			'enable_beta_updates',
-			'check_beta_update_available',
 			'force_check_plugin_updates',
-			'update_beta_plugin',
 			'enable_file_generation',
 			'regenerate_assets',
 			'enable_templates_button',
@@ -183,8 +180,22 @@ class Common_Settings extends Ajax_Base {
 		if ( ! isset( $_POST[ $key ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
 			wp_send_json_error( array( 'messsage' => __( 'No post data found!', 'ultimate-addons-for-gutenberg' ) ) );
 		}
-		// security validation done as per data type in function save_admin_settings.
-		return $_POST[ $key ]; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.NonceVerification.Missing
+		return sanitize_text_field( wp_unslash( $_POST[ $key ] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+	}
+
+	/**
+	 * Returns raw POST value for JSON fields that need json_decode().
+	 * Callers MUST sanitize individual elements after decoding.
+	 *
+	 * @param string $key The POST key to retrieve.
+	 * @return string Raw unslashed POST value.
+	 */
+	private function check_post_value_json( $key = 'value' ) {
+		// nonce verification done in function check_permission_nonce.
+		if ( ! isset( $_POST[ $key ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			wp_send_json_error( array( 'messsage' => __( 'No post data found!', 'ultimate-addons-for-gutenberg' ) ) );
+		}
+		return wp_unslash( $_POST[ $key ] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 	}
 
 	/**
@@ -376,6 +387,28 @@ class Common_Settings extends Ajax_Base {
 	}
 
 	/**
+	 * Resync the FSE theme fonts after a font setting changes.
+	 *
+	 * The font-file deletion and theme.json rewrite live in
+	 * UAGB_FSE_Fonts_Compatibility. Running it here keeps the sync inside this
+	 * capability-and-nonce-checked handler, rather than the former
+	 * unauthenticated GET request.
+	 *
+	 * @since 2.20.5
+	 * @return void
+	 */
+	private function sync_fse_theme_fonts() {
+		if ( ! class_exists( 'UAGB_FSE_Fonts_Compatibility' ) ) {
+			return;
+		}
+
+		$fse_fonts = \UAGB_FSE_Fonts_Compatibility::get_instance();
+		if ( $fse_fonts instanceof \UAGB_FSE_Fonts_Compatibility ) {
+			$fse_fonts->sync_theme_fonts();
+		}
+	}
+
+	/**
 	 * Save setting - Loads selected font globally.
 	 *
 	 * @since 2.5.1
@@ -384,7 +417,9 @@ class Common_Settings extends Ajax_Base {
 	public function load_fse_font_globally() {
 		$this->check_permission_nonce( 'uag_load_fse_font_globally' );
 		$value = $this->check_post_value();
-		$this->save_admin_settings( 'uag_load_fse_font_globally', sanitize_text_field( $value ) );
+		\UAGB_Admin_Helper::update_admin_settings_option( 'uag_load_fse_font_globally', sanitize_text_field( $value ) );
+		$this->sync_fse_theme_fonts();
+		wp_send_json_success( array( 'messsage' => __( 'Successfully saved data!', 'ultimate-addons-for-gutenberg' ) ) );
 	}
 
 	/**
@@ -395,8 +430,14 @@ class Common_Settings extends Ajax_Base {
 	 */
 	public function select_font_globally() {
 		$this->check_permission_nonce( 'uag_select_font_globally' );
-		$value = $this->check_post_value();
-		$value = json_decode( stripslashes( $value ), true );
+		$value = $this->check_post_value_json();
+		$value = json_decode( $value, true );
+
+		// SECURITY: Validate JSON decode was successful.
+		if ( null === $value && JSON_ERROR_NONE !== json_last_error() ) {
+			wp_send_json_error( array( 'messsage' => __( 'Invalid JSON data received.', 'ultimate-addons-for-gutenberg' ) ) );
+		}
+
 		$this->save_admin_settings( 'uag_select_font_globally', $this->sanitize_form_inputs( $value ) );
 	}
 
@@ -408,8 +449,14 @@ class Common_Settings extends Ajax_Base {
 	 */
 	public function fse_font_globally_delete() {
 		$this->check_permission_nonce( 'uag_fse_font_globally_delete' );
-		$value = $this->check_post_value();
-		$value = json_decode( stripslashes( $value ), true );
+		$value = $this->check_post_value_json();
+		$value = json_decode( $value, true );
+
+		// SECURITY: Validate JSON decode was successful.
+		if ( null === $value && JSON_ERROR_NONE !== json_last_error() ) {
+			wp_send_json_error( array( 'messsage' => __( 'Invalid JSON data received.', 'ultimate-addons-for-gutenberg' ) ) );
+		}
+
 		\UAGB_FSE_Fonts_Compatibility::delete_theme_font_family( $value );
 	}
 
@@ -421,8 +468,13 @@ class Common_Settings extends Ajax_Base {
 	 */
 	public function fse_font_globally() {
 		$this->check_permission_nonce( 'uag_fse_font_globally' );
-		$value = $this->check_post_value();
-		$value = json_decode( stripslashes( $value ), true );
+		$value = $this->check_post_value_json();
+		$value = json_decode( $value, true );
+
+		// SECURITY: Validate JSON decode was successful.
+		if ( null === $value && JSON_ERROR_NONE !== json_last_error() ) {
+			wp_send_json_error( array( 'messsage' => __( 'Invalid JSON data received.', 'ultimate-addons-for-gutenberg' ) ) );
+		}
 
 		$spectra_global_fse_fonts = \UAGB_Admin_Helper::get_admin_settings_option( 'spectra_global_fse_fonts', array() );
 
@@ -432,7 +484,9 @@ class Common_Settings extends Ajax_Base {
 
 		$spectra_global_fse_fonts[] = $value;
 
-		$this->save_admin_settings( 'spectra_global_fse_fonts', $this->sanitize_form_inputs( $spectra_global_fse_fonts ) );
+		\UAGB_Admin_Helper::update_admin_settings_option( 'spectra_global_fse_fonts', $this->sanitize_form_inputs( $spectra_global_fse_fonts ) );
+		$this->sync_fse_theme_fonts();
+		wp_send_json_success( array( 'messsage' => __( 'Successfully saved data!', 'ultimate-addons-for-gutenberg' ) ) );
 	}
 
 	/**
@@ -513,16 +567,16 @@ class Common_Settings extends Ajax_Base {
 		);
 		// nonce verification is done in above function check_permission_nonce.
 		if ( isset( $_POST['socialRegister'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$social['socialRegister'] = rest_sanitize_boolean( sanitize_text_field( $_POST['socialRegister'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$social['socialRegister'] = rest_sanitize_boolean( sanitize_text_field( wp_unslash( $_POST['socialRegister'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		}
 		if ( isset( $_POST['googleClientId'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$social['googleClientId'] = sanitize_text_field( $_POST['googleClientId'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$social['googleClientId'] = sanitize_text_field( wp_unslash( $_POST['googleClientId'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		}
 		if ( isset( $_POST['facebookAppId'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$social['facebookAppId'] = sanitize_text_field( $_POST['facebookAppId'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$social['facebookAppId'] = sanitize_text_field( wp_unslash( $_POST['facebookAppId'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		}
 		if ( isset( $_POST['facebookAppSecret'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$social['facebookAppSecret'] = sanitize_text_field( $_POST['facebookAppSecret'] ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$social['facebookAppSecret'] = sanitize_text_field( wp_unslash( $_POST['facebookAppSecret'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		}
 
 		$this->save_admin_settings( 'uag_social', $social );
@@ -631,13 +685,18 @@ class Common_Settings extends Ajax_Base {
 	 */
 	public function blocks_activation_and_deactivation() {
 		$this->check_permission_nonce( 'uag_blocks_activation_and_deactivation' );
-		$value  = $this->check_post_value();
+		$value  = $this->check_post_value_json();
 		$status = $this->check_post_value( 'status' );
 		if ( '' !== $status ) {
 			$status_value = 'disabled' === $status ? 'disabled' : 'enabled';
 		}
 		// will sanitize $value in later stage.
-		$value = json_decode( stripslashes( $value ), true );
+		$value = json_decode( $value, true );
+
+		// SECURITY: Validate JSON decode was successful.
+		if ( null === $value && JSON_ERROR_NONE !== json_last_error() ) {
+			wp_send_json_error( array( 'messsage' => __( 'Invalid JSON data received.', 'ultimate-addons-for-gutenberg' ) ) );
+		}
 
 		if ( 'disabled' === \UAGB_Helper::$file_generation ) {
 			\UAGB_Admin_Helper::create_specific_stylesheet(); // Get Specific Stylesheet.
@@ -674,120 +733,6 @@ class Common_Settings extends Ajax_Base {
 			}
 		} else {
 			$this->save_admin_settings( '_uagb_blocks', $this->sanitize_form_inputs( $value ) );
-		}
-	}
-
-	/**
-	 * Save setting - Enables beta updates.
-	 *
-	 * @return void
-	 */
-	public function enable_beta_updates() {
-		$this->check_permission_nonce( 'uag_enable_beta_updates' );
-		$value = $this->check_post_value();
-		$this->save_admin_settings( 'uagb_beta', sanitize_text_field( $value ) );
-
-		// If enabling beta updates, clear update transients to force a fresh check.
-		if ( 'yes' === $value ) {
-			delete_site_transient( 'update_plugins' );
-			delete_transient( 'update_plugins' );
-
-			// Delete the beta version transient.
-			$transient_key = md5( 'uagb_beta_testers_response_key' );
-			delete_site_transient( $transient_key );
-
-			// Trigger WordPress to check for updates.
-			wp_update_plugins();
-		}
-	}
-
-	/**
-	 * Check if beta update is available.
-	 *
-	 * @since 2.19.16
-	 * @return void
-	 */
-	public function check_beta_update_available() {
-		$this->check_permission_nonce( 'uag_check_beta_update_available' );
-
-		// Validate required constants exist.
-		if ( ! defined( 'UAGB_VER' ) ) {
-			wp_send_json_error(
-				array(
-					'messsage' => __( 'Plugin version not defined.', 'ultimate-addons-for-gutenberg' ),
-				)
-			);
-		}
-
-		// Note: Removed beta enabled check to allow dashboard notice to show
-		// Users can check for beta updates even if not enabled yet
-
-		// Get the beta version from WordPress.org with timeout.
-		$response = wp_remote_get(
-			'https://plugins.svn.wordpress.org/ultimate-addons-for-gutenberg/trunk/readme.txt',
-			array(
-				'timeout'   => 15,
-				'sslverify' => true,
-			)
-		);
-
-		if ( is_wp_error( $response ) ) {
-			wp_send_json_error(
-				array(
-					'messsage' => __( 'Unable to check for beta updates.', 'ultimate-addons-for-gutenberg' ),
-				)
-			);
-		}
-
-		// Validate response status code.
-		$response_code = wp_remote_retrieve_response_code( $response );
-		if ( 200 !== $response_code ) {
-			wp_send_json_error(
-				array(
-					'messsage' => __( 'Unable to check for beta updates.', 'ultimate-addons-for-gutenberg' ),
-				)
-			);
-		}
-
-		$beta_version = 'false';
-		$body         = wp_remote_retrieve_body( $response );
-
-		if ( ! empty( $body ) && is_string( $body ) ) {
-			preg_match( '/Beta tag:\s*([0-9.]+)/i', $body, $matches );
-			if ( isset( $matches[1] ) ) {
-				$beta_version = sanitize_text_field( trim( $matches[1] ) );
-				// Validate version format (x.x.x or x.x.x-beta.x).
-				if ( ! preg_match( '/^[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z0-9.]+)?$/i', $beta_version ) ) {
-					$beta_version = 'false';
-				}
-			}
-		}
-
-		$current_version = sanitize_text_field( UAGB_VER );
-
-		// Compare with current version.
-		if ( 'false' !== $beta_version && version_compare( $beta_version, $current_version, '>' ) ) {
-			wp_send_json_success(
-				array(
-					'has_update'      => true,
-					'beta_version'    => $beta_version,
-					'current_version' => $current_version,
-					'messsage'        => sprintf(
-						// Translators: %1$s is the beta version number, %2$s is the current version.
-						__( 'Beta version %1$s is available (current: %2$s).', 'ultimate-addons-for-gutenberg' ),
-						esc_html( $beta_version ),
-						esc_html( $current_version )
-					),
-				)
-			);
-		} else {
-			wp_send_json_success(
-				array(
-					'has_update'      => false,
-					'current_version' => $current_version,
-					'messsage'        => __( 'You are running the latest version.', 'ultimate-addons-for-gutenberg' ),
-				)
-			);
 		}
 	}
 
@@ -873,136 +818,6 @@ class Common_Settings extends Ajax_Base {
 				)
 			);
 		}
-	}
-
-	/**
-	 * Update the beta plugin automatically.
-	 *
-	 * @since 2.19.16
-	 * @return void
-	 */
-	public function update_beta_plugin() {
-		$this->check_permission_nonce( 'uag_update_beta_plugin' );
-
-		// Validate required constants and user capabilities.
-		if ( ! defined( 'UAGB_BASE' ) ) {
-			wp_send_json_error(
-				array(
-					'messsage' => __( 'Plugin identifier not defined.', 'ultimate-addons-for-gutenberg' ),
-				)
-			);
-		}
-
-		// Check if user has permission to update plugins.
-		if ( ! current_user_can( 'update_plugins' ) ) {
-			wp_send_json_error(
-				array(
-					'messsage' => __( 'You do not have permission to update plugins.', 'ultimate-addons-for-gutenberg' ),
-				)
-			);
-		}
-
-		// Delete the update transients to force a fresh check.
-		delete_site_transient( 'update_plugins' );
-		delete_transient( 'update_plugins' );
-
-		// Delete the beta version transient.
-		$transient_key = md5( 'uagb_beta_testers_response_key' );
-		delete_site_transient( $transient_key );
-
-		// Trigger WordPress to check for updates.
-		wp_update_plugins();
-
-		// Get the update information.
-		$update_plugins = get_site_transient( 'update_plugins' );
-		$plugin_slug    = UAGB_BASE;
-
-		// Validate transient structure.
-		if ( ! is_object( $update_plugins ) || ! isset( $update_plugins->response ) || ! is_array( $update_plugins->response ) ) {
-			wp_send_json_error(
-				array(
-					'messsage' => __( 'No updates available to install.', 'ultimate-addons-for-gutenberg' ),
-				)
-			);
-		}
-
-		// Check if update is available.
-		if ( ! isset( $update_plugins->response[ $plugin_slug ] ) ) {
-			wp_send_json_error(
-				array(
-					'messsage' => __( 'No updates available to install.', 'ultimate-addons-for-gutenberg' ),
-				)
-			);
-		}
-
-		// Check if plugin is currently active.
-		$was_active = is_plugin_active( $plugin_slug );
-
-		// Include required WordPress files for plugin update.
-		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
-		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		require_once ABSPATH . 'wp-admin/includes/misc.php';
-
-		// Create a custom skin to suppress output.
-		$skin = new \WP_Ajax_Upgrader_Skin();
-
-		// Create the upgrader instance.
-		$upgrader = new \Plugin_Upgrader( $skin );
-
-		// Perform the plugin update.
-		$result = $upgrader->upgrade( $plugin_slug );
-
-		// Check if update was successful.
-		if ( is_wp_error( $result ) ) {
-			wp_send_json_error(
-				array(
-					'messsage' => sprintf(
-						// Translators: %s is the error message.
-						__( 'Update failed: %s', 'ultimate-addons-for-gutenberg' ),
-						$result->get_error_message()
-					),
-				)
-			);
-		} elseif ( false === $result ) {
-			wp_send_json_error(
-				array(
-					'messsage' => __( 'Update failed. Please try again or update manually from the plugins page.', 'ultimate-addons-for-gutenberg' ),
-				)
-			);
-		}
-
-		// Reactivate the plugin if it was active before.
-		if ( $was_active ) {
-			$activate_result = activate_plugin( $plugin_slug );
-			if ( is_wp_error( $activate_result ) ) {
-				wp_send_json_error(
-					array(
-						'messsage' => sprintf(
-							// Translators: %s is the error message.
-							__( 'Plugin updated but reactivation failed: %s', 'ultimate-addons-for-gutenberg' ),
-							$activate_result->get_error_message()
-						),
-					)
-				);
-			}
-		}
-
-		// Get the new version after update.
-		$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin_slug );
-		$new_version = isset( $plugin_data['Version'] ) ? $plugin_data['Version'] : '';
-
-		wp_send_json_success(
-			array(
-				'messsage'    => sprintf(
-					// Translators: %s is the new version number.
-					__( 'Successfully updated to version %s!', 'ultimate-addons-for-gutenberg' ),
-					esc_html( $new_version )
-				),
-				'new_version' => $new_version,
-				'reload'      => true,
-			)
-		);
 	}
 
 	/**
@@ -1133,8 +948,14 @@ class Common_Settings extends Ajax_Base {
 	 */
 	public function insta_linked_accounts() {
 		$this->check_permission_nonce( 'uag_insta_linked_accounts' );
-		$value = $this->check_post_value();
-		$value = json_decode( stripslashes( $value ), true );
+		$value = $this->check_post_value_json();
+		$value = json_decode( $value, true );
+
+		// SECURITY: Validate JSON decode was successful.
+		if ( null === $value && JSON_ERROR_NONE !== json_last_error() ) {
+			wp_send_json_error( array( 'messsage' => __( 'Invalid JSON data received.', 'ultimate-addons-for-gutenberg' ) ) );
+		}
+
 		// The previous $value is not sanitized, as the array sanitization is handled in the class method used below.
 		$this->save_admin_settings( 'uag_insta_linked_accounts', $this->sanitize_form_inputs( $value ) );
 	}
@@ -1148,8 +969,13 @@ class Common_Settings extends Ajax_Base {
 	 */
 	public function insta_all_users_media() {
 		$this->check_permission_nonce( 'uag_insta_all_users_media' );
-		$value = $this->check_post_value();
-		$value = json_decode( stripslashes( $value ), true );
+		$value = $this->check_post_value_json();
+		$value = json_decode( $value, true );
+
+		// SECURITY: Validate JSON decode was successful.
+		if ( null === $value && JSON_ERROR_NONE !== json_last_error() ) {
+			wp_send_json_error( array( 'messsage' => __( 'Invalid JSON data received.', 'ultimate-addons-for-gutenberg' ) ) );
+		}
 		// The previous $value is not sanitized, as the array sanitization is handled in the class method used below.
 		$this->save_admin_settings( 'uag_insta_all_users_media', $this->sanitize_form_inputs( $value ) );
 	}

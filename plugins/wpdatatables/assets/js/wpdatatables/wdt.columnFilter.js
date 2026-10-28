@@ -158,6 +158,235 @@ var fnOnFiltered = function () {
 };
 
 /**
+ * Build a safe <option> element HTML string for filter selectboxes.
+ *
+ * @param {string} value Option value.
+ * @param {string} text Option label.
+ * @param {boolean} selected Whether the option should be selected.
+ * @returns {string}
+ */
+function buildSafeFilterOption(value, text, selected, encodeOptionValue) {
+    if (encodeOptionValue === undefined) {
+        encodeOptionValue = true;
+    }
+
+    var optionValue = encodeOptionValue
+        ? wdtEncodeFilterOptionValue(value)
+        : (value == null ? '' : String(value));
+    var $option = jQuery('<option></option>');
+
+    $option.attr('value', optionValue).text(text !== undefined && text !== null ? text : value);
+
+    if (selected) {
+        $option.prop('selected', true);
+    }
+
+    return $option;
+}
+
+function buildSafeFilterOptionHtml(value, text, selected, encodeOptionValue) {
+    return buildSafeFilterOption(value, text, selected, encodeOptionValue)[0].outerHTML;
+}
+
+/**
+ * Encode option value the same way legacy filter selectboxes did (selectboxSearch decodes on change).
+ *
+ * @param {*} value
+ * @returns {string}
+ */
+function wdtEncodeFilterOptionValue(value) {
+    return encodeURI(value == null ? '' : String(value));
+}
+
+/**
+ * Decode an encodeURI-encoded filter option value for search (mirrors selectboxSearch).
+ *
+ * @param {*} value
+ * @returns {string}
+ */
+function wdtDecodeFilterOptionValue(value) {
+    if (value == null || value === '') {
+        return '';
+    }
+
+    var str = String(value).replace(/%0D%0A|%0A/gi, ' ');
+
+    try {
+        return decodeURIComponent(str);
+    } catch (e) {
+        return str;
+    }
+}
+
+/**
+ * Escape regex metacharacters for client-side DataTables column search.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function wdtEscapeFilterSearchRegex(value) {
+    if (typeof jQuery !== 'undefined'
+        && jQuery.fn
+        && jQuery.fn.dataTable
+        && jQuery.fn.dataTable.util
+        && typeof jQuery.fn.dataTable.util.escapeRegex === 'function') {
+        return jQuery.fn.dataTable.util.escapeRegex(String(value));
+    }
+
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Encode a raw database/default filter value the same way interactive controls do.
+ *
+ * @param {*} value
+ * @returns {string}
+ */
+function wdtNormalizeRawFilterValueForSearch(value) {
+    if (value != null && typeof value === 'object' && value.value != null) {
+        return wdtEncodeFilterOptionValue(value.value);
+    }
+
+    return wdtEncodeFilterOptionValue(value);
+}
+
+/**
+ * Decode common HTML entities for filter value comparison without HTML parsing.
+ *
+ * @param {*} value
+ * @returns {string}
+ */
+function wdtDecodeHtmlEntities(value) {
+    var str = String(value == null ? '' : value);
+
+    if (str.indexOf('&') === -1) {
+        return str.trim();
+    }
+
+    var namedEntities = {
+        amp: '&',
+        lt: '<',
+        gt: '>',
+        quot: '"',
+        apos: "'",
+        nbsp: '\u00a0'
+    };
+
+    return str.replace(/&(#(?:x[0-9a-fA-F]+|\d+)|[a-zA-Z]+);/g, function (match, entity) {
+        if (entity.charAt(0) === '#') {
+            var codePoint = entity.charAt(1).toLowerCase() === 'x'
+                ? parseInt(entity.slice(2), 16)
+                : parseInt(entity.slice(1), 10);
+
+            if (isNaN(codePoint)) {
+                return match;
+            }
+
+            return String.fromCharCode(codePoint);
+        }
+
+        if (Object.prototype.hasOwnProperty.call(namedEntities, entity)) {
+            return namedEntities[entity];
+        }
+
+        return match;
+    }).trim();
+}
+
+/**
+ * Compare a selectbox option value with a configured filter default.
+ *
+ * @param {*} optionValue
+ * @param {*} defaultValue
+ * @returns {boolean}
+ */
+function wdtFilterDefaultMatchesOptionValue(optionValue, defaultValue) {
+    if (defaultValue === '' || defaultValue == null) {
+        return false;
+    }
+
+    var defaultCompareValue = defaultValue;
+
+    if (typeof defaultValue === 'object') {
+        defaultCompareValue = defaultValue.value != null ? defaultValue.value : defaultValue['value'];
+    }
+
+    if (optionValue == defaultCompareValue) {
+        return true;
+    }
+
+    return wdtDecodeHtmlEntities(optionValue) === wdtDecodeHtmlEntities(defaultCompareValue);
+}
+
+/**
+ * Sync bootstrap-select UI with a default filter value after options are built.
+ *
+ * @param {jQuery} $select
+ * @param {*} defaultValue
+ * @param {string[]} [selectedEncodedValues]
+ */
+function wdtSyncSelectFilterDefaultValue($select, defaultValue, selectedEncodedValues) {
+    if (selectedEncodedValues && selectedEncodedValues.length) {
+        $select.val($select.prop('multiple') ? selectedEncodedValues : selectedEncodedValues[0]);
+        return;
+    }
+
+    if (defaultValue === '' || defaultValue == null) {
+        return;
+    }
+
+    if (jQuery.isArray(defaultValue)) {
+        var encodedValues = [];
+
+        for (var i = 0; i < defaultValue.length; i++) {
+            if (typeof defaultValue[i] === 'object') {
+                encodedValues.push(wdtEncodeFilterOptionValue(defaultValue[i].value));
+            } else if (defaultValue[i]) {
+                encodedValues.push(wdtEncodeFilterOptionValue(defaultValue[i]));
+            }
+        }
+
+        if (encodedValues.length) {
+            $select.val(encodedValues);
+        }
+
+        return;
+    }
+
+    if (typeof defaultValue === 'object') {
+        defaultValue = defaultValue.value != null ? defaultValue.value : defaultValue['value'];
+    }
+
+    if (defaultValue !== '' && defaultValue != null) {
+        $select.val(wdtEncodeFilterOptionValue(defaultValue));
+    }
+}
+
+/**
+ * Push bootstrap-select UI to reflect the native select value after plugin init.
+ *
+ * @param {jQuery} $select
+ * @param {*} defaultValue
+ * @param {string[]} [selectedOptionValues]
+ */
+function wdtApplySelectFilterDefaultToPicker($select, defaultValue, selectedOptionValues) {
+    wdtSyncSelectFilterDefaultValue($select, defaultValue, selectedOptionValues);
+
+    if (!$select.data('selectpicker')) {
+        return;
+    }
+
+    var currentValue = $select.val();
+
+    if (currentValue == null || currentValue === '' || (jQuery.isArray(currentValue) && !currentValue.length)) {
+        return;
+    }
+
+    $select.selectpicker('val', currentValue);
+    $select.selectpicker('render');
+}
+
+/**
  * Creates "Text" and "Number" filter
  * @param oTable
  * @param aoColumn
@@ -879,7 +1108,7 @@ function wdtCreateTimeRangeInput(oTable, aoColumn, columnIndex, sColumnLabel, th
  * @param serverSide
  */
 function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, serverSide) {
-    var tableId = oTable.attr('id'), selected;
+    var tableId = oTable.attr('id'), selected, selectedFilterValues = [];
     var tableDescription = JSON.parse(jQuery('#' + oTable.data('described-by')).val());
 
     // When server side is disabled, load the values with datatables api
@@ -901,19 +1130,25 @@ function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, ser
     // Label of the selectbox if "Filter label" option is set
     var selectTitle = aoColumn.filterLabel ? _.escape(aoColumn.filterLabel) : wpdatatables_filter_strings.nothingSelected_columnfilter;
 
-    // Create selectbox HTML with live search
-    var select = '<select class="wdt-select-filter wdt-filter-control selectpicker" title="' + selectTitle + '" data-index="' + columnIndex + '" data-live-search="true" data-live-search-placeholder="' + wpdatatables_filter_strings.search_columnfilter + '">';
+    // Create selectbox with live search
+    var select = jQuery('<select class="wdt-select-filter wdt-filter-control selectpicker" data-index="' + columnIndex + '" data-live-search="true" data-live-search-placeholder="' + wpdatatables_filter_strings.search_columnfilter + '">')
+        .attr('title', selectTitle);
 
     // Create selectbox based on "Number of possible values to load" option
     if (aoColumn.possibleValuesAjax !== -1) {
-
         // If default value is set, append it to selectbox HTML
-        if (typeof aoColumn.defaultValue === 'object') {
-            select += '<option selected value="' + aoColumn.defaultValue['value'] + '">' + aoColumn.defaultValue['text'] + '</option>';
-            oTable.api().column(columnIndex).search(aoColumn.defaultValue['value']);
-        } else {
-            select += '<option selected value="' + aoColumn.defaultValue + '">' + aoColumn.defaultValue + '</option>';
-            oTable.api().column(columnIndex).search(aoColumn.defaultValue);
+        // Encode option values so selectboxSearch()'s decodeURIComponent() does not throw on literals like "100%".
+        if (aoColumn.defaultValue) {
+            if (typeof aoColumn.defaultValue === 'object') {
+                select.append(buildSafeFilterOption(aoColumn.defaultValue['value'], aoColumn.defaultValue['text'], true, true));
+                selectedFilterValues.push(wdtEncodeFilterOptionValue(aoColumn.defaultValue['value']));
+                oTable.api().column(columnIndex).search(aoColumn.defaultValue['value']);
+            } else {
+                if (tableDescription.advanced_filter_option) aoColumn.defaultValue = wdtreplaceHtmlEntitiesForSpecialCharaters(aoColumn.defaultValue);
+                select.append(buildSafeFilterOption(aoColumn.defaultValue, aoColumn.defaultValue, true, true));
+                selectedFilterValues.push(wdtEncodeFilterOptionValue(aoColumn.defaultValue));
+                oTable.api().column(columnIndex).search(aoColumn.defaultValue);
+            }
         }
 
     } else {
@@ -926,33 +1161,34 @@ function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, ser
             selected = '';
 
             // Add selected attribute if option is predefined value
-            if (aoColumn.defaultValue !== '') {
-                if (typeof aoColumn.defaultValue === 'object') {
-
-                    if (aoColumn.values[j].value == aoColumn.defaultValue.value) {
-                        selected = 'selected="selected" ';
-                    }
-                } else {
-                    if (aoColumn.values[j].value == aoColumn.defaultValue) {
-                        selected = 'selected="selected" ';
-                    }
+            if (aoColumn.defaultValue !== '' && aoColumn.defaultValue != null) {
+                if (typeof aoColumn.defaultValue !== 'object' && tableDescription.advanced_filter_option) {
+                    aoColumn.defaultValue = wdtreplaceHtmlEntitiesForSpecialCharaters(aoColumn.defaultValue);
+                }
+                if (wdtFilterDefaultMatchesOptionValue(aoColumn.values[j].value, aoColumn.defaultValue)) {
+                    selected = 'selected="selected" ';
                 }
             }
-            select += '<option ' + selected + 'value="' + encodeURI(aoColumn.values[j].value) + '">' + aoColumn.values[j].label + '</option>';
+            select.append(buildSafeFilterOption(aoColumn.values[j].value, aoColumn.values[j].label, !!selected, true));
             if (selected) {
+                selectedFilterValues.push(wdtEncodeFilterOptionValue(aoColumn.values[j].value));
                 oTable.api().column(columnIndex).search(aoColumn.values[j].value);
             }
 
         }
     }
 
-    select = jQuery(select + '</select>');
+    wdtSyncSelectFilterDefaultValue(select, aoColumn.defaultValue, selectedFilterValues);
     th.html(select);
     th.wrapInner('<span class="filter_column filter_select" data-filter_type="selectbox" data-index="' + columnIndex + '"/>');
 
     // Add event to perform search on selectbox change
     select.on('change.selectChange', function () {
-        selectboxSearch.call(jQuery(this));
+        if (tableDescription.advanced_filter_option) {
+            selectboxSearchSpecialCharacters(jQuery(this).val());
+        } else {
+            selectboxSearch.call(jQuery(this));
+        }
     });
 
     // Create selectbox based on "Number of possible values to load" option
@@ -964,6 +1200,29 @@ function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, ser
             select.closest('.filter_column').find('.bs-searchbox .form-control').val('').trigger('keyup');
             //Added for fixed columns and fixed headers (height for showing selectbox)
             showSelectMultiSelectboxForFixedHeaderAndColumns(tableDescription, oTable, select);
+        }).on('shown.bs.select', function (e) {
+            // Fix width when using container: body
+            var bsContainer = jQuery('.bs-container').filter(function() {
+                return jQuery(this).find('select').is(select);
+            });
+            if (bsContainer.length > 0) {
+                bsContainer.css('width', 'auto');
+                bsContainer.css('min-width', '200px');
+                bsContainer.find('.dropdown-menu').css('min-width', '200px');
+            }
+
+            // Trigger search to load options immediately after dropdown is shown
+            var searchBox = select.parent().find('.bs-searchbox .form-control');
+            if (searchBox.length === 0) {
+                // When using container: body, find it in the body
+                var btnId = select.parent().find('button.dropdown-toggle').attr('aria-owns');
+                if (btnId) {
+                    searchBox = jQuery('#' + btnId).parent().find('.bs-searchbox .form-control');
+                }
+            }
+            if (searchBox.length > 0) {
+                searchBox.focus().val('').trigger('input').trigger('keyup');
+            }
         }).on('hide.bs.select', function (e) {
             //Added for fixed columns and fixed headers (when closing selectbox)
             hideSelectMultiSelectboxForFixedHeaderAndColumns(select);
@@ -985,7 +1244,8 @@ function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, ser
                     url: wdt_ajax_object.ajaxurl,
                     method: 'POST',
                     data: {
-                        wdtNonce: jQuery('#wdtNonce').val(),
+                        wdtNonce: jQuery('#wdtNonceFrontendServerSide_' + oTable.data('wpdatatable_id')).val()
+                            || jQuery('#wdtFrontendelementorNonce_' + oTable.data('wpdatatable_id')).val(),
                         action: 'wpdatatables_get_column_possible_values',
                         tableId: oTable.data('wpdatatable_id'),
                         originalHeader: aoColumn.origHeader
@@ -1014,10 +1274,13 @@ function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, ser
             });
 
         // Filter the table if default value is set
-        if (aoColumn.defaultValue && !serverSide) {
+        if (aoColumn.defaultValue && (!serverSide || tableDescription.advanced_filter_option)) {
             // Workaround for AJAX selectbox to be able to have predefined values
             select.trigger('change').data('AjaxBootstrapSelect').list.cache = {};
         }
+
+        wdtApplySelectFilterDefaultToPicker(select, aoColumn.defaultValue, selectedFilterValues);
+
         // Hide/Show search box in filter
         if (aoColumn.searchInSelectBox !== 1) {
             jQuery(th).find('.bs-searchbox').hide();
@@ -1029,6 +1292,7 @@ function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, ser
 
     } else {
         select.selectpicker('refresh');
+        wdtApplySelectFilterDefaultToPicker(select, aoColumn.defaultValue, selectedFilterValues);
         // Hide/Show search box in filter
         if (aoColumn.searchInSelectBox !== 1) {
             // Hide search in selectbox if possibleValuesAjax is All
@@ -1056,8 +1320,9 @@ function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, ser
             })
         }
         // Filter the table if default value is set
-        if (aoColumn.defaultValue && !serverSide) {
+        if (aoColumn.defaultValue && (!serverSide || tableDescription.advanced_filter_option)) {
             oTable.fnFilter(aoColumn.defaultValue, columnIndex);
+            wdtApplySelectFilterDefaultToPicker(select, aoColumn.defaultValue, selectedFilterValues);
         }
     }
 
@@ -1087,6 +1352,34 @@ function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, ser
             fnOnFiltered();
         }
     }
+    function selectboxSearchSpecialCharacters(value) {
+        if (value !== null) {
+            var search = '';
+            var cellValue = serverSide ? value : jQuery.fn.dataTable.util.escapeRegex(value);
+            if(aoColumn.possibleValuesAjax == -1) cellValue = decodeURIComponent(cellValue);
+            if (serverSide && aoColumn.possibleValuesAjax !== -1) {
+                cellValue =  encodeURIComponent(cellValue);
+            }
+            if (cellValue === 'possibleValuesAddEmpty' && !serverSide) {
+                oTable.api().column(columnIndex).search('^$', true, false);
+            } else {
+                if (aoColumn.exactFiltering) {
+                    cellValue = serverSide ? cellValue :  cellValue.replace(/%/g, '%25'); // Encode '%' character
+                    search = serverSide ? decodeURIComponent(cellValue) : '^' + decodeURIComponent(cellValue) + '$';
+                    oTable.api().column(columnIndex).search(cellValue ? search : '', true, false);
+                } else {
+                    cellValue = serverSide ? cellValue :  cellValue.replace(/%/g, '%25'); // Encode '%' character
+                    oTable.api().column(columnIndex).search(decodeURIComponent(cellValue), true, false);
+                }
+            }
+
+            if (typeof wpDataTables[tableId].drawTable === 'undefined' || wpDataTables[tableId].drawTable === true) {
+                oTable.api().draw();
+            }
+
+            fnOnFiltered();
+        }
+    }
 }
 
 /**
@@ -1099,7 +1392,7 @@ function wdtCreateSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, ser
  * @param serverSide
  */
 function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th, serverSide) {
-    var tableId = oTable.attr('id'), selected;
+    var tableId = oTable.attr('id'), selected, selectedFilterValues = [];
     var tableDescription = JSON.parse(jQuery('#' + oTable.data('described-by')).val());
 
     // When server side is disabled, load the values with datatables api
@@ -1129,12 +1422,13 @@ function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th
             var search = '';
             for (i = 0; i < aoColumn.defaultValue.length; i++) {
                 if (typeof aoColumn.defaultValue[i] === 'object') {
-                    select += '<option selected value="' + aoColumn.defaultValue[i].value + '">' + aoColumn.defaultValue[i].text + '</option>';
-                    search += buildSearchStringForMultiFilters(aoColumn.defaultValue[i].value, aoColumn.exactFiltering);
+                    select += buildSafeFilterOptionHtml(aoColumn.defaultValue[i].value, aoColumn.defaultValue[i].text, true);
+                    search += buildSearchStringForMultiFilters(wdtNormalizeRawFilterValueForSearch(aoColumn.defaultValue[i].value), aoColumn.exactFiltering, !serverSide);
                     oTable.api().column(columnIndex).search(search.substring(0, search.length - 1));
                 } else {
-                    select += '<option selected value="' + aoColumn.defaultValue[i] + '">' + aoColumn.defaultValue[i] + '</option>';
-                    search += buildSearchStringForMultiFilters(aoColumn.defaultValue[i], aoColumn.exactFiltering);
+                    if (tableDescription.advanced_filter_option) aoColumn.defaultValue[i] = wdtreplaceHtmlEntitiesForSpecialCharaters(aoColumn.defaultValue[i]);
+                    select += buildSafeFilterOptionHtml(aoColumn.defaultValue[i], aoColumn.defaultValue[i], true);
+                    search += buildSearchStringForMultiFilters(wdtNormalizeRawFilterValueForSearch(aoColumn.defaultValue[i]), aoColumn.exactFiltering, !serverSide);
                     oTable.api().column(columnIndex).search(search.substring(0, search.length - 1));
                 }
             }
@@ -1154,17 +1448,20 @@ function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th
                         return false;
                 });
             } else {
-                selected = jQuery.inArray(aoColumn.values[j].value.toString(), aoColumn.defaultValue) !== -1 ? selected = 'selected="selected" ' : '';
+                if (tableDescription.advanced_filter_option) aoColumn.defaultValue = aoColumn.defaultValue.map(wdtreplaceHtmlEntitiesForSpecialCharaters);
+                selected = jQuery.inArray(aoColumn.values[j].value.toString(), aoColumn.defaultValue) !== -1 ? 'selected="selected" ' : '';
             }
-            select += '<option ' + selected + 'value="' + encodeURI(aoColumn.values[j].value) + '">' + aoColumn.values[j].label + '</option>';
+            select += buildSafeFilterOptionHtml(aoColumn.values[j].value, aoColumn.values[j].label, !!selected);
             if (selected) {
-                search += buildSearchStringForMultiFilters(aoColumn.values[j].value, aoColumn.exactFiltering);
+                selectedFilterValues.push(wdtEncodeFilterOptionValue(aoColumn.values[j].value));
+                search += buildSearchStringForMultiFilters(wdtNormalizeRawFilterValueForSearch(aoColumn.values[j].value), aoColumn.exactFiltering, !serverSide);
                 oTable.api().column(columnIndex).search(search.substring(0, search.length - 1));
             }
         }
     }
 
     select = jQuery(select + '</select>');
+    wdtSyncSelectFilterDefaultValue(select, aoColumn.defaultValue, selectedFilterValues);
     th.html(select);
     th.wrapInner('<span class="filter_column filter_select" data-filter_type="multiselectbox" data-index="' + columnIndex + '" />');
 
@@ -1181,6 +1478,29 @@ function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th
             select.closest('.filter_column').find('.bs-searchbox .form-control').val('').trigger('keyup');
             //Added for fixed columns and fixed headers (height for showing multiselectbox)
             showSelectMultiSelectboxForFixedHeaderAndColumns(tableDescription, oTable, select);
+        }).on('shown.bs.select', function (e) {
+            // Fix width when using container: body
+            var bsContainer = jQuery('.bs-container').filter(function() {
+                return jQuery(this).find('select').is(select);
+            });
+            if (bsContainer.length > 0) {
+                bsContainer.css('width', 'auto');
+                bsContainer.css('min-width', '200px');
+                bsContainer.find('.dropdown-menu').css('min-width', '200px');
+            }
+
+            // Trigger search to load options immediately after dropdown is shown
+            var searchBox = select.parent().find('.bs-searchbox .form-control');
+            if (searchBox.length === 0) {
+                // When using container: body, find it in the body
+                var btnId = select.parent().find('button.dropdown-toggle').attr('aria-owns');
+                if (btnId) {
+                    searchBox = jQuery('#' + btnId).parent().find('.bs-searchbox .form-control');
+                }
+            }
+            if (searchBox.length > 0) {
+                searchBox.focus().val('').trigger('input').trigger('keyup');
+            }
         }).on('hide.bs.select', function (e) {
             //Added for fixed columns and fixed headers (when closing multiselectbox)
             hideSelectMultiSelectboxForFixedHeaderAndColumns(select);
@@ -1201,7 +1521,8 @@ function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th
                 url: wdt_ajax_object.ajaxurl,
                 method: 'POST',
                 data: {
-                    wdtNonce: jQuery('#wdtNonce').val(),
+                    wdtNonce: jQuery('#wdtNonceFrontendServerSide_' + oTable.data('wpdatatable_id')).val()
+                        || jQuery('#wdtFrontendelementorNonce_' + oTable.data('wpdatatable_id')).val(),
                     action: 'wpdatatables_get_column_possible_values',
                     tableId: oTable.data('wpdatatable_id'),
                     originalHeader: aoColumn.origHeader
@@ -1227,7 +1548,7 @@ function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th
         });
 
         // Filter the table if default value is set
-        if (aoColumn.defaultValue[0] && !serverSide) {
+        if (aoColumn.defaultValue[0] && (!serverSide || tableDescription.advanced_filter_option)) {
             // Workaround for AJAX selectbox to be able to have predefined values
             select.trigger('change').data('AjaxBootstrapSelect').list.cache = {};
         }
@@ -1264,11 +1585,11 @@ function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th
         }
         wdtAddAttributesForWCAGSelectBox(select, 'wdt-multiselect-filter', tableDescription);
         // Filter the table if default value is set
-        if (aoColumn.defaultValue[0] && !serverSide) {
+        if (aoColumn.defaultValue[0] && (!serverSide || tableDescription.advanced_filter_option)) {
             var search = '';
             if (aoColumn.andLogic) {
                 for (var i = 0; i < aoColumn.defaultValue.length; i++) {
-                    search += buildAndSearchStringForMultiFilters(aoColumn.defaultValue[i], aoColumn.exactFiltering, i);
+                    search += buildAndSearchStringForMultiFilters(wdtNormalizeRawFilterValueForSearch(aoColumn.defaultValue[i]), aoColumn.exactFiltering, i, !serverSide);
                 }
                 if (aoColumn.exactFiltering) {
                     search = search.slice(0, -2);
@@ -1277,7 +1598,7 @@ function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th
                 oTable.fnFilter(search, columnIndex, true, false);
             } else {
                 for (var i = 0; i < aoColumn.defaultValue.length; i++) {
-                    search += buildSearchStringForMultiFilters(aoColumn.defaultValue[i], aoColumn.exactFiltering);
+                    search += buildSearchStringForMultiFilters(wdtNormalizeRawFilterValueForSearch(aoColumn.defaultValue[i]), aoColumn.exactFiltering, !serverSide);
                 }
                 oTable.fnFilter(search.substring(0, search.length - 1), columnIndex, true, false);
             }
@@ -1302,7 +1623,7 @@ function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th
 
         if (aoColumn.andLogic && !serverSide) {
             jQuery.each(selectedOptions, function (index, value) {
-                search += buildAndSearchStringForMultiFilters(value, aoColumn.exactFiltering, index);
+                search += buildAndSearchStringForMultiFilters(value, aoColumn.exactFiltering, index, true);
             });
             if (aoColumn.exactFiltering) {
                 search = search.slice(0, -2);
@@ -1316,7 +1637,7 @@ function wdtCreateMultiSelectbox(oTable, aoColumn, columnIndex, sColumnLabel, th
                     var endIndex = value.lastIndexOf("%22");
                     value = value.substr(startIndex, endIndex - startIndex)
                 }
-                search += buildSearchStringForMultiFilters(value, aoColumn.exactFiltering);
+                search += buildSearchStringForMultiFilters(value, aoColumn.exactFiltering, !serverSide);
             });
             oTable.api().column(columnIndex).search(search.substring(0, search.length - 1), true, false);
         }
@@ -1402,10 +1723,10 @@ function wdtCreateCheckbox(oTable, aoColumn, columnIndex, sColumnLabel, th, serv
                 '</div>';
         }
         if (checked && !useAndLogic) {
-            search += buildSearchStringForMultiFilters(encodeURI(value), aoColumn.exactFiltering);
+            search += buildSearchStringForMultiFilters(wdtNormalizeRawFilterValueForSearch(value), aoColumn.exactFiltering, !serverSide);
             oTable.api().column(columnIndex).search(search.substring(0, search.length - 1));
         } else if (checked) {
-            search += buildAndSearchStringForMultiFilters(value, aoColumn.exactFiltering, i++);
+            search += buildAndSearchStringForMultiFilters(wdtNormalizeRawFilterValueForSearch(value), aoColumn.exactFiltering, i++, !serverSide);
         }
     }
 
@@ -1428,7 +1749,7 @@ function wdtCreateCheckbox(oTable, aoColumn, columnIndex, sColumnLabel, th, serv
     if (aoColumn.defaultValue[0] && !serverSide && !useAndLogic) {
         var search = '';
         for (var i = 0; i < aoColumn.defaultValue.length; i++) {
-            search += buildSearchStringForMultiFilters(aoColumn.defaultValue[i], aoColumn.exactFiltering);
+            search += buildSearchStringForMultiFilters(wdtNormalizeRawFilterValueForSearch(aoColumn.defaultValue[i]), aoColumn.exactFiltering, true);
         }
         oTable.fnFilter(search.substring(0, search.length - 1), columnIndex, true, false);
         fnOnFiltered();
@@ -1519,7 +1840,7 @@ function wdtCreateCheckbox(oTable, aoColumn, columnIndex, sColumnLabel, th, serv
         checkedInputs = jQuery(this).closest('#' + checkboxesDivId).find('input:checkbox:checked');
         useAndLogic = aoColumn.andLogic && !serverSide;
 
-        var checkedValue = jQuery(this).val().replaceAll('%0A', ' ');
+        var checkedValue = jQuery(this).val().replace(/%0D%0A|%0A/gi, ' ');
         if (checkedInputs.length <= 1) orderCheckbox = [];
         if (!jQuery(this).is(':checked')) {
             orderCheckbox = orderCheckbox.filter(function (value) {
@@ -1542,8 +1863,8 @@ function wdtCreateCheckbox(oTable, aoColumn, columnIndex, sColumnLabel, th, serv
                 var endIndex = value.lastIndexOf("%22");
                 value = value.substr(startIndex, endIndex - startIndex)
             }
-            search += useAndLogic ? buildAndSearchStringForMultiFilters(value, aoColumn.exactFiltering, i)
-                : buildSearchStringForMultiFilters(value, aoColumn.exactFiltering);
+            search += useAndLogic ? buildAndSearchStringForMultiFilters(value, aoColumn.exactFiltering, i, !serverSide)
+                : buildSearchStringForMultiFilters(value, aoColumn.exactFiltering, !serverSide);
             i++;
         });
 
@@ -1683,15 +2004,21 @@ function getColumnDistinctValues(tableId, columnIndex, applySearch) {
  * @param value
  * @param exactFiltering
  */
-function buildSearchStringForMultiFilters(value, exactFiltering) {
+function buildSearchStringForMultiFilters(value, exactFiltering, escapeForRegex) {
     var search = '', or = '|';
+    var decodedValue = wdtDecodeFilterOptionValue(value);
+
+    if (escapeForRegex) {
+        decodedValue = wdtEscapeFilterSearchRegex(decodedValue);
+    }
 
     if (exactFiltering) {
-        search = search + '^' + value.toString().replace(/\+/g, '\\+') + '$' + or;
+        search = '^' + decodedValue + '$' + or;
     } else {
-        search = search + value.toString().replace(/\+/g, '\\+') + or;
+        search = decodedValue + or;
     }
-    return decodeURIComponent(search);
+
+    return search;
 }
 
 /**
@@ -1699,21 +2026,27 @@ function buildSearchStringForMultiFilters(value, exactFiltering) {
  * @param value
  * @param exactFiltering
  * @param index
+ * @param escapeForRegex
  */
-function buildAndSearchStringForMultiFilters(value, exactFiltering, index) {
+function buildAndSearchStringForMultiFilters(value, exactFiltering, index, escapeForRegex) {
     var search = '';
+    var decodedValue = wdtDecodeFilterOptionValue(value);
+
+    if (escapeForRegex) {
+        decodedValue = wdtEscapeFilterSearchRegex(decodedValue);
+    }
 
     if (exactFiltering) {
         if (index === 0) {
             search = '^';
         }
-        search += value.toString().replace(/\+/g, '\\+') + ', ';
+        search += decodedValue + ', ';
     } else {
-        search = search + '(?=.*' + value.toString().replace(/\+/g, '\\+') + ')';
+        search = search + '(?=.*' + decodedValue + ')';
     }
-    return decodeURIComponent(search);
-}
 
+    return search;
+}
 /**
  * Function that attach event on clear filters button
  */
@@ -1763,7 +2096,7 @@ function wdtClearFilters() {
                 tableId = jQuery(this).closest('.wpDataTablesWrapper').find('table.wpDataTable').prop('id');
             }
 
-            wpDataTables[tableId].api().columns().search('');
+            wpDataTables[tableId].api().columns().search('').draw();
             wpDataTables[tableId].api().search('').draw();
 
             wpDataTableSelecter.find('.wdt-filter-control').eq(0).change();
@@ -1805,4 +2138,10 @@ function wdtAddAttributesForDateTime(selector, element, selectorPicker) {
     } else {
         jQuery(selector).parent().parent().attr('data-value-to', jQuery(selector).val());
     }
+}
+
+function wdtreplaceHtmlEntitiesForSpecialCharaters(text) {
+    var wdtTextAreaheleper = document.createElement('textarea');
+    wdtTextAreaheleper.innerHTML = text;
+    return wdtTextAreaheleper.value;
 }

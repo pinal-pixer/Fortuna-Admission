@@ -5,12 +5,15 @@
  * @package SureForms
  */
 
+use SRFM\Inc\Compatibility\Multilingual\String_Translator;
 use SRFM\Inc\Generate_Form_Markup;
 use SRFM\Inc\Helper;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
+
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Template-scoped variables consumed only within this template, not true plugin globals.
 
 $srfm_custom_post_id = absint( get_the_ID() );
 $srfm_form_preview   = isset( $_GET['form_preview'] ) ? boolval( wp_unslash( $_GET['form_preview'] ) ) : false;  // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Nonce verification is not required here.
@@ -154,11 +157,11 @@ if ( $use_banner_as_page_background ) {
 						}
 
 						if ( ! empty( $single_page_form_title ) ) {
+							$srfm_banner_title = String_Translator::get_instance()->translate_form_title( (int) get_the_ID(), Helper::get_string_value( get_the_title() ) );
 							?>
-							<h1 class="srfm-single-banner-title"><?php echo esc_html( get_the_title() ); ?></h1>
+							<h1 class="srfm-single-banner-title"><?php echo esc_html( $srfm_banner_title ); ?></h1>
 							<?php
 						}
-
 						?>
 					</div>
 					<div class="srfm-form-wrapper">

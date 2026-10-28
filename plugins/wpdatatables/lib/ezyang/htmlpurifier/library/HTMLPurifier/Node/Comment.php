@@ -1,21 +1,21 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Concrete comment node class.
  */
-class HTMLPurifier_Node_Comment extends HTMLPurifier_Node
+class HTMLPurifier_Node_Comment extends \WPDT\HTMLPurifier_Node
 {
     /**
      * Character data within comment.
      * @type string
      */
     public $data;
-
     /**
      * @type bool
      */
-    public $is_whitespace = true;
-
+    public $is_whitespace = \true;
     /**
      * Transparent constructor.
      *
@@ -29,8 +29,8 @@ class HTMLPurifier_Node_Comment extends HTMLPurifier_Node
         $this->line = $line;
         $this->col = $col;
     }
-
-    public function toTokenPair() {
-        return array(new HTMLPurifier_Token_Comment($this->data, $this->line, $this->col), null);
+    public function toTokenPair()
+    {
+        return array(new \WPDT\HTMLPurifier_Token_Comment($this->data, $this->line, $this->col), null);
     }
 }

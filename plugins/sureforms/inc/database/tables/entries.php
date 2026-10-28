@@ -37,7 +37,7 @@ class Entries extends Base {
 	 *
 	 * @var int
 	 */
-	protected $table_version = 1;
+	protected $table_version = 2;
 
 	/**
 	 * Current logs.
@@ -120,6 +120,11 @@ class Entries extends Base {
 		return [
 			'ID BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY',
 			'form_id BIGINT(20) UNSIGNED',
+			// NOT NULL DEFAULT 0 is load-bearing, not tidiness. An anonymous
+			// submission stores 0, and Forms_Data::calculate_form_metrics() excludes
+			// site editors with `user_id NOT IN (…)`. NOT IN never matches NULL, so
+			// making this column nullable would drop every anonymous entry from the
+			// numerator and report a conversion rate near 0% on every form.
 			'user_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0',
 			'form_data LONGTEXT', // Note: @since 0.0.13 -- We have renamed `user_data` column to `form_data`.
 			'logs LONGTEXT',
@@ -133,6 +138,12 @@ class Entries extends Base {
 			'INDEX idx_form_id (form_id)', // Indexing for the performance improvements.
 			'INDEX idx_user_id (user_id)',
 			'INDEX idx_form_id_created_at_status (form_id, created_at, status)', // Composite index for performance improvements.
+			// Leads on the two columns Forms_Data::get_editing_submitter_ids()
+			// filters. idx_user_id alone cannot serve it -- created_at is not in it,
+			// and no other index leads on created_at -- so that lookup was a range
+			// scan with a row read per row plus a temp table for DISTINCT, on every
+			// Forms-list render.
+			'INDEX idx_user_id_created_at (user_id, created_at)',
 		];
 	}
 
@@ -146,6 +157,8 @@ class Entries extends Base {
 			'extras LONGTEXT AFTER status',
 			'user_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 AFTER form_id',
 			'INDEX idx_user_id (user_id)',
+			// Note: @since 2.12.7 -- Covers the conversion rate's submitter lookup.
+			'INDEX idx_user_id_created_at (user_id, created_at)',
 		];
 	}
 
@@ -185,7 +198,7 @@ class Entries extends Base {
 		$log = [
 			'title'     => Helper::get_string_value( trim( $title ) ),
 			'messages'  => Helper::get_array_value( $messages ),
-			'timestamp' => current_time( 'timestamp' ), //phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp -- Using current_time() to match the WordPress timezone.
+			'timestamp' => current_time( 'mysql' ), //phpcs:ignore WordPress.DateTime.CurrentTimeTimestamp -- Using current_time() to match the WordPress timezone.
 		];
 
 		$this->logs = array_merge( [ $log ], $this->logs );
@@ -261,7 +274,16 @@ class Entries extends Base {
 			$data['logs'] = $instance->get_logs();
 		}
 
-		return $instance->use_insert( $data );
+		$result = $instance->use_insert( $data );
+
+		if ( ! $result ) {
+			// A failed entries write is the live-drop signal issue #3084 describes: the
+			// table can have been dropped after being cached as present. Drop that cache
+			// so the next admin load re-checks instead of trusting a stale answer.
+			\SRFM\Inc\Database\Register::flush_entries_table_cache();
+		}
+
+		return $result;
 	}
 
 	/**
@@ -479,6 +501,53 @@ class Entries extends Base {
 	}
 
 	/**
+	 * Check if any non-trashed entry for a given form contains a specific field value.
+	 *
+	 * Uses a single SQL query with JSON_EXTRACT on the form_data column
+	 * instead of loading all entries into PHP. Stops at the first match.
+	 *
+	 * SECURITY INVARIANT — do not relax the key matching. The only caller is the
+	 * unauthenticated uniqueness check (Form_Submit::field_unique_validation()), which
+	 * allows a probe only for fields the form marks unique. That restriction holds
+	 * because the lookup is anchored to the EXACT submitted key: a stored form_data key
+	 * always embeds its own block ID, so a key that resolves to field X can only carry
+	 * X's block ID. Matching on block ID instead, or switching to LIKE / JSON_SEARCH,
+	 * would break that anchoring and widen the probe beyond the allowlisted field.
+	 *
+	 * @param int    $form_id     The form ID to search within.
+	 * @param string $field_key   The form_data JSON key to match against.
+	 * @param string $field_value The value to check for uniqueness.
+	 * @since 2.7.0
+	 * @return bool True if a duplicate exists, false otherwise.
+	 */
+	public static function has_duplicate_field_value( $form_id, $field_key, $field_value ) {
+		if ( empty( $form_id ) || empty( $field_key ) || '' === $field_value ) {
+			return false;
+		}
+
+		global $wpdb;
+		$table_name = self::get_instance()->get_tablename();
+
+		// $wpdb->prepare() escapes this for SQL, but the key is interpolated into a JSON
+		// path string, where a quote or backslash would change the path's meaning rather
+		// than break the query. Neutralise both so the path can only ever be a single
+		// quoted member access.
+		$json_path = '$."' . str_replace( [ '\\', '"' ], [ '\\\\', '\\"' ], $field_key ) . '"';
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- One-off existence check; table name from get_tablename() (not user input); caching not beneficial for uniqueness validation.
+		$exists = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT 1 FROM {$table_name} WHERE form_id = %d AND status != 'trash' AND JSON_UNQUOTE(JSON_EXTRACT(form_data, %s)) = %s LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table name is internally generated.
+				$form_id,
+				$json_path,
+				$field_value
+			)
+		);
+
+		return null !== $exists;
+	}
+
+	/**
 	 * Get form IDs associated with a list of entry IDs.
 	 * This method retrieves the distinct form IDs that are linked to the provided entry IDs.
 	 *
@@ -487,7 +556,7 @@ class Entries extends Base {
 	 * @return array<int> An array of form IDs.
 	 */
 	public static function get_form_ids_by_entries( $entry_ids ) {
-		if ( empty( $entry_ids ) && ! is_array( $entry_ids ) ) {
+		if ( empty( $entry_ids ) || ! is_array( $entry_ids ) ) {
 			return [];
 		}
 
@@ -535,5 +604,19 @@ class Entries extends Base {
 			'form_data, extras'
 		);
 		return isset( $result[0] ) && is_array( $result[0] ) ? $result[0] : [];
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * Restricts orderable columns to indexed, semantically meaningful fields.
+	 * Excludes LONGTEXT blob columns (form_data, submission_info, notes, logs, extras)
+	 * to prevent full-table sorts on un-indexed columns.
+	 *
+	 * @since 2.6.0
+	 * @return array<string>
+	 */
+	protected function get_allowed_orderby_columns() {
+		return [ 'ID', 'id', 'form_id', 'user_id', 'status', 'type', 'created_at', 'updated_at' ];
 	}
 }

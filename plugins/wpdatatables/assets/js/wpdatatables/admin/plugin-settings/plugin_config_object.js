@@ -196,6 +196,13 @@ var wpdatatable_plugin_config = {
         }
     },
 
+    setMcpEnabled: function (wdtMcpEnabled) {
+        wdt_current_config.wdtMcpEnabled = wdtMcpEnabled;
+        if (jQuery('#wdt-mcp-enabled').val() != wdtMcpEnabled) {
+            jQuery('#wdt-mcp-enabled').prop('checked', wdtMcpEnabled);
+        }
+    },
+
     setAlignNumber: function (alignNumber) {
         wdt_current_config.wdtNumbersAlign = alignNumber;
         if (jQuery('#wdt-numbers-align').val() != alignNumber) {
@@ -345,16 +352,17 @@ var wpdatatable_plugin_config = {
         }
     },
 
-    setHighChartStableVersion: function (highChartStableVersion) {
-        wdt_current_config.wdtHighChartStableVersion = highChartStableVersion;
-        if (jQuery('#wdt-use-highcharts-stable-version').val() != highChartStableVersion) {
-            jQuery('#wdt-use-highcharts-stable-version').prop('checked', highChartStableVersion);
-        }
-    },
     setApexStableVersion: function (apexChartStableVersion) {
         wdt_current_config.wdtApexStableVersion = apexChartStableVersion;
         if (jQuery('#wdt-use-apexcharts-stable-version').val() != apexChartStableVersion) {
             jQuery('#wdt-use-apexcharts-stable-version').prop('checked', apexChartStableVersion);
+        }
+    },
+
+    setUsageTrackingEnabled: function (usageTrackingEnabled) {
+        wdt_current_config.wdtUsageTrackingEnabled = usageTrackingEnabled;
+        if (jQuery('#wdt-usage-tracking-enabled').prop('checked') != usageTrackingEnabled) {
+            jQuery('#wdt-usage-tracking-enabled').prop('checked', usageTrackingEnabled);
         }
     }
 };

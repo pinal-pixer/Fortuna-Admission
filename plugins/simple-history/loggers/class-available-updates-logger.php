@@ -2,6 +2,11 @@
 
 namespace Simple_History\Loggers;
 
+use Simple_History\Event_Details\Event_Details_Container;
+use Simple_History\Event_Details\Event_Details_Group;
+use Simple_History\Event_Details\Event_Details_Group_Inline_Formatter;
+use Simple_History\Event_Details\Event_Details_Group_Table_Formatter;
+use Simple_History\Event_Details\Event_Details_Item;
 use Simple_History\Log_Initiators;
 
 /**
@@ -19,7 +24,7 @@ class Available_Updates_Logger extends Logger {
 	 * @return array
 	 */
 	public function get_info() {
-		$arr_info = array(
+		return array(
 			'name'        => _x( 'Available Updates Logger', 'AvailableUpdatesLogger', 'simple-history' ),
 			'type'        => 'core',
 			'description' => __( 'Logs found updates to WordPress, plugins, and themes', 'simple-history' ),
@@ -47,8 +52,6 @@ class Available_Updates_Logger extends Logger {
 				), // search array.
 			), // labels.
 		);
-
-		return $arr_info;
 	}
 
 	/**
@@ -56,12 +59,10 @@ class Available_Updates_Logger extends Logger {
 	 */
 	public function loaded() {
 
-		// When WP is done checking for core updates it sets a site transient called "update_core"
-		// set_site_transient( 'update_core', null ); // Uncomment to test.
+		// When WP is done checking for core updates it sets a site transient called "update_core".
 		add_action( 'set_site_transient_update_core', array( $this, 'on_setted_update_core_transient' ), 10, 1 );
 
-		// Ditto for plugins
-		// set_site_transient( 'update_plugins', null ); // Uncomment to test.
+		// Ditto for plugins.
 		add_action( 'set_site_transient_update_plugins', array( $this, 'on_setted_update_plugins_transient' ), 10, 1 );
 
 		add_action( 'set_site_transient_update_themes', array( $this, 'on_setted_update_update_themes' ), 10, 1 );
@@ -91,24 +92,27 @@ class Available_Updates_Logger extends Logger {
 		require_once ABSPATH . WPINC . '/version.php';
 
 		// If found version is same version as we have logged about before then don't continue.
-		if ( $last_version_checked == $new_wp_core_version ) {
+		if ( $last_version_checked === $new_wp_core_version ) {
 			return;
 		}
 
 		// is WP core update available?
-		if ( isset( $updates->updates[0]->response ) && 'upgrade' == $updates->updates[0]->response ) {
-			$this->notice_message(
-				'core_update_available',
-				array(
-					'wp_core_current_version' => $wp_version,
-					'wp_core_new_version' => $new_wp_core_version,
-					'_initiator' => Log_Initiators::WORDPRESS,
-				)
-			);
-
-			// Store updated version available, so we don't log that version again.
-			update_option( "simplehistory_{$this->get_slug()}_wp_core_version_available", $new_wp_core_version );
+		if ( ! isset( $updates->updates[0]->response ) || $updates->updates[0]->response !== 'upgrade' ) {
+			return;
 		}
+
+		$this->notice_message(
+			'core_update_available',
+			array(
+				'wp_core_current_version' => $wp_version,
+				'wp_core_new_version'     => $new_wp_core_version,
+				'_initiator'              => Log_Initiators::WORDPRESS,
+			)
+		);
+
+		// Store updated version available, so we don't log that version again.
+		// Autoload disabled since this option is only accessed during update checks.
+		update_option( "simplehistory_{$this->get_slug()}_wp_core_version_available", $new_wp_core_version, false );
 	}
 
 	/**
@@ -124,7 +128,7 @@ class Available_Updates_Logger extends Logger {
 			return;
 		}
 
-		$option_key = "simplehistory_{$this->get_slug()}_plugin_updates_available";
+		$option_key      = "simplehistory_{$this->get_slug()}_plugin_updates_available";
 		$checked_updates = get_option( $option_key );
 
 		if ( ! is_array( $checked_updates ) ) {
@@ -146,10 +150,11 @@ class Available_Updates_Logger extends Logger {
 				continue;
 			}
 
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
 			$fp = fopen( $file, 'r' );
 
 			// Continue with next plugin if plugin file could not be read.
-			if ( false === $fp ) {
+			if ( $fp === false ) {
 				continue;
 			}
 
@@ -164,25 +169,36 @@ class Available_Updates_Logger extends Logger {
 				);
 			}
 
-			if ( $checked_updates[ $key ]['checked_version'] == $plugin_new_version ) {
+			if ( $checked_updates[ $key ]['checked_version'] === $plugin_new_version ) {
 				// This version has been checked/logged already.
 				continue;
 			}
 
 			$checked_updates[ $key ]['checked_version'] = $plugin_new_version;
 
-			$this->notice_message(
-				'plugin_update_available',
-				array(
-					'plugin_name' => $plugin_info['Name'] ?? '',
-					'plugin_current_version' => $plugin_info['Version'] ?? '',
-					'plugin_new_version' => $plugin_new_version,
-					'_initiator' => Log_Initiators::WORDPRESS,
-				)
+			$context = array(
+				'plugin_name'            => $plugin_info['Name'] ?? '',
+				'plugin_slug'            => $data->slug ?? '',
+				'plugin_current_version' => $plugin_info['Version'] ?? '',
+				'plugin_new_version'     => $plugin_new_version,
+				'_initiator'             => Log_Initiators::WORDPRESS,
 			);
-		} // End foreach().
 
-		update_option( $option_key, $checked_updates );
+			// Add autoupdate flag if present (indicates forced security update).
+			if ( ! empty( $data->autoupdate ) ) {
+				$context['plugin_autoupdate'] = '1';
+			}
+
+			// Add upgrade notice if present.
+			if ( ! empty( $data->upgrade_notice ) ) {
+				$context['plugin_upgrade_notice'] = $data->upgrade_notice;
+			}
+
+			$this->notice_message( 'plugin_update_available', $context );
+		}
+
+		// Autoload disabled since this option is only accessed during update checks.
+		update_option( $option_key, $checked_updates, false );
 	}
 
 	/**
@@ -198,7 +214,7 @@ class Available_Updates_Logger extends Logger {
 			return;
 		}
 
-		$option_key = "simplehistory_{$this->get_slug()}_theme_updates_available";
+		$option_key      = "simplehistory_{$this->get_slug()}_theme_updates_available";
 		$checked_updates = get_option( $option_key );
 
 		if ( ! is_array( $checked_updates ) ) {
@@ -209,9 +225,6 @@ class Available_Updates_Logger extends Logger {
 		foreach ( $updates->response as $key => $data ) {
 			$theme_info = wp_get_theme( $key );
 
-			// $message .= "\n" . sprintf( __( "Theme: %s is out of date. Please update from version %s to %s", "wp-updates-notifier" ), $theme_info['Name'], $theme_info['Version'], $data['new_version'] ) . "\n";
-			$settings['notified']['theme'][ $key ] = $data['new_version']; // set theme version we are notifying about.
-
 			$theme_new_version = $data['new_version'] ?? '';
 
 			// check if this plugin and this version has been checked/logged already.
@@ -221,7 +234,7 @@ class Available_Updates_Logger extends Logger {
 				);
 			}
 
-			if ( $checked_updates[ $key ]['checked_version'] == $theme_new_version ) {
+			if ( $checked_updates[ $key ]['checked_version'] === $theme_new_version ) {
 				// This version has been checked/logged already.
 				continue;
 			}
@@ -231,75 +244,157 @@ class Available_Updates_Logger extends Logger {
 			$this->notice_message(
 				'theme_update_available',
 				array(
-					'theme_name' => $theme_info['Name'] ?? '',
+					'theme_name'            => $theme_info['Name'] ?? '',
 					'theme_current_version' => $theme_info['Version'] ?? '',
-					'theme_new_version' => $theme_new_version,
-					'_initiator' => Log_Initiators::WORDPRESS,
-				// "plugin_info" => $plugin_info,
-				// "remote_plugin_info" => $remote_plugin_info,
-				// "active_plugins" => $active_plugins,
-				// "updates" => $updates,
+					'theme_new_version'     => $theme_new_version,
+					'_initiator'            => Log_Initiators::WORDPRESS,
 				)
 			);
-		} // End foreach().
+		}
 
-		update_option( $option_key, $checked_updates );
+		// Autoload disabled since this option is only accessed during update checks.
+		update_option( $option_key, $checked_updates, false );
 	}
 
 	/**
 	 * Append prev and current version of update object as details in the output
 	 *
 	 * @param object $row Log row.
+	 * @return Event_Details_Group|Event_Details_Container|string
 	 */
 	public function get_log_row_details_output( $row ) {
-
-		$output = '';
+		$context_message_key = $row->context_message_key ?? null;
+		$context             = $row->context ?? array();
 
 		$current_version = null;
-		$new_version = null;
-		$context_message_key = $row->context_message_key ?? null;
-
-		$context = $row->context ?? array();
+		$new_version     = null;
+		$groups          = [];
 
 		switch ( $context_message_key ) {
 			case 'core_update_available':
 				$current_version = $context['wp_core_current_version'] ?? null;
-				$new_version = $context['wp_core_new_version'] ?? null;
+				$new_version     = $context['wp_core_new_version'] ?? null;
 				break;
 
 			case 'plugin_update_available':
 				$current_version = $context['plugin_current_version'] ?? null;
-				$new_version = $context['plugin_new_version'] ?? null;
+				$new_version     = $context['plugin_new_version'] ?? null;
+
+				// Security auto-update notice.
+				if ( ! empty( $context['plugin_autoupdate'] ) ) {
+					$security_group = ( new Event_Details_Group() )
+						->set_formatter( new Event_Details_Group_Table_Formatter() )
+						->add_item(
+							( new Event_Details_Item(
+								null,
+								_x( 'Security auto-update', 'Available updates logger: forced update indicator', 'simple-history' )
+							) )->set_new_value(
+								__( 'This update will be installed automatically by WordPress.', 'simple-history' )
+							)
+						);
+					$groups[]       = $security_group;
+				}
+
+				// Upgrade notice.
+				if ( ! empty( $context['plugin_upgrade_notice'] ) ) {
+					$upgrade_notice = wp_strip_all_tags( $context['plugin_upgrade_notice'] );
+					$upgrade_notice = wp_trim_words( $upgrade_notice, 30, '…' );
+
+					$notice_group = ( new Event_Details_Group() )
+						->set_formatter( new Event_Details_Group_Table_Formatter() )
+						->add_item(
+							( new Event_Details_Item(
+								null,
+								_x( 'Update notice', 'Available updates logger: update notice label', 'simple-history' )
+							) )->set_new_value( $upgrade_notice )
+						);
+					$groups[]     = $notice_group;
+				}
 				break;
 
 			case 'theme_update_available':
 				$current_version = $context['theme_current_version'] ?? null;
-				$new_version = $context['theme_new_version'] ?? null;
+				$new_version     = $context['theme_new_version'] ?? null;
 				break;
 		}
 
+		// Version info as inline group.
 		if ( $current_version && $new_version ) {
-			$output .= '<p>';
-			$output .= '<span class="SimpleHistoryLogitem__inlineDivided">';
-			$output .= '<em>' . __( 'Available version', 'simple-history' ) . '</em> ' . esc_html( $new_version );
-			$output .= '</span> ';
-
-			$output .= '<span class="SimpleHistoryLogitem__inlineDivided">';
-			$output .= '<em>' . __( 'Installed version', 'simple-history' ) . '</em> ' . esc_html( $current_version );
-			$output .= '</span>';
-
-			$output .= '</p>';
-
-			// Add link to update-page, if user is allowed  to that page.
-			$is_allowed_to_update_page = current_user_can( 'update_core' ) || current_user_can( 'update_themes' ) || current_user_can( 'update_plugins' );
-
-			if ( $is_allowed_to_update_page ) {
-				$output .= sprintf( '<p><a href="%1$s">', admin_url( 'update-core.php' ) );
-				$output .= __( 'View all updates', 'simple-history' );
-				$output .= '</a></p>';
-			}
+			$version_group = ( new Event_Details_Group() )
+				->set_formatter( new Event_Details_Group_Inline_Formatter() )
+				->add_items(
+					[
+						( new Event_Details_Item( null, __( 'Available version', 'simple-history' ) ) )
+							->set_new_value( $new_version ),
+						( new Event_Details_Item( null, __( 'Installed version', 'simple-history' ) ) )
+							->set_new_value( $current_version ),
+					] 
+				);
+			$groups[]      = $version_group;
 		}
 
-		return $output;
+		if ( empty( $groups ) ) {
+			return '';
+		}
+
+		return Event_Details_Container::create_from( $groups );
+	}
+
+	/**
+	 * Get action links for a log row.
+	 *
+	 * Plugin-update events with a known wp.org slug get per-plugin links to
+	 * the plugin-information thickbox: "Changelog" (what's in the update) and
+	 * "Plugin info" (what the plugin actually is — useful when an unfamiliar
+	 * plugin shows up in the log). All events get an "All updates" overview
+	 * link.
+	 *
+	 * The thickbox destination (plugin-install.php) gates itself with
+	 * `install_plugins` and wp_dies without it, so the per-plugin links are
+	 * capped on that — not on the update_* caps — to avoid surfacing links
+	 * that land on a permission-denied screen.
+	 *
+	 * @param object $row Log row object.
+	 * @return array Array of action link arrays.
+	 */
+	public function get_action_links( $row ) {
+		$context     = $row->context;
+		$message_key = $context['_message_key'] ?? '';
+		$plugin_slug = $context['plugin_slug'] ?? '';
+		$is_network  = is_multisite();
+
+		$action_links = [];
+
+		if ( $message_key === 'plugin_update_available' && $plugin_slug && current_user_can( 'install_plugins' ) ) {
+			$changelog_path = "plugin-install.php?tab=plugin-information&plugin={$plugin_slug}&section=changelog&TB_iframe=true&width=772&height=550";
+
+			$action_links[] = [
+				'url'    => $is_network ? network_admin_url( $changelog_path ) : admin_url( $changelog_path ),
+				'label'  => _x( 'Changelog', 'Available updates logger: changelog link', 'simple-history' ),
+				'action' => 'view',
+			];
+
+			$plugin_info_path = "plugin-install.php?tab=plugin-information&plugin={$plugin_slug}&TB_iframe=true&width=640&height=550";
+
+			$action_links[] = [
+				'url'    => $is_network ? network_admin_url( $plugin_info_path ) : admin_url( $plugin_info_path ),
+				'label'  => _x( 'Plugin info', 'Available updates logger: plugin info thickbox link', 'simple-history' ),
+				'action' => 'view',
+			];
+		}
+
+		// On multisite updates are applied in the network admin, so route
+		// the overview link there.
+		$is_allowed_to_update_page = current_user_can( 'update_core' ) || current_user_can( 'update_themes' ) || current_user_can( 'update_plugins' );
+
+		if ( $is_allowed_to_update_page ) {
+			$action_links[] = [
+				'url'    => $is_network ? network_admin_url( 'update-core.php' ) : admin_url( 'update-core.php' ),
+				'label'  => __( 'All updates', 'simple-history' ),
+				'action' => 'view',
+			];
+		}
+
+		return $action_links;
 	}
 }

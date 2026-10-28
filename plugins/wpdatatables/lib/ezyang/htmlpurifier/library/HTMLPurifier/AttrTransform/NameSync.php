@@ -1,23 +1,22 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Post-transform that performs validation to the name attribute; if
  * it is present with an equivalent id attribute, it is passed through;
  * otherwise validation is performed.
  */
-class HTMLPurifier_AttrTransform_NameSync extends HTMLPurifier_AttrTransform
+class HTMLPurifier_AttrTransform_NameSync extends \WPDT\HTMLPurifier_AttrTransform
 {
-
     /**
      * @type HTMLPurifier_AttrDef_HTML_ID
      */
     public $idDef;
-
     public function __construct()
     {
-        $this->idDef = new HTMLPurifier_AttrDef_HTML_ID();
+        $this->idDef = new \WPDT\HTMLPurifier_AttrDef_HTML_ID();
     }
-
     /**
      * @param array $attr
      * @param HTMLPurifier_Config $config
@@ -34,7 +33,7 @@ class HTMLPurifier_AttrTransform_NameSync extends HTMLPurifier_AttrTransform
             return $attr;
         }
         $result = $this->idDef->validate($name, $config, $context);
-        if ($result === false) {
+        if ($result === \false) {
             unset($attr['name']);
         } else {
             $attr['name'] = $result;
@@ -42,5 +41,4 @@ class HTMLPurifier_AttrTransform_NameSync extends HTMLPurifier_AttrTransform
         return $attr;
     }
 }
-
 // vim: et sw=4 sts=4

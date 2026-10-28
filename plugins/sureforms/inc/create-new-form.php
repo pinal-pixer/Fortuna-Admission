@@ -8,6 +8,8 @@
 
 namespace SRFM\Inc;
 
+use SRFM\Admin\Analytics;
+use SRFM\Inc\AI_Form_Builder\AI_Helper;
 use SRFM\Inc\Traits\Get_Instance;
 use WP_Error;
 use WP_REST_Response;
@@ -54,29 +56,33 @@ class Create_New_Form {
 	/**
 	 * Get default post metas for form when creating using template.
 	 *
-	 * @return array<string, array<int, int|string>> Default meta keys.
+	 * @return array<string, int|string|bool> Default meta keys.
+	 * @since 2.0.0 updated the return type.
 	 * @since 0.0.2
 	 */
 	public static function get_default_meta_keys() {
-		return [
-			'_srfm_submit_button_text'       => [ __( 'Submit', 'sureforms' ) ],
-			'_srfm_use_label_as_placeholder' => [ '' ],
-			'_srfm_single_page_form_title'   => [ 1 ],
-			'_srfm_instant_form'             => [ '' ],
-			'_srfm_form_container_width'     => [ 650 ],
-			'_srfm_bg_type'                  => [ 'image' ],
-			'_srfm_bg_image'                 => [ '' ],
-			'_srfm_cover_image'              => [ '' ],
-			'_srfm_bg_color'                 => [ '#ffffff' ],
-			'_srfm_submit_width_backend'     => [ 'max-content' ],
-			'_srfm_submit_alignment'         => [ 'left' ],
-			'_srfm_submit_alignment_backend' => [ '100%' ],
-			'_srfm_submit_width'             => [ '' ],
-			'_srfm_inherit_theme_button'     => [ '' ],
-			'_srfm_additional_classes'       => [ '' ],
-			'_srfm_submit_type'              => [ 'message' ],
-			'_srfm_form_recaptcha'           => [ 'none' ],
+		$default_values = [
+			'_srfm_submit_button_text'       => __( 'Submit', 'sureforms' ),
+			'_srfm_use_label_as_placeholder' => false,
+			'_srfm_single_page_form_title'   => 1,
+			'_srfm_instant_form'             => '',
+			'_srfm_form_container_width'     => 650,
+			'_srfm_bg_type'                  => 'image',
+			'_srfm_bg_image'                 => '',
+			'_srfm_cover_image'              => '',
+			'_srfm_bg_color'                 => '#ffffff',
+			'_srfm_submit_width_backend'     => 'max-content',
+			'_srfm_submit_alignment'         => 'left',
+			'_srfm_submit_alignment_backend' => '100%',
+			'_srfm_submit_width'             => '',
+			'_srfm_inherit_theme_button'     => false,
+			'_srfm_additional_classes'       => '',
+			'_srfm_submit_type'              => 'message',
+			'_srfm_form_recaptcha'           => 'none',
+			'_srfm_is_inline_button'         => false, // @since 2.0.0 -- adding required default value.
 		];
+
+		return apply_filters( 'srfm_add_post_meta_defaults', $default_values );
 	}
 
 	/**
@@ -141,29 +147,54 @@ class Create_New_Form {
 				'meta_input'   => $post_metas,
 				'post_status'  => 'draft',
 				'post_type'    => 'sureforms_form',
-			]
+			],
+			true
 		);
 
-		if ( ! empty( $post_id ) ) {
-
-			/**
-			 * Update _srfm_is_ai_generated meta to true.
-			 * If the request is coming here then the form is AI generated.
-			 */
-			update_post_meta( $post_id, '_srfm_is_ai_generated', true );
-
+		if ( is_wp_error( $post_id ) ) {
+			// Pass the raw WP_Error through the shared sanitizer so any URLs,
+			// request IDs, or model names injected by a filter on
+			// wp_insert_post don't leak via the REST response. The raw message
+			// is still logged server-side (gated on WP_DEBUG / WP_DEBUG_LOG).
+			$sanitized = AI_Helper::sanitize_ai_error_message( $post_id->get_error_message(), 'wp_insert_post' );
+			if ( '' === $sanitized ) {
+				$sanitized = __( 'Error creating SureForms Form.', 'sureforms' );
+			}
 			return new WP_REST_Response(
 				[
-					'message' => __( 'SureForms Form created successfully.', 'sureforms' ),
-					'id'      => $post_id,
-				]
+					'message' => $sanitized,
+				],
+				500
 			);
 		}
-			wp_send_json_error(
+
+		if ( ! is_int( $post_id ) || $post_id <= 0 ) {
+			return new WP_REST_Response(
 				[
-					'message' => __( 'Error creating SureForms Form, ', 'sureforms' ),
-				]
+					'message' => __( 'Error creating SureForms Form.', 'sureforms' ),
+				],
+				500
 			);
+		}
+
+		/**
+		 * Update _srfm_is_ai_generated meta to true.
+		 * If the request is coming here then the form is AI generated.
+		 */
+		update_post_meta( $post_id, '_srfm_is_ai_generated', true );
+
+		// Count the AI form against the starter card (if any) its prompt came from.
+		$starter_id = isset( $form_info_obj->ai_starter ) && is_string( $form_info_obj->ai_starter ) ? $form_info_obj->ai_starter : '';
+		$edited     = ! empty( $form_info_obj->ai_starter_edited );
+
+		Analytics::track_ai_starter_usage( $starter_id, $edited );
+
+		return new WP_REST_Response(
+			[
+				'message' => __( 'SureForms Form created successfully.', 'sureforms' ),
+				'id'      => $post_id,
+			]
+		);
 	}
 
 }

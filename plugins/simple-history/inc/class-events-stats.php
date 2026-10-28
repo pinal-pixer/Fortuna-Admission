@@ -2,6 +2,7 @@
 
 namespace Simple_History;
 
+use Simple_History\Loggers\User_Logger;
 use WP_Session_Tokens;
 
 /**
@@ -30,7 +31,7 @@ class Events_Stats {
 	 */
 	private function get_events_table_name() {
 		if ( ! $this->events_table ) {
-			$simple_history = Simple_History::get_instance();
+			$simple_history     = Simple_History::get_instance();
 			$this->events_table = $simple_history->get_events_table_name();
 		}
 		return $this->events_table;
@@ -43,7 +44,7 @@ class Events_Stats {
 	 */
 	private function get_contexts_table_name() {
 		if ( ! $this->contexts_table ) {
-			$simple_history = Simple_History::get_instance();
+			$simple_history       = Simple_History::get_instance();
 			$this->contexts_table = $simple_history->get_contexts_table_name();
 		}
 		return $this->contexts_table;
@@ -53,7 +54,7 @@ class Events_Stats {
 	 * Method for getting event counts by logger and message value.
 	 *
 	 * Examples:
-	 * get_event_count( 'SimpleUserLogger', [ 'user_login_failed', 'user_unknown_login_failed' ], $date_from, $date_to );
+	 * get_event_count( 'SimpleUserLogger', User_Logger::get_failed_login_message_keys(), $date_from, $date_to );
 	 * et_event_count( 'SimpleUserLogger', 'user_created', $date_from, $date_to );
 	 *
 	 * @param string       $logger_slug    The logger slug (e.g. 'SimpleMediaLogger').
@@ -72,7 +73,7 @@ class Events_Stats {
 		// This creates a string like this: "%s,%s,%s".
 		$value_placeholders = implode( ',', array_fill( 0, count( $values ), '%s' ) );
 
-		$events_table = $this->get_events_table_name();
+		$events_table   = $this->get_events_table_name();
 		$contexts_table = $this->get_contexts_table_name();
 
 		$query_args = array_merge(
@@ -81,8 +82,9 @@ class Events_Stats {
 			[ $date_from, $date_to ]
 		);
 
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared -- value_placeholders is safe here
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->get_var(
+			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Dynamic IN clause placeholders in $value_placeholders variable matched with merged $query_args array
 			$wpdb->prepare(
 				'SELECT COUNT(DISTINCT h.id)
 					FROM %i h
@@ -109,6 +111,7 @@ class Events_Stats {
 		$logged_in_users = [];
 
 		// Query session tokens directly from user meta table.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$users_with_session_tokens = $wpdb->get_col(
 			$wpdb->prepare(
 				"SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = %s AND meta_value != ''",
@@ -120,13 +123,15 @@ class Events_Stats {
 			$sessions = WP_Session_Tokens::get_instance( $one_user_id );
 
 			$all_user_sessions = $sessions->get_all();
-			if ( $all_user_sessions ) {
-				$logged_in_users[] = [
-					'user' => get_userdata( $one_user_id ),
-					'sessions_count' => count( $all_user_sessions ),
-					'sessions' => $all_user_sessions,
-				];
+			if ( ! $all_user_sessions ) {
+				continue;
 			}
+
+			$logged_in_users[] = [
+				'user'           => get_userdata( $one_user_id ),
+				'sessions_count' => count( $all_user_sessions ),
+				'sessions'       => $all_user_sessions,
+			];
 		}
 
 		return array_slice( $logged_in_users, 0, $limit );
@@ -148,7 +153,9 @@ class Events_Stats {
 
 		$events_table = $this->get_events_table_name();
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->get_var(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 			$wpdb->prepare(
 				'SELECT 
 					COUNT(*)
@@ -178,9 +185,10 @@ class Events_Stats {
 			return false;
 		}
 
-		$events_table = $this->get_events_table_name();
+		$events_table   = $this->get_events_table_name();
 		$contexts_table = $this->get_contexts_table_name();
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				'SELECT 
@@ -215,26 +223,28 @@ class Events_Stats {
 			return false;
 		}
 
-		$events_table = $this->get_events_table_name();
+		$events_table   = $this->get_events_table_name();
 		$contexts_table = $this->get_contexts_table_name();
 
+		// phpcs:disable WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users -- Performance-critical stats query, WP user APIs too slow for bulk data
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_row(
 			$wpdb->prepare(
-				'SELECT 
+				'SELECT
 					h.*,
 					c.value as user_id,
 					u.display_name
-				FROM 
+				FROM
 					%i h
-				JOIN 
+				JOIN
 					%i c ON h.id = c.history_id
-				LEFT JOIN 
+				LEFT JOIN
 					' . $wpdb->users . ' u ON u.ID = CAST(c.value AS UNSIGNED)
-				WHERE 
+				WHERE
 					c.key = "_user_id"
 					AND h.date >= FROM_UNIXTIME(%d)
 					AND h.date <= FROM_UNIXTIME(%d)
-				ORDER BY 
+				ORDER BY
 					h.date DESC
 				LIMIT 1',
 				$events_table,
@@ -243,6 +253,7 @@ class Events_Stats {
 				$date_to
 			)
 		);
+		// phpcs:enable WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users
 	}
 
 	/**
@@ -261,24 +272,31 @@ class Events_Stats {
 			return false;
 		}
 
-		$events_table = $this->get_events_table_name();
+		$events_table   = $this->get_events_table_name();
 		$contexts_table = $this->get_contexts_table_name();
 
+		// Inner JOIN on wp_users + _user_id > 0 excludes anonymous events
+		// (_user_id=0 for WEB_USER/WP_CLI/WP/OTHER initiators) and deleted users
+		// from "most active users", which can't be ranked meaningfully.
+		// phpcs:disable WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users -- Performance-critical stats query, WP user APIs too slow for bulk data
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users
 		$users = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT
 					c.value as user_id,
 					COUNT(*) as count,
 					u.display_name,
+					u.user_login,
 					u.user_email
 				FROM
 					%i c
 				JOIN
 					%i h ON h.id = c.history_id
-				LEFT JOIN
+				JOIN
 					%i u ON u.ID = CAST(c.value AS UNSIGNED)
 				WHERE
 					c.key = "_user_id"
+					AND CAST(c.value AS UNSIGNED) > 0
 					AND h.date >= FROM_UNIXTIME(%d)
 					AND h.date <= FROM_UNIXTIME(%d)
 				GROUP BY
@@ -293,18 +311,27 @@ class Events_Stats {
 				$date_to,
 				$limit
 			)
+			// phpcs:enable WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users
 		);
 
 		if ( ! $users ) {
 			return [];
 		}
 
-		// Format user data with avatars and proper types.
+		// Format user data with avatars and proper types. Fall back to user_login
+		// when display_name is empty so users without first/last name still
+		// render with a usable label (e.g. "admin" instead of just "(1)").
 		return array_map(
 			function ( $user ) {
+				$display_name = trim( (string) $user->display_name );
+
+				if ( $display_name === '' ) {
+					$display_name = $user->user_login;
+				}
+
 				return [
 					'id'           => $user->user_id,
-					'display_name' => $user->display_name,
+					'display_name' => $display_name,
 					'user_email'   => $user->user_email,
 					'avatar'       => get_avatar_url( $user->user_id ),
 					'count'        => (int) $user->count,
@@ -333,11 +360,12 @@ class Events_Stats {
 
 		// Get WordPress timezone offset for converting dates from GMT to local timezone.
 		// Database stores dates in GMT, but we need to group by dates in WordPress timezone.
-		$wp_timezone = wp_timezone();
+		$wp_timezone       = wp_timezone();
 		$wp_offset_seconds = $wp_timezone->getOffset( new \DateTime( 'now', $wp_timezone ) );
 
 		// Use DATE_ADD with INTERVAL to convert from GMT to WordPress timezone.
 		// This is more reliable than CONVERT_TZ which requires timezone tables.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT
@@ -381,8 +409,8 @@ class Events_Stats {
 				$complete_range[] = $activity_by_date[ $date_str ];
 			} else {
 				// Add empty day with zero count.
-				$empty_day = new \stdClass();
-				$empty_day->date = $date_str;
+				$empty_day        = new \stdClass();
+				$empty_day->date  = $date_str;
 				$empty_day->count = 0;
 				$complete_range[] = $empty_day;
 			}
@@ -411,11 +439,12 @@ class Events_Stats {
 
 		// Get WordPress timezone offset for converting dates from GMT to local timezone.
 		// Database stores dates in GMT, but we need to group by hours in WordPress timezone.
-		$wp_timezone = wp_timezone();
+		$wp_timezone       = wp_timezone();
 		$wp_offset_seconds = $wp_timezone->getOffset( new \DateTime( 'now', $wp_timezone ) );
 
 		// Use DATE_ADD with INTERVAL to convert from GMT to WordPress timezone.
 		// This is more reliable than CONVERT_TZ which requires timezone tables.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT
@@ -440,7 +469,7 @@ class Events_Stats {
 
 		// Add human readable time spans to each result.
 		foreach ( $results as $result ) {
-			$hour = (int) $result->hour;
+			$hour              = (int) $result->hour;
 			$result->time_span = sprintf( '%02d:00-%02d:59', $hour, $hour );
 		}
 
@@ -465,11 +494,12 @@ class Events_Stats {
 
 		// Get WordPress timezone offset for converting dates from GMT to local timezone.
 		// Database stores dates in GMT, but we need to group by dates in WordPress timezone.
-		$wp_timezone = wp_timezone();
+		$wp_timezone       = wp_timezone();
 		$wp_offset_seconds = $wp_timezone->getOffset( new \DateTime( 'now', $wp_timezone ) );
 
 		// Use DATE_ADD with INTERVAL to convert from GMT to WordPress timezone.
 		// This is more reliable than CONVERT_TZ which requires timezone tables.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT
@@ -521,7 +551,7 @@ class Events_Stats {
 	 * @return int|false Number of failed logins, or false if invalid dates.
 	 */
 	public function get_failed_logins_count( $date_from, $date_to ) {
-		return $this->get_event_count( 'SimpleUserLogger', [ 'user_login_failed', 'user_unknown_login_failed' ], $date_from, $date_to );
+		return $this->get_event_count( 'SimpleUserLogger', User_Logger::get_failed_login_message_keys(), $date_from, $date_to );
 	}
 
 	/**
@@ -606,9 +636,9 @@ class Events_Stats {
 		}
 
 		$message_keys = array();
-		$logger_slug = 'SimplePluginLogger';
-		$name_key = 'plugin_name';
-		$version_key = 'plugin_version';
+		$logger_slug  = 'SimplePluginLogger';
+		$name_key     = 'plugin_name';
+		$version_key  = 'plugin_version';
 
 		switch ( $action_type ) {
 			case 'updated':
@@ -628,17 +658,17 @@ class Events_Stats {
 				break;
 			case 'plugin_update_available':
 				$message_keys = array( 'plugin_update_available' );
-				$logger_slug = 'AvailableUpdatesLogger';
-				$name_key = 'plugin_name';
-				$version_key = 'plugin_new_version';
+				$logger_slug  = 'AvailableUpdatesLogger';
+				$name_key     = 'plugin_name';
+				$version_key  = 'plugin_new_version';
 				break;
 			default:
 				return [];
 		}
 
 		// Prepare the query parts for safe execution.
-		$where_in = implode( ',', array_fill( 0, count( $message_keys ), '%s' ) );
-		$events_table = $this->get_events_table_name();
+		$where_in       = implode( ',', array_fill( 0, count( $message_keys ), '%s' ) );
+		$events_table   = $this->get_events_table_name();
 		$contexts_table = $this->get_contexts_table_name();
 
 		$sql = $wpdb->prepare(
@@ -675,11 +705,11 @@ class Events_Stats {
 
 		// Add the IN clause and limit safely.
 		$sql .= " AND c.value IN ($where_in) ORDER BY h.date DESC LIMIT %d";
-
+		
 		// Prepare the complete query with all parameters.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
-				// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 				$sql,
 				array_merge(
 					$message_keys,
@@ -687,13 +717,14 @@ class Events_Stats {
 				)
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 
 		$plugins = array();
 		foreach ( $results as $result ) {
 			$plugins[] = array(
-				'name' => $result->plugin_name,
+				'name'    => $result->plugin_name,
 				'version' => $result->plugin_version,
-				'when' => sprintf(
+				'when'    => sprintf(
 					/* translators: %s last modified date and time in human time diff-format */
 					__( '%1$s ago', 'simple-history' ),
 					human_time_diff( strtotime( $result->date ), time() )
@@ -710,16 +741,16 @@ class Events_Stats {
 	 * @return array Array of plugins with updates.
 	 */
 	public function get_plugins_with_updates() {
-		$plugins = array();
+		$plugins        = array();
 		$update_plugins = get_site_transient( 'update_plugins' );
 
 		if ( ! empty( $update_plugins->response ) ) {
 			foreach ( $update_plugins->response as $plugin_file => $plugin_data ) {
 				$plugin_info = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin_file );
-				$plugins[] = array(
-					'name' => $plugin_info['Name'],
+				$plugins[]   = array(
+					'name'            => $plugin_info['Name'],
 					'current_version' => $plugin_info['Version'],
-					'new_version' => $plugin_data->new_version,
+					'new_version'     => $plugin_data->new_version,
 				);
 			}
 		}
@@ -790,9 +821,10 @@ class Events_Stats {
 			return false;
 		}
 
-		$events_table = $this->get_events_table_name();
+		$events_table   = $this->get_events_table_name();
 		$contexts_table = $this->get_contexts_table_name();
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT 
@@ -981,7 +1013,7 @@ class Events_Stats {
 	 * @param int  $date_to End date timestamp.
 	 * @param int  $limit Optional. Number of entries per section. Default 50.
 	 * @param bool $include_ip Optional. Whether to include IP addresses. Default false.
-	 * @return array Array of detailed user activity stats.
+	 * @return array|false Array of detailed user activity stats, or false if dates are missing.
 	 */
 	public function get_detailed_user_stats( $date_from, $date_to, $limit = 50, $include_ip = false ) {
 		if ( ! $date_from || ! $date_to ) {
@@ -990,10 +1022,10 @@ class Events_Stats {
 
 		return array(
 			'successful_logins' => $this->get_successful_logins_details( $date_from, $date_to, $limit ),
-			'failed_logins' => $this->get_failed_logins_details( $date_from, $date_to, $limit, $include_ip ),
-			'profile_updates' => $this->get_profile_updates_details( $date_from, $date_to, $limit ),
-			'added_users' => $this->get_added_users_details( $date_from, $date_to, $limit ),
-			'removed_users' => $this->get_removed_users_details( $date_from, $date_to, $limit ),
+			'failed_logins'     => $this->get_failed_logins_details( $date_from, $date_to, $limit, $include_ip ),
+			'profile_updates'   => $this->get_profile_updates_details( $date_from, $date_to, $limit ),
+			'added_users'       => $this->get_added_users_details( $date_from, $date_to, $limit ),
+			'removed_users'     => $this->get_removed_users_details( $date_from, $date_to, $limit ),
 		);
 	}
 
@@ -1008,9 +1040,10 @@ class Events_Stats {
 	public function get_successful_logins_details( $date_from, $date_to, $limit ) {
 		global $wpdb;
 
-		$events_table = $this->get_events_table_name();
+		$events_table   = $this->get_events_table_name();
 		$contexts_table = $this->get_contexts_table_name();
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT 
@@ -1072,7 +1105,14 @@ class Events_Stats {
 	public function get_failed_logins_details( $date_from, $date_to, $limit, $include_ip ) {
 		global $wpdb;
 
+		$failed_login_keys = User_Logger::get_failed_login_message_keys();
+
+		// One %s per failed-login message key, matched by the merged argument array below.
+		$message_key_placeholders = implode( ',', array_fill( 0, count( $failed_login_keys ), '%s' ) );
+
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 		if ( $include_ip ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			return $wpdb->get_results(
 				$wpdb->prepare(
 					"SELECT 
@@ -1096,20 +1136,19 @@ class Events_Stats {
 							FROM {$wpdb->prefix}simple_history_contexts c_msg 
 							WHERE c_msg.history_id = h.id 
 							AND c_msg.key = '_message_key'
-							AND c_msg.value IN ('user_login_failed', 'user_unknown_login_failed')
+							AND c_msg.value IN (" . $message_key_placeholders . ')
 						)
 					GROUP BY 
 						c.value
 					ORDER BY 
 						failed_count DESC
-					LIMIT %d",
-					$date_from,
-					$date_to,
-					$limit
+					LIMIT %d',
+					array_merge( [ $date_from, $date_to ], $failed_login_keys, [ $limit ] )
 				)
 			);
 		}
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT 
@@ -1130,18 +1169,17 @@ class Events_Stats {
 						FROM {$wpdb->prefix}simple_history_contexts c_msg 
 						WHERE c_msg.history_id = h.id 
 						AND c_msg.key = '_message_key'
-						AND c_msg.value IN ('user_login_failed', 'user_unknown_login_failed')
+						AND c_msg.value IN (" . $message_key_placeholders . ')
 					)
 				GROUP BY 
 					c.value
 				ORDER BY 
 					failed_count DESC
-				LIMIT %d",
-				$date_from,
-				$date_to,
-				$limit
+				LIMIT %d',
+				array_merge( [ $date_from, $date_to ], $failed_login_keys, [ $limit ] )
 			)
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 	}
 
 	/**
@@ -1155,6 +1193,7 @@ class Events_Stats {
 	public function get_profile_updates_details( $date_from, $date_to, $limit ) {
 		global $wpdb;
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT 
@@ -1208,6 +1247,7 @@ class Events_Stats {
 	public function get_added_users_details( $date_from, $date_to, $limit ) {
 		global $wpdb;
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT 
@@ -1266,6 +1306,7 @@ class Events_Stats {
 	public function get_removed_users_details( $date_from, $date_to, $limit ) {
 		global $wpdb;
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT 
@@ -1311,7 +1352,7 @@ class Events_Stats {
 	 * @param int $date_from Start date timestamp.
 	 * @param int $date_to End date timestamp.
 	 * @param int $limit Optional. Number of entries per section. Default 50.
-	 * @return array Array of detailed content item stats.
+	 * @return array|false Array of detailed content item stats, or false if dates are missing.
 	 */
 	public function get_detailed_content_stats( $date_from, $date_to, $limit = 50 ) {
 		if ( ! $date_from || ! $date_to ) {
@@ -1337,6 +1378,7 @@ class Events_Stats {
 	protected function get_content_created_details( $date_from, $date_to, $limit ) {
 		global $wpdb;
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT 
@@ -1391,6 +1433,7 @@ class Events_Stats {
 	protected function get_content_updated_details( $date_from, $date_to, $limit ) {
 		global $wpdb;
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT 
@@ -1445,6 +1488,7 @@ class Events_Stats {
 	protected function get_content_trashed_details( $date_from, $date_to, $limit ) {
 		global $wpdb;
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT 
@@ -1499,7 +1543,9 @@ class Events_Stats {
 	protected function get_content_deleted_details( $date_from, $date_to, $limit ) {
 		global $wpdb;
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		return $wpdb->get_results(
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared
 			$wpdb->prepare(
 				"SELECT 
 					h.date as deleted_date,
@@ -1583,7 +1629,7 @@ class Events_Stats {
 	 * @param string $message_value The value to match against.
 	 * @param int    $date_from    Start timestamp.
 	 * @param int    $date_to      End timestamp.
-	 * @return array Array of detailed stats.
+	 * @return array|false Array of detailed stats, or false if dates are missing.
 	 */
 	protected function get_detailed_stats_for_logger_and_value( $logger_slug, $message_key, $message_value, $date_from, $date_to ) {
 		global $wpdb;
@@ -1592,10 +1638,11 @@ class Events_Stats {
 			return false;
 		}
 
-		$events_table = $this->get_events_table_name();
+		$events_table   = $this->get_events_table_name();
 		$contexts_table = $this->get_contexts_table_name();
 
 		// First query: Get matching history entries.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$history_results = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT DISTINCT 
@@ -1636,6 +1683,7 @@ class Events_Stats {
 		$history_ids_placeholders = implode( ',', array_fill( 0, count( $history_ids ), '%d' ) );
 
 		// Second query: Get all context data for these history entries.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$context_results = $wpdb->get_results(
 			$wpdb->prepare(
 				// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -1663,9 +1711,7 @@ class Events_Stats {
 
 		// Add context data to history entries.
 		foreach ( $history_results as $history ) {
-			$history->context = isset( $context_by_history_id[ $history->id ] )
-				? $context_by_history_id[ $history->id ]
-				: array();
+			$history->context = $context_by_history_id[ $history->id ] ?? array();
 		}
 
 		return $history_results;
@@ -1690,7 +1736,7 @@ class Events_Stats {
 		];
 
 		// Get counts from both loggers since plugin update available events are logged in AvailableUpdatesLogger.
-		$simple_plugin_logger_count = $this->get_event_count( 'SimplePluginLogger', $plugin_events, $date_from, $date_to );
+		$simple_plugin_logger_count     = $this->get_event_count( 'SimplePluginLogger', $plugin_events, $date_from, $date_to );
 		$available_updates_logger_count = $this->get_event_count( 'AvailableUpdatesLogger', [ 'plugin_update_available' ], $date_from, $date_to );
 
 		return $simple_plugin_logger_count + $available_updates_logger_count;
@@ -1704,15 +1750,16 @@ class Events_Stats {
 	 * @return int|false Total count of user events, or false if invalid dates.
 	 */
 	public function get_user_total_count( $date_from, $date_to ) {
-		$user_events = [
-			'user_logged_in',
-			'user_unknown_logged_in',
-			'user_login_failed',
-			'user_unknown_login_failed',
-			'user_updated_profile',
-			'user_created',
-			'user_deleted',
-		];
+		$user_events = array_merge(
+			[
+				'user_logged_in',
+				'user_unknown_logged_in',
+				'user_updated_profile',
+				'user_created',
+				'user_deleted',
+			],
+			User_Logger::get_failed_login_message_keys()
+		);
 		return $this->get_event_count( 'SimpleUserLogger', $user_events, $date_from, $date_to );
 	}
 
@@ -1776,6 +1823,7 @@ class Events_Stats {
 
 		$events_table = $this->get_events_table_name();
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$results = $wpdb->get_results(
 			$wpdb->prepare(
 				'SELECT * FROM %i ORDER BY date ASC LIMIT 1',
@@ -1792,6 +1840,146 @@ class Events_Stats {
 	}
 
 	/**
+	 * Get number of notes added for a given period.
+	 * Includes both new notes and replies to existing notes.
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return int|false Number of notes added, or false if invalid dates.
+	 */
+	public function get_notes_added_count( $date_from, $date_to ) {
+		return $this->get_event_count( 'NotesLogger', [ 'note_added', 'note_reply_added' ], $date_from, $date_to );
+	}
+
+	/**
+	 * Get number of notes resolved for a given period.
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return int|false Number of notes resolved, or false if invalid dates.
+	 */
+	public function get_notes_resolved_count( $date_from, $date_to ) {
+		return $this->get_event_count( 'NotesLogger', 'note_resolved', $date_from, $date_to );
+	}
+
+	/**
+	 * Get total count of notes events (added, replied, edited, deleted, resolved, reopened).
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return int|false Total count of notes events, or false if invalid dates.
+	 */
+	public function get_notes_total_count( $date_from, $date_to ) {
+		$note_events = [
+			'note_added',
+			'note_reply_added',
+			'note_edited',
+			'note_deleted',
+			'note_resolved',
+			'note_reopened',
+		];
+		return $this->get_event_count( 'NotesLogger', $note_events, $date_from, $date_to );
+	}
+
+	/**
+	 * Get detailed notes added events (note_added and note_reply_added).
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return array|false Array of note events with context, or false if invalid dates.
+	 */
+	public function get_notes_added_details( $date_from, $date_to ) {
+		$note_added = $this->get_detailed_stats_for_logger_and_value( 'NotesLogger', '_message_key', 'note_added', $date_from, $date_to );
+		$note_reply = $this->get_detailed_stats_for_logger_and_value( 'NotesLogger', '_message_key', 'note_reply_added', $date_from, $date_to );
+
+		// Merge both arrays if they're valid.
+		if ( $note_added === false && $note_reply === false ) {
+			return false;
+		}
+
+		$combined = array_merge(
+			is_array( $note_added ) ? $note_added : [],
+			is_array( $note_reply ) ? $note_reply : []
+		);
+
+		// Sort by date descending (most recent first).
+		usort(
+			$combined,
+			function ( $a, $b ) {
+				return strtotime( $b->date ) - strtotime( $a->date );
+			}
+		);
+
+		return array_slice( $combined, 0, 50 );
+	}
+
+	/**
+	 * Get detailed notes resolved events.
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return array|false Array of note resolved events with context, or false if invalid dates.
+	 */
+	public function get_notes_resolved_details( $date_from, $date_to ) {
+		return $this->get_detailed_stats_for_logger_and_value( 'NotesLogger', '_message_key', 'note_resolved', $date_from, $date_to );
+	}
+
+	/**
+	 * Get number of comments added for a given period.
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return int|false Number of comments added, or false if invalid dates.
+	 */
+	public function get_comments_added_count( $date_from, $date_to ) {
+		return $this->get_event_count( 'SimpleCommentsLogger', [ 'anon_comment_added', 'user_comment_added' ], $date_from, $date_to );
+	}
+
+	/**
+	 * Get number of comments approved for a given period.
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return int|false Number of comments approved, or false if invalid dates.
+	 */
+	public function get_comments_approved_count( $date_from, $date_to ) {
+		return $this->get_event_count( 'SimpleCommentsLogger', 'comment_status_approve', $date_from, $date_to );
+	}
+
+	/**
+	 * Get number of comments marked as spam for a given period.
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return int|false Number of spam comments, or false if invalid dates.
+	 */
+	public function get_comments_spam_count( $date_from, $date_to ) {
+		return $this->get_event_count( 'SimpleCommentsLogger', 'comment_status_spam', $date_from, $date_to );
+	}
+
+	/**
+	 * Get number of theme switches for a given period.
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return int|false Number of theme switches, or false if invalid dates.
+	 */
+	public function get_theme_switches_count( $date_from, $date_to ) {
+		return $this->get_event_count( 'SimpleThemeLogger', 'theme_switched', $date_from, $date_to );
+	}
+
+	/**
+	 * Get number of theme updates for a given period.
+	 *
+	 * @param int $date_from Required. Start date as Unix timestamp.
+	 * @param int $date_to   Required. End date as Unix timestamp.
+	 * @return int|false Number of theme updates, or false if invalid dates.
+	 */
+	public function get_theme_updates_count( $date_from, $date_to ) {
+		return $this->get_event_count( 'SimpleThemeLogger', 'theme_updated', $date_from, $date_to );
+	}
+
+	/**
 	 * Get the number of events today.
 	 * Uses log_query so it respects the user's permissions,
 	 * meaning that the number of events is the number
@@ -1805,9 +1993,14 @@ class Events_Stats {
 		$logResults = $logQuery->query(
 			array(
 				'posts_per_page' => 1,
-				'date_from' => Date_Helper::get_today_start_timestamp(),
+				'date_from'      => Date_Helper::get_today_start_timestamp(),
+				'ungrouped'      => true,
 			)
 		);
+
+		if ( is_wp_error( $logResults ) ) {
+			return 0;
+		}
 
 		return (int) $logResults['total_row_count'];
 	}

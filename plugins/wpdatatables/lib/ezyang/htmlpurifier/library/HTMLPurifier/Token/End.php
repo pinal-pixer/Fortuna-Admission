@@ -1,5 +1,7 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Concrete end token class.
  *
@@ -7,7 +9,7 @@
  * is for optimization reasons, as under normal circumstances, the Lexers
  * do not pass attributes.
  */
-class HTMLPurifier_Token_End extends HTMLPurifier_Token_Tag
+class HTMLPurifier_Token_End extends \WPDT\HTMLPurifier_Token_Tag
 {
     /**
      * Token that started this node.
@@ -15,10 +17,9 @@ class HTMLPurifier_Token_End extends HTMLPurifier_Token_Tag
      * @type HTMLPurifier_Token
      */
     public $start;
-
-    public function toNode() {
-        throw new Exception("HTMLPurifier_Token_End->toNode not supported!");
+    public function toNode()
+    {
+        throw new \Exception("HTMLPurifier_Token_End->toNode not supported!");
     }
 }
-
 // vim: et sw=4 sts=4

@@ -1,0 +1,42 @@
+{
+  "apiVersion": 3,
+  "name": "gutsliders/photo-carousel",
+  "version": "3.2.0",
+  "title": "Photos",
+  "category": "slider-blocks",
+  "description": "Show photos in carousel mode.",
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "example": {
+    "attributes": {
+      "preview": true
+    },
+    "viewportWidth": 432
+  },
+  "textdomain": "slider-blocks",
+  "editorScript": [
+    "file:./index.js",
+    "gutslider-swiper-script",
+    "gutslider-blocks-global-script"
+  ],
+  "editorStyle": [
+    "file:./index.css",
+    "gutslider-swiper-style",
+    "gutslider-blocks-global-style"
+  ],
+  "style": [
+    "file:./style-index.css",
+    "gutslider-swiper-style"
+  ],
+  "viewScript": [
+    "file:./frontend.js",
+    "gutslider-swiper-script",
+    "gutslider-fslightbox"
+  ]
+}

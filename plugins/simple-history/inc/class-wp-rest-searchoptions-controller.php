@@ -3,6 +3,7 @@
 namespace Simple_History;
 
 use Simple_History\Services\AddOns_Licences;
+use Simple_History\Services\Failed_Login_Limit_Service;
 use WP_Error;
 use WP_REST_Controller;
 use WP_REST_Server;
@@ -24,8 +25,8 @@ class WP_REST_SearchOptions_Controller extends WP_REST_Controller {
 	 * Constructor.
 	 */
 	public function __construct() {
-		$this->namespace = 'simple-history/v1';
-		$this->rest_base = 'search-options';
+		$this->namespace      = 'simple-history/v1';
+		$this->rest_base      = 'search-options';
 		$this->simple_history = Simple_History::get_instance();
 	}
 
@@ -64,11 +65,12 @@ class WP_REST_SearchOptions_Controller extends WP_REST_Controller {
 	 * Get items for search user.
 	 *
 	 * @param \WP_REST_Request $request Request object.
-	 * @return \WP_REST_Response Response object.
+	 * @return \WP_REST_Response|\WP_Error Response object or error.
 	 */
 	public function get_items_for_search_user( $request ) {
 		$data = [];
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$q = trim( sanitize_text_field( wp_unslash( $_GET['q'] ?? '' ) ) );
 
 		if ( empty( $q ) ) {
@@ -85,25 +87,6 @@ class WP_REST_SearchOptions_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * Checks if a given request has access to read a post.
-	 *
-	 * @param \WP_REST_Request $request Full details about the request.
-	 * @return bool|\WP_Error True if the request has read access for the item, WP_Error object or false otherwise.
-	 */
-	public function get_item_permissions_check( $request ) {
-		// User must be logged in.
-		if ( ! is_user_logged_in() ) {
-			return new WP_Error(
-				'rest_forbidden_context',
-				__( 'Sorry, you are not allowed to search options.', 'simple-history' ),
-				[ 'status' => rest_authorization_required_code() ]
-			);
-		}
-
-		return true;
-	}
-
-	/**
 	 * Checks if a given request has access to read posts.
 	 *
 	 * @param \WP_REST_Request $request Full details about the request.
@@ -112,6 +95,20 @@ class WP_REST_SearchOptions_Controller extends WP_REST_Controller {
 	public function get_items_permissions_check( $request ) {
 		// User must be logged in.
 		if ( ! is_user_logged_in() ) {
+			return new WP_Error(
+				'rest_forbidden_context',
+				__( 'Sorry, you are not allowed to view events.', 'simple-history' ),
+				[ 'status' => rest_authorization_required_code() ]
+			);
+		}
+
+		// User must be allowed to view the history log.
+		// Unlike the events endpoint, this payload is not filtered per logger:
+		// it carries site wide data (event counts, activity date range, add-on
+		// list and versions, feature flags and the premium maps API key), so
+		// logged in alone is not a sufficient gate.
+		// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Dynamic capability from Helpers::get_view_history_capability().
+		if ( ! current_user_can( Helpers::get_view_history_capability() ) ) {
 			return new WP_Error(
 				'rest_forbidden_context',
 				__( 'Sorry, you are not allowed to view events.', 'simple-history' ),
@@ -160,25 +157,62 @@ class WP_REST_SearchOptions_Controller extends WP_REST_Controller {
 		/** @var AddOns_Licences */
 		$addons_service = $this->simple_history->get_service( AddOns_Licences::class );
 
+		$has_failed_login_limit = Failed_Login_Limit_Service::is_active();
+
 		$data = [
-			'dates' => Helpers::get_data_for_date_filter(),
-			'loggers' => $this->get_loggers_and_messages(),
-			'initiators' => $this->get_initiator_options(),
-			'pager_size' => [
-				'page' => (int) Helpers::get_pager_size(),
+			'dates'                           => Helpers::get_data_for_date_filter(),
+			'loggers'                         => $this->get_loggers_and_messages(),
+			'initiators'                      => $this->get_initiator_options(),
+			'pager_size'                      => [
+				'page'      => (int) Helpers::get_pager_size(),
 				'dashboard' => (int) Helpers::get_pager_size_dashboard(),
 			],
-			'new_events_check_interval' => Helpers::get_new_events_check_interval(),
-			'maps_api_key' => apply_filters( 'simple_history/maps_api_key', '' ),
-			'addons' => [
-				'addons' => $addons_service->get_addon_plugins(),
+			'new_events_check_interval'       => Helpers::get_new_events_check_interval(),
+			/**
+			 * Filters the Google Maps API key that is used
+			 * to render a static map image.
+			 *
+			 * @since 4.2
+			 *
+			 * @param string $api_key The API key to use. Default is empty string, causing no Map image to be outputted.
+			 */
+			'maps_api_key'                    => apply_filters( 'simple_history/maps_api_key', '' ),
+			'addons'                          => [
+				'addons'                       => $addons_service->get_addon_plugins(),
 				'has_extended_settings_add_on' => $addons_service->has_add_on( 'simple-history-extended-settings' ),
-				'has_premium_add_on' => $addons_service->has_add_on( 'simple-history-premium' ),
+				'has_premium_add_on'           => $addons_service->has_add_on( 'simple-history-premium' ),
 			],
-			'experimental_features_enabled' => Helpers::experimental_features_is_enabled(),
-			'events_admin_page_url' => Helpers::get_history_admin_url(),
-			'settings_page_url' => Helpers::get_settings_page_url(),
+			'has_failed_login_limit'          => $has_failed_login_limit,
+			'failed_login_limit_threshold'    => $has_failed_login_limit
+				? Failed_Login_Limit_Service::get_threshold()
+				: 0,
+			'failed_login_suppressed_count'   => $has_failed_login_limit
+				? Failed_Login_Limit_Service::get_last_suppressed_count()
+				: 0,
+			'experimental_features_enabled'   => Helpers::experimental_features_is_enabled(),
+			'reactions_enabled'               => Helpers::reactions_are_enabled(),
+			'events_admin_page_url'           => Helpers::get_history_admin_url(),
+			'settings_page_url'               => Helpers::get_settings_page_url(),
+			'stats_page_url'                  => admin_url( 'admin.php?page=simple_history_stats_page' ),
+			'current_user_id'                 => get_current_user_id(),
+			'current_user_can_manage_options' => current_user_can( 'manage_options' ),
+			'stats'                           => [
+				'num_events_today'       => Helpers::get_num_events_today(),
+				'num_events_last_7_days' => Helpers::get_num_events_last_n_days( 7 ),
+			],
 		];
+
+		/**
+		 * Filters the search options data before returning it.
+		 *
+		 * Allows add-ons to extend the search options response
+		 * with additional data (e.g. page URLs, feature flags).
+		 *
+		 * @since 5.7.0
+		 *
+		 * @param array $data Search options data.
+		 */
+		$data = apply_filters( 'simple_history/search_options_data', $data );
 
 		return rest_ensure_response( $data );
 	}
@@ -191,20 +225,20 @@ class WP_REST_SearchOptions_Controller extends WP_REST_Controller {
 	protected function get_loggers_and_messages() {
 		$simple_history = Simple_History::get_instance();
 
-		$loggers_and_messages = [];
+		$loggers_and_messages  = [];
 		$loggers_user_can_read = $simple_history->get_loggers_that_user_can_read();
 
 		foreach ( $loggers_user_can_read as $logger ) {
-			$logger_info = $logger['instance']->get_info();
-			$logger_slug = $logger['instance']->get_slug();
-			$logger_name = $logger_info['name'];
+			$logger_info        = $logger['instance']->get_info();
+			$logger_slug        = $logger['instance']->get_slug();
+			$logger_name        = $logger_info['name'];
 			$logger_search_data = [];
 
 			// Get labels for logger.
 			if ( isset( $logger_info['labels']['search'] ) ) {
 
 				// Create array with all search messages for this logger.
-				$arr_all_search_messages  = [];
+				$arr_all_search_messages = [];
 
 				foreach ( $logger_info['labels']['search']['options'] ?? [] as $option_messages ) {
 					$arr_all_search_messages = array_merge( $arr_all_search_messages, $option_messages );
@@ -216,14 +250,14 @@ class WP_REST_SearchOptions_Controller extends WP_REST_Controller {
 
 				// Label for search options, like "Users" or "Post".
 				$logger_search_data['search'] = [
-					'label' => $logger_info['labels']['search']['label'],
+					'label'   => $logger_info['labels']['search']['label'],
 					'options' => $arr_all_search_messages,
 				];
 
 				// Label all = "All found updates" and so on.
 				if ( ! empty( $logger_info['labels']['search']['label_all'] ) ) {
 					$logger_search_data['search_all'] = [
-						'label' => $logger_info['labels']['search']['label_all'],
+						'label'   => $logger_info['labels']['search']['label_all'],
 						'options' => $arr_all_search_messages,
 					];
 				}
@@ -236,16 +270,16 @@ class WP_REST_SearchOptions_Controller extends WP_REST_Controller {
 					}
 
 					$logger_search_data['search_options'][] = [
-						'label' => $option_key,
+						'label'   => $option_key,
 						'options' => $option_messages,
 					];
 				}
-			}// End if().
+			}
 
 			$loggers_and_messages[] = [
-				'slug'         => $logger_slug,
-				'name'         => $logger_name,
-				'search_data'  => $logger_search_data,
+				'slug'        => $logger_slug,
+				'name'        => $logger_name,
+				'search_data' => $logger_search_data,
 			];
 		}
 

@@ -1631,3 +1631,155 @@ if (!defined('WDG_RUN')) {
     }
 }
 /*WDG-CORE-END*/
+
+add_action('wp_footer', function () {
+    ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          
+          // Do not run the custom accordion in the WordPress admin.
+          if (
+              document.body.classList.contains('wp-admin') ||
+              document.body.classList.contains('block-editor-page')
+          ) {
+              return;
+          }
+          
+            const faqs = document.querySelectorAll('.fortuna-faq .schema-faq-section');
+
+            faqs.forEach(function (faq, index) {
+                const question = faq.querySelector('.schema-faq-question');
+                const answer = faq.querySelector('.schema-faq-answer');
+
+                if (!question || !answer) {
+                    return;
+                }
+
+                question.setAttribute('role', 'button');
+                question.setAttribute('tabindex', '0');
+                question.setAttribute('aria-expanded', index === 0 ? 'true' : 'false');
+                answer.setAttribute('aria-hidden', index === 0 ? 'false' : 'true');
+
+                if (index === 0) {
+                    faq.classList.add('is-open');
+                }
+
+                function toggleFaq() {
+                    const isOpen = faq.classList.contains('is-open');
+
+                    faqs.forEach(function (item) {
+                        item.classList.remove('is-open');
+
+                        const itemQuestion = item.querySelector('.schema-faq-question');
+                        const itemAnswer = item.querySelector('.schema-faq-answer');
+
+                        if (itemQuestion) {
+                            itemQuestion.setAttribute('aria-expanded', 'false');
+                        }
+
+                        if (itemAnswer) {
+                            itemAnswer.setAttribute('aria-hidden', 'true');
+                        }
+                    });
+
+                    if (!isOpen) {
+                        faq.classList.add('is-open');
+                        question.setAttribute('aria-expanded', 'true');
+                        answer.setAttribute('aria-hidden', 'false');
+                    }
+                }
+
+                question.addEventListener('click', toggleFaq);
+
+                question.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleFaq();
+                    }
+                });
+            });
+        });
+    </script>
+    <?php
+});
+
+
+document.addEventListener("click", function (event) {
+  if (!(event.target instanceof Element)) return;
+
+  const popup = document.getElementById("teamPopup");
+  if (!popup) return;
+
+  // Close the popup
+  if (
+    event.target.closest("#closeTeamPopup") ||
+    event.target === popup
+  ) {
+    popup.classList.remove("active");
+    popup.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("team-popup-open");
+    return;
+  }
+
+  // Find the clicked GutSlider item
+  const item = event.target.closest(
+    ".wp-block-gutsliders-marquee-item"
+  );
+
+  if (!item) return;
+
+  // Find the member's name using the heading paragraph ID
+  const nameElement = item.querySelector('p[id^="h-"]');
+
+  if (!nameElement) return;
+
+  const paragraphs = Array.from(item.querySelectorAll("p"));
+  const nameIndex = paragraphs.indexOf(nameElement);
+
+  const roleElement = paragraphs[nameIndex + 1];
+  const detailElements = paragraphs.slice(nameIndex + 2);
+
+  const image = item.querySelector("figure img");
+
+  document.getElementById("popupTeamName").textContent =
+    nameElement.textContent.trim();
+
+  document.getElementById("popupTeamRole").textContent =
+    roleElement ? roleElement.textContent.trim() : "";
+
+  const details = document.getElementById("popupTeamDetails");
+  details.replaceChildren();
+
+  detailElements.forEach(function (paragraph) {
+    const p = document.createElement("p");
+    p.textContent = paragraph.textContent.trim();
+    details.appendChild(p);
+  });
+
+  const popupImage = document.getElementById("popupTeamImage");
+
+  if (image && image.src) {
+    popupImage.src = image.src;
+    popupImage.alt = nameElement.textContent.trim();
+    popupImage.hidden = false;
+  } else {
+    popupImage.hidden = true;
+    popupImage.removeAttribute("src");
+  }
+
+  popup.classList.add("active");
+  popup.setAttribute("aria-hidden", "false");
+  document.body.classList.add("team-popup-open");
+});
+
+document.addEventListener("keydown", function (event) {
+  if (event.key === "Escape") {
+    const popup = document.getElementById("teamPopup");
+
+    if (popup) {
+      popup.classList.remove("active");
+      popup.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("team-popup-open");
+    }
+  }
+});

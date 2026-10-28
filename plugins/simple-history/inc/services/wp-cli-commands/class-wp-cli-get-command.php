@@ -4,7 +4,7 @@ namespace Simple_History\Services;
 
 use Simple_History\Simple_History;
 use Simple_History\Log_Initiators;
-use Simple_History\Log_Query;
+use Simple_History\Services\WP_CLI_Commands\WP_CLI_Query_Helper;
 use WP_CLI;
 use WP_CLI_Command;
 
@@ -45,16 +45,20 @@ class WP_CLI_Get_Command extends WP_CLI_Command {
 			WP_CLI::error( 'Event ID must be an integer.' );
 		}
 
-		// Override capability check: if you can run wp cli commands you can read all loggers.
-		add_filter( 'simple_history/loggers_user_can_read/can_read_single_logger', '__return_true', 10, 0 );
-
 		// Get information about event using the Simple History Log Query API.
-		$query        = new Log_Query();
-		$query_result = $query->query(
+		// Override the logger read capability check: if you can run WP-CLI
+		// commands you can read all loggers.
+		$query_result = WP_CLI_Query_Helper::query_with_full_read_access(
 			array(
-				'post__in' => [ $event_id ],
+				'post__in'  => [ $event_id ],
+				'ungrouped' => true,
 			)
 		);
+
+		// Handle database errors.
+		if ( is_wp_error( $query_result ) ) {
+			WP_CLI::error( $query_result->get_error_message() );
+		}
 
 		// Return early if no found events.
 		if ( $query_result['total_row_count'] === 0 ) {
@@ -86,7 +90,7 @@ class WP_CLI_Get_Command extends WP_CLI_Command {
 			'date'         => $event_row->date,
 			'initiator'    => $initiator,
 			'message'      => $text_output,
-			'via'          => $event_logger ? $event_logger->get_info_value_by_key( 'name_via' ) : '',
+			'via'          => $event_logger ? $event_logger->get_via( $event_row ) : '',
 			'logger'       => $event_row->logger,
 			'level'        => $event_row->level,
 			'count'        => $event_row->subsequentOccasions, // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
@@ -116,13 +120,13 @@ class WP_CLI_Get_Command extends WP_CLI_Command {
 
 		// Append context. For table format = prepend each key with "context_"
 		// and for JSON just add it all to a "context" key.
-		if ( 'table' === $format ) {
+		if ( $format === 'table' ) {
 			foreach ( $event_row->context as $key => $value ) {
 				$prefixed_key                  = 'context_' . $key;
 				$output_array[ $prefixed_key ] = $value;
 				$fields[]                      = $prefixed_key;
 			}
-		} elseif ( 'json' === $format ) {
+		} elseif ( $format === 'json' ) {
 			$message_details      = $simple_history->get_log_row_details_output( $event_row );
 			$message_details_json = $message_details->to_json();
 
@@ -139,12 +143,5 @@ class WP_CLI_Get_Command extends WP_CLI_Command {
 		);
 
 		$formatter->display_item( $output_array );
-
-		// phpcs:disable Squiz.Commenting.InlineComment.InvalidEndChar
-		// If table format then output another one with the message details?
-		// if ( 'table' === $format ) {
-		// $message_details = $simple_history->get_log_row_details_output( $event_row );
-		// sh_d($message_details->to_json());
-		// }
 	}
 }

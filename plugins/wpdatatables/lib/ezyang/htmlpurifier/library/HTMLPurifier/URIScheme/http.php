@@ -1,25 +1,24 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Validates http (HyperText Transfer Protocol) as defined by RFC 2616
  */
-class HTMLPurifier_URIScheme_http extends HTMLPurifier_URIScheme
+class HTMLPurifier_URIScheme_http extends \WPDT\HTMLPurifier_URIScheme
 {
     /**
      * @type int
      */
     public $default_port = 80;
-
     /**
      * @type bool
      */
-    public $browsable = true;
-
+    public $browsable = \true;
     /**
      * @type bool
      */
-    public $hierarchical = true;
-
+    public $hierarchical = \true;
     /**
      * @param HTMLPurifier_URI $uri
      * @param HTMLPurifier_Config $config
@@ -29,8 +28,7 @@ class HTMLPurifier_URIScheme_http extends HTMLPurifier_URIScheme
     public function doValidate(&$uri, $config, $context)
     {
         $uri->userinfo = null;
-        return true;
+        return \true;
     }
 }
-
 // vim: et sw=4 sts=4

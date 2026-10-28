@@ -9,7 +9,6 @@
 namespace SRFM\Inc;
 
 use SRFM\Inc\Traits\Get_Instance;
-use WP_REST_Server;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -49,8 +48,7 @@ class Export {
 	 * @since  0.0.1
 	 */
 	public function __construct() {
-		add_action( 'wp_ajax_export_form', [ $this, 'handle_export_form' ] );
-		add_action( 'rest_api_init', [ $this, 'register_custom_endpoint' ] );
+		// Modern REST API endpoints are registered in rest-api.php.
 	}
 
 	/**
@@ -72,7 +70,7 @@ class Export {
 	 *     - On websitedemos.net, for exporting the Spectra Block Patterns & Pages with SureForms form.
 	 *
 	 * @since 1.13.0
-	 * @param array<int, string> $post_ids Array of post IDs to retrieve forms for.
+	 * @param array<int,string>|array<int, int> $post_ids Array of post IDs to retrieve forms for.
 	 * @return array Array of forms with their post data and meta data.
 	 */
 	public function get_forms_with_meta( $post_ids = [] ) {
@@ -82,7 +80,15 @@ class Export {
 			$post_id   = intval( $post_id );
 			$post      = get_post( $post_id );
 			$post_meta = get_post_meta( $post_id );
-			$posts[]   = [
+
+			// The view counter belongs to this site's traffic, not to the form. These
+			// payloads feed shared starter templates, so shipping it would hand every
+			// importer a stranger's numbers. The import side already refuses the key,
+			// so this is about not exporting it in the first place.
+			if ( is_array( $post_meta ) ) {
+				unset( $post_meta[ \SRFM\Inc\Form_Views::META_KEY ] );
+			}
+			$posts[] = [
 				'post'      => $post,
 				'post_meta' => $post_meta,
 			];
@@ -105,29 +111,120 @@ class Export {
 	}
 
 	/**
-	 * Handle Export form
+	 * Handle Export form via REST API
 	 *
-	 * @since 0.0.1
-	 * @return void
+	 * @param \WP_REST_Request $request Full details about the request.
+	 * @since 2.0.0
+	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function handle_export_form() {
-		if ( empty( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'export_form_nonce' ) ) {
-			$error_message = __( 'Nonce verification failed.', 'sureforms' );
+	public function handle_export_form_rest( $request ) {
+		$nonce = sanitize_text_field( Helper::get_string_value( $request->get_header( 'X-WP-Nonce' ) ) );
 
-			$error_data = [
-				'error' => $error_message,
-			];
-			wp_send_json_error( $error_data );
+		if ( ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+			return new \WP_Error(
+				'invalid_nonce',
+				__( 'Nonce verification failed.', 'sureforms' ),
+				[ 'status' => 403 ]
+			);
 		}
 
-		if ( isset( $_POST['post_id'] ) ) {
-			$post_ids = explode( ',', sanitize_text_field( wp_unslash( $_POST['post_id'] ) ) );
-		} else {
-			$post_ids = [];
+		$params   = $request->get_params();
+		$post_ids = [];
+
+		// Handle post_ids parameter - can be array or comma-separated string.
+		if ( isset( $params['post_ids'] ) ) {
+			if ( is_array( $params['post_ids'] ) ) {
+				$post_ids = array_map( 'intval', $params['post_ids'] );
+			} else {
+				$post_ids = array_map( 'intval', explode( ',', sanitize_text_field( Helper::get_string_value( $params['post_ids'] ) ) ) );
+			}
 		}
 
-		$posts = $this->get_forms_with_meta( $post_ids );
-		wp_send_json( $posts );
+		// Validate that all post IDs are valid sureforms_form posts.
+		$validated_post_ids = [];
+		foreach ( $post_ids as $post_id ) {
+			$post = get_post( $post_id );
+			if ( $post && 'sureforms_form' === $post->post_type ) {
+				$validated_post_ids[] = $post_id;
+			}
+		}
+
+		if ( empty( $validated_post_ids ) ) {
+			return new \WP_Error(
+				'no_valid_forms',
+				__( 'No valid forms found for export.', 'sureforms' ),
+				[ 'status' => 400 ]
+			);
+		}
+
+		$posts = $this->get_forms_with_meta( $validated_post_ids );
+
+		return new \WP_REST_Response(
+			[
+				'success' => true,
+				'data'    => $posts,
+				'count'   => count( $posts ),
+			]
+		);
+	}
+
+	/**
+	 * Handle Import form via REST API
+	 *
+	 * @param \WP_REST_Request $request Full details about the request.
+	 * @since 2.0.0
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function handle_import_form_rest( $request ) {
+		$nonce = sanitize_text_field( Helper::get_string_value( $request->get_header( 'X-WP-Nonce' ) ) );
+
+		if ( ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+			return new \WP_Error(
+				'invalid_nonce',
+				__( 'Nonce verification failed.', 'sureforms' ),
+				[ 'status' => 403 ]
+			);
+		}
+
+		$params = $request->get_params();
+
+		// Get forms data from the request.
+		$forms_data     = isset( $params['forms_data'] ) && is_array( $params['forms_data'] ) ? $params['forms_data'] : [];
+		$default_status = isset( $params['default_status'] ) ? sanitize_text_field( Helper::get_string_value( $params['default_status'] ) ) : 'draft';
+
+		if ( empty( $forms_data ) ) {
+			return new \WP_Error(
+				'no_forms_data',
+				__( 'No forms data provided for import.', 'sureforms' ),
+				[ 'status' => 400 ]
+			);
+		}
+
+		// Validate forms data structure.
+		foreach ( $forms_data as $form_data ) {
+			if ( ! is_array( $form_data ) || ! isset( $form_data['post'] ) || ! isset( $form_data['post_meta'] ) ) {
+				return new \WP_Error(
+					'invalid_form_data',
+					__( 'Invalid form data structure provided.', 'sureforms' ),
+					[ 'status' => 400 ]
+				);
+			}
+		}
+
+		$result = $this->import_forms_with_meta( $forms_data, $default_status );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new \WP_REST_Response(
+			[
+				'success'        => true,
+				'message'        => __( 'Forms imported successfully!', 'sureforms' ),
+				'forms_mapping'  => $result,
+				'imported_count' => count( $result ),
+			]
+		);
 	}
 
 	/**
@@ -151,7 +248,20 @@ class Export {
 			$post_meta    = $form_data['post_meta'];
 			$post_type    = sanitize_text_field( $form_data['post']['post_type'] );
 
-			$post_content = addslashes( $post_content );
+			// Remove percent-encoded slugs from imported form content.
+			// Non-Latin labels produce broken slugs like %e3%83%95%e3%83%aa
+			// via sanitize_title(). Clearing them lets process_blocks()
+			// regenerate clean block-name-based slugs on save.
+			$cleaned_content = preg_replace(
+				'/"slug":"(%[a-fA-F0-9]{2}[^"]*)"/',
+				'"slug":""',
+				$post_content
+			);
+			if ( is_string( $cleaned_content ) ) {
+				$post_content = $cleaned_content;
+			}
+
+			$post_content = wp_slash( $post_content );
 
 			// Check if sureforms/form exists in post_content.
 			if ( 'sureforms_form' === $post_type ) {
@@ -179,26 +289,47 @@ class Export {
 				);
 
 				if ( ! $post_id ) {
-					return new \WP_Error( 'import_forms_failed', __( 'Failed to import form.', 'sureforms' ) );
+					return new \WP_Error( 'import_forms_failed', __( 'Unable to import form.', 'sureforms' ) );
 				}
 
 				$forms_mapping[ $old_id ] = $post_id;
 
 				// Update post meta.
+				$allowed_keys           = $this->get_allowed_import_meta_keys();
+				$unserialized_meta_keys = $this->get_unserialized_post_metas();
+				$registered             = get_registered_meta_keys( 'post', SRFM_FORMS_POST_TYPE );
 				foreach ( $post_meta as $meta_key => $meta_value ) {
-					// Check if the meta key is one of the unserialized post metas then add it as is.
-					if ( in_array( $meta_key, $this->get_unserialized_post_metas(), true ) ) {
-						add_post_meta( $post_id, $meta_key, $meta_value );
-					} else {
-						if ( is_array( $meta_value ) && isset( $meta_value[0] ) ) {
-							add_post_meta( $post_id, $meta_key, $meta_value[0] );
-						} else {
-							add_post_meta( $post_id, $meta_key, $meta_value );
+					// 1. Whitelist check — skip unknown keys from crafted import files.
+					if ( ! in_array( $meta_key, $allowed_keys, true ) ) {
+						continue;
+					}
+
+					// Note: add_post_meta() internally runs wp_unslash() on the value before
+					// invoking the registered sanitize_callback. Imported values are unslashed,
+					// so without re-slashing, backslashes are stripped — corrupting JSON-string
+					// metas (e.g. _srfm_save_resume, _srfm_conditional_confirmation) whose escaped
+					// quotes (\") then fail json_decode() in their sanitizers, wiping the value to
+					// an empty string. wp_slash() pre-escapes so wp_unslash() restores the original.
+					if ( in_array( $meta_key, $unserialized_meta_keys, true ) ) {
+						// Complex array metas — sanitize_callback registered via register_post_meta()
+						// is automatically invoked by add_post_meta() → update_metadata() pipeline.
+						// When Pro is inactive, some keys may lack a registered callback — apply fallback.
+						if ( empty( $registered[ $meta_key ]['sanitize_callback'] ) ) {
+							$meta_value = Helper::sanitize_by_type( $meta_value );
 						}
+						add_post_meta( $post_id, $meta_key, wp_slash( $meta_value ) );
+					} else {
+						// Scalar metas — unwrap single-element arrays produced by get_post_meta().
+						$raw_value = is_array( $meta_value ) && isset( $meta_value[0] ) ? $meta_value[0] : $meta_value;
+						// Fallback sanitization — skip when a registered callback already handles it.
+						if ( is_string( $raw_value ) && empty( $registered[ $meta_key ]['sanitize_callback'] ) ) {
+							$raw_value = sanitize_text_field( $raw_value );
+						}
+						add_post_meta( $post_id, $meta_key, wp_slash( $raw_value ) );
 					}
 				}
 			} else {
-				return new \WP_Error( 'import_forms_invalid_post_type', __( 'Failed to import form.', 'sureforms' ) );
+				return new \WP_Error( 'import_forms_invalid_post_type', __( 'Unable to import form.', 'sureforms' ) );
 			}
 		}
 
@@ -206,61 +337,60 @@ class Export {
 	}
 
 	/**
-	 * Handle Import Form
+	 * Get the list of meta keys allowed during import.
 	 *
-	 * @param \WP_REST_Request $request Full details about the request.
+	 * Only meta keys present in this list will be written to the DB during import.
+	 * Unknown keys from crafted import files are silently ignored.
 	 *
-	 * @since 0.0.1
-	 * @return void
+	 * @since 2.8.0
+	 * @return array<string>
 	 */
-	public function handle_import_form( $request ) {
+	private function get_allowed_import_meta_keys(): array {
+		$scalar_metas = [
+			'_srfm_additional_classes',
+			'_srfm_bg_color',
+			'_srfm_bg_image',
+			'_srfm_bg_type',
+			'_srfm_button_border_radius',
+			'_srfm_captcha_security_type',
+			'_srfm_cover_image',
+			'_srfm_form_container_width',
+			'_srfm_form_custom_css',
+			'_srfm_form_recaptcha',
+			'_srfm_form_restriction',
+			'_srfm_inherit_theme_button',
+			'_srfm_instant_form',
+			'_srfm_is_ai_generated',
+			'_srfm_is_inline_button',
+			'_srfm_single_page_form_title',
+			'_srfm_submit_alignment',
+			'_srfm_submit_alignment_backend',
+			'_srfm_submit_button_text',
+			'_srfm_submit_type',
+			'_srfm_submit_width',
+			'_srfm_submit_width_backend',
+			'_srfm_use_label_as_placeholder',
+		];
 
-		$nonce = Helper::get_string_value( $request->get_header( 'X-WP-Nonce' ) );
+		/**
+		 * Filter the list of scalar meta keys allowed during import.
+		 *
+		 * Pro and other extensions can hook into this to add their own scalar meta keys.
+		 *
+		 * @since 2.8.0
+		 * @param array<string> $scalar_metas List of scalar meta keys.
+		 */
+		$scalar_metas = apply_filters( 'srfm_import_scalar_meta_keys', $scalar_metas );
 
-		if ( ! wp_verify_nonce( sanitize_text_field( $nonce ), 'wp_rest' ) ) {
-			wp_send_json_error(
-				[
-					'data'   => __( 'Nonce verification failed.', 'sureforms' ),
-					'status' => false,
-				]
-			);
-		}
-
-		// Get the raw POST data.
-		$post_data = file_get_contents( 'php://input' );
-		if ( ! $post_data ) {
-			wp_send_json_error( __( 'Failed to import form.', 'sureforms' ) );
-		}
-		$data = json_decode( $post_data, true );
-		if ( ! is_iterable( $data ) ) {
-			wp_send_json_error( __( 'Failed to import form.', 'sureforms' ) );
-		}
-
-		$result = $this->import_forms_with_meta( $data );
-		if ( is_wp_error( $result ) ) {
-			http_response_code( 400 );
-			wp_send_json_error( $result->get_error_message() );
-		}
-
-		// Return the responses.
-		wp_send_json_success();
-	}
-
-	/**
-	 * Add custom API Route submit-form
-	 *
-	 * @return void
-	 * @since 0.0.1
-	 */
-	public function register_custom_endpoint() {
-		register_rest_route(
-			'sureforms/v1',
-			'/sureforms_import',
-			[
-				'methods'             => WP_REST_Server::EDITABLE,
-				'callback'            => [ $this, 'handle_import_form' ],
-				'permission_callback' => [ Helper::class, 'get_items_permissions_check' ],
-			]
+		// Ensure filter consumers cannot inject non-SureForms meta keys.
+		$scalar_metas = array_filter(
+			$scalar_metas,
+			static function ( $key ) {
+				return str_starts_with( $key, '_srfm_' );
+			}
 		);
+
+		return array_merge( $this->get_unserialized_post_metas(), $scalar_metas );
 	}
+
 }

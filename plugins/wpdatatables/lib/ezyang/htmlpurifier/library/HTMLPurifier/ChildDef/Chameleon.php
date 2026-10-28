@@ -1,5 +1,7 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Definition that uses different definitions depending on context.
  *
@@ -9,37 +11,32 @@
  * definitions depending on context.  While this somewhat generalized,
  * it is specifically intended for those two tags.
  */
-class HTMLPurifier_ChildDef_Chameleon extends HTMLPurifier_ChildDef
+class HTMLPurifier_ChildDef_Chameleon extends \WPDT\HTMLPurifier_ChildDef
 {
-
     /**
      * Instance of the definition object to use when inline. Usually stricter.
      * @type HTMLPurifier_ChildDef_Optional
      */
     public $inline;
-
     /**
      * Instance of the definition object to use when block.
      * @type HTMLPurifier_ChildDef_Optional
      */
     public $block;
-
     /**
      * @type string
      */
     public $type = 'chameleon';
-
     /**
      * @param array $inline List of elements to allow when inline.
      * @param array $block List of elements to allow when block.
      */
     public function __construct($inline, $block)
     {
-        $this->inline = new HTMLPurifier_ChildDef_Optional($inline);
-        $this->block = new HTMLPurifier_ChildDef_Optional($block);
+        $this->inline = new \WPDT\HTMLPurifier_ChildDef_Optional($inline);
+        $this->block = new \WPDT\HTMLPurifier_ChildDef_Optional($block);
         $this->elements = $this->block->elements;
     }
-
     /**
      * @param HTMLPurifier_Node[] $children
      * @param HTMLPurifier_Config $config
@@ -48,20 +45,11 @@ class HTMLPurifier_ChildDef_Chameleon extends HTMLPurifier_ChildDef
      */
     public function validateChildren($children, $config, $context)
     {
-        if ($context->get('IsInline') === false) {
-            return $this->block->validateChildren(
-                $children,
-                $config,
-                $context
-            );
+        if ($context->get('IsInline') === \false) {
+            return $this->block->validateChildren($children, $config, $context);
         } else {
-            return $this->inline->validateChildren(
-                $children,
-                $config,
-                $context
-            );
+            return $this->inline->validateChildren($children, $config, $context);
         }
     }
 }
-
 // vim: et sw=4 sts=4

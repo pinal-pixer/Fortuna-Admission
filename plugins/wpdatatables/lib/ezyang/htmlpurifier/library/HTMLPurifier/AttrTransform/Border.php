@@ -1,9 +1,11 @@
 <?php
 
+namespace WPDT;
+
 /**
  * Pre-transform that changes deprecated border attribute to CSS.
  */
-class HTMLPurifier_AttrTransform_Border extends HTMLPurifier_AttrTransform
+class HTMLPurifier_AttrTransform_Border extends \WPDT\HTMLPurifier_AttrTransform
 {
     /**
      * @param array $attr
@@ -22,5 +24,4 @@ class HTMLPurifier_AttrTransform_Border extends HTMLPurifier_AttrTransform
         return $attr;
     }
 }
-
 // vim: et sw=4 sts=4

@@ -37,12 +37,11 @@ class Admin_Ajax {
 		add_action( 'wp_ajax_sureforms_recommended_plugin_activate', [ $this, 'required_plugin_activate' ] );
 		add_action( 'wp_ajax_sureforms_recommended_plugin_install', 'wp_ajax_install_plugin' );
 		add_action( 'wp_ajax_sureforms_integration', [ $this, 'generate_data_for_suretriggers_integration' ] );
+		add_action( 'wp_ajax_srfm_download_export', [ $this, 'download_export_file' ] );
+		add_action( 'wp_ajax_srfm_download_logs', [ $this, 'download_client_log' ] );
+		add_action( 'wp_ajax_srfm_clear_logs', [ $this, 'clear_client_log' ] );
 
 		add_filter( SRFM_SLUG . '_admin_filter', [ $this, 'localize_script_integration' ] );
-
-		// adding support for rest-nonce endpoint. To regenerate latest nonce incase of form submission failure.
-		add_action( 'wp_ajax_rest-nonce', [ $this, 'print_rest_nonce' ], 999 );
-		add_action( 'wp_ajax_nopriv_rest-nonce', [ $this, 'print_rest_nonce' ], 999 );
 	}
 
 	/**
@@ -83,11 +82,33 @@ class Admin_Ajax {
 
 		$plugin_init = isset( $_POST['init'] ) ? sanitize_text_field( wp_unslash( $_POST['init'] ) ) : '';
 
+		// Activation runs the plugin's own activation code, so this needs the
+		// real capability (a multisite sub-site admin has manage_options but not
+		// activate_plugins) and only plugins SureForms itself offers.
+		if ( ! current_user_can( 'activate_plugins' ) ) {
+			wp_send_json_error( $response_data );
+		}
+
+		if ( ! in_array( $plugin_init, self::get_activatable_plugins(), true ) ) {
+			wp_send_json_error(
+				[
+					'success' => false,
+					'message' => __( 'This plugin cannot be activated from SureForms.', 'sureforms' ),
+				]
+			);
+		}
+
 		$plugin_slug = isset( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : '';
 
-		$activate = activate_plugin( $plugin_init, '', false, true );
+		// Not silent: a silent activation skips the plugin's activation hook, so
+		// whatever it sets up there never happens. SureMail, for one, creates its
+		// email log table on activation; installed from SureForms, its Email Logs
+		// screen failed with "Failed to retrieve email logs." Output from the
+		// hook is caught by activate_plugin() and returned as an error -- but the
+		// plugin is active by then, so that one error is not a failure.
+		$activate = activate_plugin( $plugin_init, '', false, false );
 
-		if ( is_wp_error( $activate ) ) {
+		if ( is_wp_error( $activate ) && ! ( 'unexpected_output' === $activate->get_error_code() && is_plugin_active( $plugin_init ) ) ) {
 			wp_send_json_error(
 				[
 					'success' => false,
@@ -95,6 +116,8 @@ class Admin_Ajax {
 				]
 			);
 		}
+
+		self::clear_activation_redirect( $plugin_init );
 
 		if ( class_exists( 'BSF_UTM_Analytics' ) && is_callable( 'BSF_UTM_Analytics::update_referer' ) ) {
 			$plugin_slug = pathinfo( $plugin_slug, PATHINFO_FILENAME );
@@ -109,6 +132,74 @@ class Admin_Ajax {
 		);
 	}
 
+	/**
+	 * Plugins the recommended-plugin installer may activate: the ones SureForms
+	 * offers (Helper::sureforms_get_integration(), both Starter Templates
+	 * editions) and the MCP adapter from Settings.
+	 *
+	 * @since 2.12.9
+	 * @return array<int,string> Plugin files.
+	 */
+	public static function get_activatable_plugins() {
+		$plugins = [ 'mcp-adapter/mcp-adapter.php', 'astra-sites/astra-sites.php', 'astra-pro-sites/astra-pro-sites.php' ];
+
+		foreach ( Helper::sureforms_get_integration() as $integration ) {
+			if ( is_array( $integration ) && ! empty( $integration['path'] ) && is_string( $integration['path'] ) ) {
+				$plugins[] = $integration['path'];
+			}
+		}
+
+		/**
+		 * Filters the plugins SureForms' installer may activate.
+		 *
+		 * @since 2.12.9
+		 * @param array<int,string> $plugins Plugin files.
+		 */
+		$plugins = apply_filters( 'srfm_activatable_plugins', $plugins );
+
+		return array_values( array_unique( array_filter( is_array( $plugins ) ? $plugins : [], 'is_string' ) ) );
+	}
+
+	/**
+	 * Clear the "show my onboarding" flag a plugin sets on activation.
+	 *
+	 * Activation now runs the plugin's activation hook, and most of these plugins
+	 * set a flag there that sends the owner to their onboarding on the next admin
+	 * page load -- pulling them out of SureForms' own onboarding mid-step.
+	 *
+	 * @since 2.12.9
+	 * @param string $plugin_init Plugin file that was activated.
+	 * @return void
+	 */
+	public static function clear_activation_redirect( $plugin_init ) {
+		/**
+		 * Filters the redirect flags cleared after activating a plugin.
+		 *
+		 * @since 2.12.9
+		 * @param array<string,array{option?:string,transient?:string}> $flags Plugin file => flag.
+		 */
+		$flags = apply_filters(
+			'srfm_plugin_activation_redirect_flags',
+			[
+				'suremails/suremails.php'             => [ 'option' => 'suremails_do_redirect' ],
+				'surerank/surerank.php'               => [ 'option' => 'surerank_redirect_on_activation' ],
+				'suretriggers/suretriggers.php'       => [ 'transient' => 'st-redirect-after-activation' ],
+				'suredonation/suredonation.php'       => [ 'option' => '__suredonation_do_redirect' ],
+				'header-footer-elementor/header-footer-elementor.php' => [ 'option' => 'hfe_start_onboarding' ],
+				'astra-sites/astra-sites.php'         => [ 'option' => 'st_start_onboarding' ],
+				'astra-pro-sites/astra-pro-sites.php' => [ 'option' => 'st_start_onboarding' ],
+			]
+		);
+
+		$flag = is_array( $flags ) && isset( $flags[ $plugin_init ] ) && is_array( $flags[ $plugin_init ] ) ? $flags[ $plugin_init ] : [];
+
+		if ( ! empty( $flag['option'] ) && is_string( $flag['option'] ) ) {
+			delete_option( $flag['option'] );
+		}
+		if ( ! empty( $flag['transient'] ) && is_string( $flag['transient'] ) ) {
+			delete_transient( $flag['transient'] );
+		}
+	}
 	/**
 	 * Get ajax error message.
 	 *
@@ -187,7 +278,7 @@ class Admin_Ajax {
 
 		// Translators: %s: Form ID.
 		$form_name = ! empty( $form->post_title ) ? $form->post_title : sprintf( __( 'SureForms id: %s', 'sureforms' ), $form_id );
-		$api_url   = apply_filters( 'suretriggers_get_iframe_url', SRFM_SURETRIGGERS_INTEGRATION_BASE_URL );
+		$api_url   = apply_filters( 'suretriggers_get_iframe_url', SRFM_SURETRIGGERS_INTEGRATION_BASE_URL ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- SureTriggers' own filter; the name must match SureTriggers exactly to integrate.
 
 		// This is the format of data required by SureTriggers for adding iframe in target id.
 		$body = [
@@ -280,6 +371,29 @@ class Admin_Ajax {
 
 		foreach ( $blocks as $block ) {
 			if ( ! empty( $block['blockName'] ) && 0 === strpos( $block['blockName'], 'srfm/' ) ) {
+
+				/**
+				 * Determine whether to skip this field from the sample data.
+				 *
+				 * @param bool  $should_skip           Default value indicating if field should be skipped.
+				 * @param array $block_details         Array containing block attributes, including 'block_name'.
+				 *
+				 * @since 2.0.0
+				 *
+				 * @hook srfm_should_skip_field_from_sample_data
+				 */
+				$should_skip_this_field = apply_filters(
+					'srfm_should_skip_field_from_sample_data',
+					false,
+					[
+						'block_name' => $block['blockName'],
+					]
+				);
+
+				if ( $should_skip_this_field ) {
+					continue;
+				}
+
 				if ( ! empty( $block['attrs']['slug'] ) ) {
 					$data[ $block['attrs']['slug'] ] = $this->get_sample_data( $block['blockName'] );
 				}
@@ -357,14 +471,171 @@ class Admin_Ajax {
 	}
 
 	/**
-	 * This function will echo wp_rest nonce
-	 * was required to provide nonce for fallback of wp.apiFetch
+	 * Download exported file.
 	 *
-	 * @since 1.2.4
+	 * @since 2.0.0
 	 * @return void
 	 */
-	public function print_rest_nonce() {
-		echo esc_js( wp_create_nonce( 'wp_rest' ) );
+	public function download_export_file() {
+		// Check user permissions.
+		if ( ! Helper::current_user_can() ) {
+			wp_die( esc_html__( 'You do not have permission to access this file.', 'sureforms' ) );
+		}
+
+		// Verify nonce for security.
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'srfm_download_export' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'sureforms' ) );
+		}
+
+		// Get and sanitize the file parameter.
+		$file = isset( $_GET['file'] ) ? sanitize_file_name( wp_unslash( $_GET['file'] ) ) : '';
+
+		if ( empty( $file ) ) {
+			wp_die( esc_html__( 'Invalid file request.', 'sureforms' ) );
+		}
+
+		// Build the full file path.
+		$temp_dir = wp_normalize_path( trailingslashit( get_temp_dir() ) );
+		$filepath = $temp_dir . $file;
+
+		// Security check: ensure the file is in the temp directory.
+		if ( strpos( wp_normalize_path( $filepath ), $temp_dir ) !== 0 ) {
+			wp_die( esc_html__( 'Invalid file path.', 'sureforms' ) );
+		}
+
+		// Check if file exists.
+		if ( ! file_exists( $filepath ) ) {
+			wp_die( esc_html__( 'File not found.', 'sureforms' ) );
+		}
+
+		// Get file info.
+		$file_size = filesize( $filepath );
+		$file_info = pathinfo( $filepath );
+
+		// Determine content type and filename based on file extension.
+		$content_type = 'application/octet-stream';
+		$filename     = $file_info['basename'];
+		if ( isset( $file_info['extension'] ) ) {
+			if ( 'csv' === $file_info['extension'] ) {
+				$content_type = 'text/csv';
+			} elseif ( 'zip' === $file_info['extension'] ) {
+				$content_type = 'application/zip';
+				/**
+				 * Filter the user-facing filename used when serving an exported ZIP archive.
+				 *
+				 * @since 2.9.0
+				 *
+				 * @param string             $filename  Default ZIP filename.
+				 * @param array<string,mixed> $file_info pathinfo() result for the file being served.
+				 */
+				$filename = (string) apply_filters( 'srfm_export_zip_filename', 'SureForms Entries.zip', $file_info );
+			}
+		}
+
+		// Set headers for download.
+		header( 'Content-Type: ' . $content_type );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Content-Length: ' . $file_size );
+		header( 'Cache-Control: private, max-age=0, must-revalidate' );
+		header( 'Pragma: public' );
+
+		// Clear output buffers.
+		if ( ob_get_level() ) {
+			ob_end_clean();
+		}
+
+		// Output the file.
+		readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_readfile, WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- Direct file output is required to stream the download.
+
+		// Clean up the temporary file.
+		wp_delete_file( $filepath );
+
 		exit;
 	}
+	/**
+	 * Stream the client debug log to an administrator.
+	 *
+	 * Takes no filename parameter. There is exactly one log file and the server
+	 * derives its path, which removes the path-traversal question entirely rather
+	 * than guarding against it -- and keeps the unguessable file name, which is
+	 * what actually protects the log on nginx, out of the page.
+	 *
+	 * @since 2.12.6
+	 * @return void
+	 */
+	public function download_client_log() {
+		$this->verify_log_request();
+
+		$path    = Client_Logger::get_log_path( false );
+		$has_log = '' !== $path && file_exists( $path );
+
+		// The buttons are always offered while logging is on, so downloading before
+		// anything has failed is a normal thing to do. Hand back an explanatory file
+		// rather than a wp_die() screen -- an empty log is the good outcome.
+		if ( ! $has_log ) {
+			header( 'Content-Type: text/plain; charset=utf-8' );
+			header( 'X-Content-Type-Options: nosniff' );
+			header( 'Content-Disposition: attachment; filename="sureforms-debug-log.txt"' );
+
+			if ( ob_get_level() ) {
+				ob_end_clean();
+			}
+
+			echo esc_html__( 'No form submission failures have been recorded.', 'sureforms' );
+			exit;
+		}
+
+		$size = filesize( $path );
+
+		header( 'Content-Type: text/plain; charset=utf-8' );
+		header( 'X-Content-Type-Options: nosniff' );
+		header( 'Content-Disposition: attachment; filename="sureforms-debug-log.txt"' );
+
+		if ( is_int( $size ) ) {
+			header( 'Content-Length: ' . $size );
+		}
+
+		header( 'Cache-Control: private, max-age=0, must-revalidate' );
+
+		if ( ob_get_level() ) {
+			ob_end_clean();
+		}
+
+		readfile( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_readfile, WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- Direct file output is required to stream the download.
+		exit;
+	}
+
+	/**
+	 * Delete the client debug log.
+	 *
+	 * @since 2.12.6
+	 * @return void
+	 */
+	public function clear_client_log() {
+		$this->verify_log_request();
+
+		Client_Logger::clear();
+
+		wp_send_json_success();
+	}
+
+	/**
+	 * Capability and nonce gate shared by both log actions.
+	 *
+	 * Capability first, ahead of the nonce, matching the ordering of the sibling
+	 * handlers in this class.
+	 *
+	 * @since 2.12.6
+	 * @return void
+	 */
+	private function verify_log_request() {
+		if ( ! Helper::current_user_can() ) {
+			wp_die( esc_html__( 'You do not have permission to access this file.', 'sureforms' ) );
+		}
+
+		if ( ! isset( $_REQUEST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) ), 'srfm_client_logs' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'sureforms' ) );
+		}
+	}
+
 }

@@ -229,6 +229,13 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 				update_option( '__uagb_do_redirect', false );
 
 				if ( ! is_multisite() ) {
+					// Redirect to onboarding wizard if not completed yet,
+					// otherwise to the Spectra dashboard.
+					if ( ! UAGB_Onboarding::is_onboarding_completed() ) {
+						wp_safe_redirect( admin_url( 'admin.php?page=spectra-onboarding' ) );
+						exit;
+					}
+
 					wp_safe_redirect(
 						add_query_arg(
 							array(
@@ -238,7 +245,7 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 							admin_url( 'admin.php' )
 						)
 					);
-					exit();
+					exit;
 				}
 			}
 		}
@@ -275,7 +282,7 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 
 			if ( ! get_option( 'uag_migration_status', false ) && 'yes' === get_option( 'uagb-old-user-less-than-2' ) && 'in-progress' !== get_option( 'uag_migration_progress_status', '' ) ) {
 
-				Astra_Notices::add_notice(
+				BSF_Admin_Notices::add_notice(
 					array(
 
 						'id'                         => 'uagb-block-migration_status',
@@ -300,10 +307,10 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
                                 </div>
                                 </div><br />',
 							$image_path,
-							__( 'Spectra database update required', 'ultimate-addons-for-gutenberg' ),
-							__( "We've detected that some of your pages were created with an older version of Spectra. To ensure your designs remain unaffected, we recommend updating the Spectra database now. Updating the Spectra database will not impact any other parts of your website.", 'ultimate-addons-for-gutenberg' ),
+							__( 'Spectra Legacy database update required', 'ultimate-addons-for-gutenberg' ),
+							__( "We've detected that some of your pages were created with an older version of Spectra Legacy. To ensure your designs remain unaffected, we recommend updating the Spectra Legacy database now. Updating the Spectra Legacy database will not impact any other parts of your website.", 'ultimate-addons-for-gutenberg' ),
 							__( 'To be on the safer side, please be sure to back up your site before updating.', 'ultimate-addons-for-gutenberg' ),
-							__( 'Update Spectra Database', 'ultimate-addons-for-gutenberg' ),
+							__( 'Update Spectra Legacy Database', 'ultimate-addons-for-gutenberg' ),
 							esc_url( 'https://wpspectra.com/docs/spectra-database-update-instructions/' ),
 							__( 'Learn More About This', 'ultimate-addons-for-gutenberg' )
 						),
@@ -312,7 +319,7 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 					)
 				);
 			} elseif ( 'yes' !== get_option( 'uag_migration_complete', 0 ) && 'yes' === get_option( 'uagb-old-user-less-than-2' ) ) {
-				Astra_Notices::add_notice(
+				BSF_Admin_Notices::add_notice(
 					array(
 						'id'                         => 'uag_migration_in_progress',
 						'type'                       => 'info',
@@ -330,7 +337,7 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
                                     </div>
                                 </div><br />',
 							$image_path,
-							__( 'Spectra database update in progress', 'ultimate-addons-for-gutenberg' ),
+							__( 'Spectra Legacy database update in progress', 'ultimate-addons-for-gutenberg' ),
 							__( 'Great! This should only take a few minutes. Thanks for hanging in there.', 'ultimate-addons-for-gutenberg' )
 						),
 						'dismissible'                => false,
@@ -339,7 +346,7 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 					)
 				);
 			} elseif ( 'yes' === get_option( 'uag_migration_complete', 0 ) ) {
-				Astra_Notices::add_notice(
+				BSF_Admin_Notices::add_notice(
 					array(
 						'id'                         => 'uag_migration_success',
 						'type'                       => 'success',
@@ -357,7 +364,7 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 							</div><br />',
 							$image_path,
 							__( 'Update Successful!', 'ultimate-addons-for-gutenberg' ),
-							__( 'Your Spectra database is now up-to-date. Your website will continue to function as before.', 'ultimate-addons-for-gutenberg' ) . ' <a href="' . esc_url( admin_url( 'admin-post.php?action=uag_download_log' ) ) . '">' . __( 'View Log', 'ultimate-addons-for-gutenberg' ) . '</a>'
+							__( 'Your Spectra Legacy database is now up-to-date. Your website will continue to function as before.', 'ultimate-addons-for-gutenberg' ) . ' <a href="' . esc_url( admin_url( 'admin-post.php?action=uag_download_log' ) ) . '">' . __( 'View Log', 'ultimate-addons-for-gutenberg' ) . '</a>'
 						),
 						'dismissible'                => true,
 						'priority'                   => 20,
@@ -370,13 +377,13 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 			if ( class_exists( 'Classic_Editor' ) ) {
 				$editor_option = get_option( 'classic-editor-replace' );
 				if ( 'block' !== $editor_option ) {
-					Astra_Notices::add_notice(
+					BSF_Admin_Notices::add_notice(
 						array(
 							'id'                         => 'uagb-classic-editor',
 							'type'                       => 'warning',
 							'message'                    => sprintf(
 								/* translators: %s: html tags */
-								__( 'Spectra requires&nbsp;%3$sBlock Editor%4$s. You can change your editor settings to Block Editor from&nbsp;%1$shere%2$s. Plugin is currently NOT RUNNING.', 'ultimate-addons-for-gutenberg' ),
+								__( 'Spectra Legacy requires&nbsp;%3$sBlock Editor%4$s. You can change your editor settings to Block Editor from&nbsp;%1$shere%2$s. Plugin is currently NOT RUNNING.', 'ultimate-addons-for-gutenberg' ),
 								'<a href="' . admin_url( 'options-writing.php' ) . '">',
 								'</a>',
 								'<strong>',
@@ -399,7 +406,7 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 					: 'not-installed';
 
 			if ( 'not-installed' === $status && isset( $_GET['post_type'] ) && 'spectra-popup' === $_GET['post_type'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- $_GET['post_type'] does not provide nonce.
-				Astra_Notices::add_notice(
+				BSF_Admin_Notices::add_notice(
 					array(
 						'id'                         => 'uagb-spectra-pro-popup-note',
 						'type'                       => '',
@@ -422,7 +429,7 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 								</div>',
 							$image_path,
 							__( 'Want to do more with Popup Builder?', 'ultimate-addons-for-gutenberg' ),
-							__( 'Maximize your popup potential with Spectra Pro. Unlock enhanced features, intuitive design options, and increased conversions!', 'ultimate-addons-for-gutenberg' ),
+							__( 'Maximize your popup potential with Spectra Legacy Pro. Unlock enhanced features, intuitive design options, and increased conversions!', 'ultimate-addons-for-gutenberg' ),
 							esc_url( \UAGB_Admin_Helper::get_spectra_pro_url( '/pricing/', 'free-plugin', 'popup-builder', 'popup-builder-banner' ) ),
 							__( 'Upgrade Now', 'ultimate-addons-for-gutenberg' )
 						),
@@ -475,7 +482,7 @@ if ( ! class_exists( 'UAGB_Admin' ) ) {
 								upgradeLink.setAttribute('rel', 'noreferrer');
 								upgradeLink.addEventListener('click', function(e) {
 									e.preventDefault();
-									window.open( <?php echo esc_url( \UAGB_Admin_Helper::get_spectra_pro_url( '/pricing/', 'free-plugin', 'dashboard', 'setting' ) ); ?>, '_blank', 'noopener,noreferrer' );
+									window.open( '<?php echo esc_url( \UAGB_Admin_Helper::get_spectra_pro_url( '/pricing/', 'free-plugin', 'dashboard', 'setting' ) ); ?>', '_blank', 'noopener,noreferrer' );
 								});
 							}
 						});

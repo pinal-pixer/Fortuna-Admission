@@ -8,7 +8,9 @@
 
 namespace SRFM\Inc;
 
+use SRFM\Inc\Compatibility\Multilingual\String_Translator;
 use SRFM\Inc\Database\Tables\Entries;
+use SRFM\Inc\Email_Delivery\Mailer;
 use SRFM\Inc\Traits\Get_Instance;
 use WP_Error;
 use WP_Post;
@@ -66,9 +68,10 @@ class Helper {
 	 * @return array<string>
 	 */
 	public static function get_common_err_msg() {
+		$translator = String_Translator::get_instance();
 		return [
-			'required' => __( 'This field is required.', 'sureforms' ),
-			'unique'   => __( 'Value needs to be unique.', 'sureforms' ),
+			'required' => $translator->translate_validation_message( 'srfm_required_field', __( 'This field is required.', 'sureforms' ) ),
+			'unique'   => $translator->translate_validation_message( 'srfm_unique_field', __( 'Value needs to be unique.', 'sureforms' ) ),
 		];
 	}
 
@@ -130,6 +133,30 @@ class Helper {
 	}
 
 	/**
+	 * Validate a date string in Y-m-d format.
+	 *
+	 * @param string $date The date string to validate.
+	 * @since 2.6.0
+	 * @return bool
+	 */
+	public static function validate_date( string $date ): bool {
+		$d = \DateTime::createFromFormat( 'Y-m-d', $date );
+		return $d && $d->format( 'Y-m-d' ) === $date;
+	}
+
+	/**
+	 * Returns a boolean representation of the given value.
+	 *
+	 * @param mixed $data Data which needs to be converted to boolean.
+	 *
+	 * @since 2.5.2
+	 * @return bool
+	 */
+	public static function get_boolean_value( $data ) {
+		return (bool) $data;
+	}
+
+	/**
 	 * Checks if current value is an array or else returns default value
 	 *
 	 * @param mixed $data Data which needs to be checked if it is an array.
@@ -166,6 +193,14 @@ class Helper {
 	/**
 	 * Extracts the field label from the dynamic field key ( or field slug ).
 	 *
+	 * ALWAYS escape the return value at the sink. The label is decoded from the
+	 * submitted key via {@see self::decode()}, so it is submitter-controlled and
+	 * unauthenticated — and this method is strictly more dangerous than decode()
+	 * alone, because it additionally runs html_entity_decode(), which expands
+	 * entities and therefore undoes any htmlspecialchars()-on-store defence.
+	 * When a label's integrity matters, read it from the form's stored block
+	 * definitions by block id instead of from the submitted key.
+	 *
 	 * @param string $field_key Dynamic field key.
 	 * @since 1.1.1
 	 * @return string Extracted field label.
@@ -176,10 +211,12 @@ class Helper {
 		}
 
 		$label = explode( '-lbl-', $field_key )[1];
-		// Getting the encrypted label. we are removing the block slug here.
+		// Getting the encoded label. we are removing the block slug here.
 		$label = explode( '-', $label )[0];
 
-		return $label ? html_entity_decode( self::decrypt( $label ) ) : '';
+		// The result is submitter-controlled and unauthenticated — escape it for its
+		// context at the sink (esc_html, escape_csv_formula, ...), never trust it.
+		return $label ? html_entity_decode( self::decode( $label ) ) : '';
 	}
 
 	/**
@@ -249,6 +286,25 @@ class Helper {
 	}
 
 	/**
+	 * Sanitize a CSS value to prevent injection.
+	 *
+	 * Strips characters that can break out of a CSS property value context
+	 * and removes dangerous CSS functions while preserving safe ones
+	 * (rgb, hsl, linear-gradient, etc.).
+	 *
+	 * @param mixed $value Raw CSS value.
+	 * @return string Sanitized CSS value.
+	 * @since 2.7.0
+	 */
+	public static function sanitize_css_value( $value ) {
+		$value = self::get_string_value( $value );
+		// Strip characters that can break out of a CSS property value context.
+		$value = preg_replace( '/[{}<>;\\\\"\'`]/', '', $value ) ?? '';
+		// Remove dangerous CSS functions (url, expression, import, etc.) while preserving safe ones (rgb, hsl, linear-gradient, etc.).
+		return preg_replace( '/\b(url|expression|import|javascript)\s*\(/i', '(', $value ) ?? '';
+	}
+
+	/**
 	 * This function sanitizes the submitted form data according to the field type.
 	 *
 	 * @param array<mixed> $form_data $form_data User submitted form data.
@@ -271,6 +327,43 @@ class Helper {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Sanitize a value based on its PHP type.
+	 *
+	 * Recursively sanitizes arrays while preserving native PHP types (bool, int, float).
+	 * Use this for complex object metas with many properties where per-field callbacks are impractical.
+	 *
+	 * @param mixed $value The value to sanitize.
+	 * @param int   $depth Current recursion depth. Values nested beyond 10 levels are discarded.
+	 * @since 2.8.0
+	 * @return mixed The sanitized value.
+	 */
+	public static function sanitize_by_type( $value, int $depth = 0 ) {
+		if ( $depth > 10 ) {
+			return '';
+		}
+		if ( is_array( $value ) ) {
+			$sanitized = [];
+			foreach ( $value as $key => $val ) {
+				$sanitized[ sanitize_text_field( (string) $key ) ] = self::sanitize_by_type( $val, $depth + 1 );
+			}
+			return $sanitized;
+		}
+		if ( is_bool( $value ) ) {
+			return $value;
+		}
+		if ( is_int( $value ) ) {
+			return intval( $value );
+		}
+		if ( is_float( $value ) ) {
+			return floatval( $value );
+		}
+		if ( is_string( $value ) ) {
+			return sanitize_text_field( $value );
+		}
+		return '';
 	}
 
 	/**
@@ -332,7 +425,7 @@ class Helper {
 					ob_start();
 					?>
 					<label id="srfm-label-<?php echo esc_attr( $block_id ); ?>" for="srfm-<?php echo esc_attr( $slug ); ?>-<?php echo esc_attr( $block_id ); ?>" class="srfm-block-label">
-						<?php echo wp_kses_post( $label ); ?>
+						<?php echo esc_html( $label ); ?>
 						<?php if ( $required ) { ?>
 							<span class="srfm-required" aria-hidden="true"> *</span>
 						<?php } ?>
@@ -346,7 +439,7 @@ class Helper {
 					ob_start();
 					?>
 					<div class="srfm-description" id="srfm-description-<?php echo esc_attr( $block_id ); ?>">
-						<?php echo wp_kses_post( $help ); ?>
+						<?php echo esc_html( $help ); ?>
 					</div>
 					<?php
 					$markup = ob_get_clean();
@@ -375,14 +468,14 @@ class Helper {
 				}
 				break;
 			case 'placeholder':
-				$markup = $label && '1' === $show_labels_as_placeholder ? wp_kses_post( $label ) . ( $required ? esc_attr( $required_sign ) : '' ) : '';
+				$markup = $label && '1' === $show_labels_as_placeholder ? esc_html( $label ) . ( $required ? esc_attr( $required_sign ) : '' ) : '';
 				break;
 			case 'label_text':
 				// This has been added for generating label text for the form markup instead of adding it in the label tag.
 				if ( $label ) {
 					ob_start();
 					?>
-					<?php echo wp_kses_post( $label ); ?>
+					<?php echo esc_html( $label ); ?>
 					<?php if ( $required ) { ?>
 						<span class="srfm-required" aria-hidden="true"> *</span>
 					<?php } ?>
@@ -428,39 +521,96 @@ class Helper {
 	}
 
 	/**
-	 * Encrypt data using base64.
+	 * Base64-encode a string for use inside a field key.
 	 *
-	 * @param string $input The input string which needs to be encrypted.
-	 * @since 0.0.1
-	 * @return string The encrypted string.
+	 * Replaces encrypt(), which is retained as a deprecated alias. The encoding itself
+	 * is unchanged since 0.0.1 — only the name is new.
+	 *
+	 * NOT ENCRYPTION. This is plain, unkeyed base64 (padding stripped) used only to
+	 * carry a label inside a field key. There is no key, no HMAC and no integrity
+	 * protection, so a value round-tripped through decode() is fully attacker-forgeable
+	 * and must never be treated as authentic or trusted as a security boundary. When a
+	 * label's integrity matters, look it up from the form's stored block definitions by
+	 * block id instead of decoding it from the submitted key.
+	 *
+	 * Two behaviours worth knowing before relying on this pair:
+	 *
+	 * - The input is run through wp_strip_all_tags(), so this is not a lossless
+	 *   round trip: decode( encode( $x ) ) !== $x whenever $x contains markup.
+	 *   That stripping happens on this trusted side only — decode() returns raw
+	 *   submitted bytes and does NOT strip anything, so every sink must escape for
+	 *   its own context (esc_html(), escape_csv_formula(), ...).
+	 * - Falsy input (including the string '0') returns '', not base64.
+	 *
+	 * @param string $input The input string to encode.
+	 * @since 2.12.3
+	 * @return string The base64-encoded string (padding removed).
 	 */
-	public static function encrypt( $input ) {
+	public static function encode( $input ) {
 		// If the input is empty or not a string, then abandon ship.
 		if ( empty( $input ) || ! is_string( $input ) ) {
 			return '';
 		}
 
-		// Encrypt the input and return it.
+		// Strip HTML tags to prevent them from being included in IDs and field names.
+		$input = wp_strip_all_tags( $input );
+
+		// Base64-encode the input and return it.
 		$base_64 = base64_encode( $input ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 		return rtrim( $base_64, '=' );
 	}
 
 	/**
-	 * Decrypt data using base64.
+	 * Base64-encode a string.
 	 *
-	 * @param string $input The input string which needs to be decrypted.
+	 * @deprecated 2.12.3 Use {@see self::encode()}. The name wrongly implied a security
+	 *             boundary — this is unkeyed base64, not encryption.
+	 *
+	 * @param string $input The input string to encode.
 	 * @since 0.0.1
-	 * @return string The decrypted string.
+	 * @return string The base64-encoded string.
 	 */
-	public static function decrypt( $input ) {
+	public static function encrypt( $input ) {
+		return self::encode( $input );
+	}
+
+	/**
+	 * Base64-decode a string produced by encode().
+	 *
+	 * Replaces decrypt(), which is retained as a deprecated alias. The decoding itself
+	 * is unchanged since 0.0.1 — only the name is new.
+	 *
+	 * NOT DECRYPTION. See {@see self::encode()} — the result is unauthenticated and
+	 * attacker-forgeable; do not trust it where integrity matters. The output is raw
+	 * submitted bytes: no tag stripping, no sanitising. Escape it at the sink.
+	 *
+	 * @param string $input The input string to decode.
+	 * @since 2.12.3
+	 * @return string The decoded string.
+	 */
+	public static function decode( $input ) {
 		// If the input is empty or not a string, then abandon ship.
 		if ( empty( $input ) || ! is_string( $input ) ) {
 			return '';
 		}
 
-		// Decrypt the input and return it.
+		// Base64-decode the input and return it.
 		$base_64 = $input . str_repeat( '=', strlen( $input ) % 4 );
 		return base64_decode( $base_64 ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+	}
+
+	/**
+	 * Base64-decode a string.
+	 *
+	 * @deprecated 2.12.3 Use {@see self::decode()}. The name wrongly implied a security
+	 *             boundary — this is unkeyed base64, not decryption.
+	 *
+	 * @param string $input The input string to decode.
+	 * @since 0.0.1
+	 * @return string The decoded string.
+	 */
+	public static function decrypt( $input ) {
+		return self::decode( $input );
 	}
 
 	/**
@@ -601,6 +751,41 @@ class Helper {
 	}
 
 	/**
+	 * Resolve the submitting user, surviving REST's nonce-less de-authentication.
+	 *
+	 * The public form endpoints authenticate with the HMAC Submit_Token rather than
+	 * a nonce, because the form markup is page-cacheable and core answers a nonce
+	 * that fails verification with a hard 403 — a value baked into a cached page
+	 * would break submissions once it aged out.
+	 *
+	 * The trade-off is that `rest_cookie_check_errors()` treats a cookie-carrying
+	 * REST request with no nonce as anonymous and calls `wp_set_current_user( 0 )`
+	 * before dispatch. So `get_current_user_id()` returns 0 during a submission even
+	 * when the visitor is signed in, which silently drops entry attribution and
+	 * blanks every `{user_*}` smart tag.
+	 *
+	 * `wp_validate_auth_cookie()` reads the logged-in cookie directly and is
+	 * unaffected by that reset. It verifies the cookie's HMAC, so the identity is
+	 * authenticated, not merely asserted — this is the same check core itself uses
+	 * for cookie auth, and the pattern already used by the Pro login route.
+	 *
+	 * Returns 0 for genuinely anonymous submissions, so callers can keep treating
+	 * falsy as "not logged in".
+	 *
+	 * @since 2.12.6
+	 * @return int User ID, or 0 when the submitter is not signed in.
+	 */
+	public static function get_submitting_user_id() {
+		$user_id = get_current_user_id();
+
+		if ( $user_id ) {
+			return $user_id;
+		}
+
+		return absint( wp_validate_auth_cookie( '', 'logged_in' ) );
+	}
+
+	/**
 	 * Check if the current user has a given capability.
 	 *
 	 * @param string       $capability The capability to check.
@@ -694,6 +879,38 @@ class Helper {
 			}
 			$label = explode( '-lbl-', $key )[1];
 			$slug  = implode( '-', array_slice( explode( '-', $label ), 1 ) );
+			$slug  = str_replace( ' ', '_', $slug );
+
+			/**
+			 * Filters whether a field should be skipped when mapping slugs to submission data.
+			 *
+			 * This filter allows plugins or custom code to determine if a field should be excluded
+			 * from the mapped submission data array (such as for internal fields or extraneous meta).
+			 *
+			 * @since 2.0.0
+			 *
+			 * @param bool  $skip_this_field Whether to skip this field from processing. Default false.
+			 * @param array $args {
+			 *     Arguments used for this field.
+			 *
+			 *     @type string $key   The original key of the field in the submission data array.
+			 *     @type string $slug  The mapped slug parsed from the field key.
+			 *     @type mixed  $value The value assigned to this field.
+			 * }
+			 */
+			$skip_this_field = apply_filters(
+				'srfm_map_slug_to_submission_data_should_skip',
+				false,
+				[
+					'key'   => $key,
+					'slug'  => $slug,
+					'value' => $value,
+				]
+			);
+
+			if ( $skip_this_field ) {
+				continue;
+			}
 
 			// Check if value is array to handle external package field functionality.
 			// like repeater fields that need special processing.
@@ -712,6 +929,17 @@ class Helper {
 					$mapped_data[ $slug ] = $filtered_submission_data['value'];
 					continue;
 				}
+			}
+
+			// If the value is an array (e.g. multi-upload field), decode each URL value.
+			if ( is_array( $value ) ) {
+				$mapped_data[ $slug ] = array_map(
+					static function ( $val ) {
+						return is_string( $val ) ? rawurldecode( $val ) : $val;
+					},
+					$value
+				);
+				continue;
 			}
 
 			$mapped_data[ $slug ] = is_string( $value ) ? html_entity_decode( esc_attr( $value ) ) : $value;
@@ -986,6 +1214,7 @@ class Helper {
 				'srfm/radio',
 				'srfm/submit',
 				'srfm/url',
+				'srfm/payment',
 			]
 		);
 	}
@@ -1143,6 +1372,17 @@ class Helper {
 
 		if ( ! empty( $block['attrs']['label'] ) && is_string( $block['attrs']['label'] ) ) {
 			$slug = sanitize_title( $block['attrs']['label'] );
+
+			// If the label contains non-Latin characters (e.g. Japanese, Chinese),
+			// sanitize_title() produces a percent-encoded slug like "%e3%83%95%e3%83%aa".
+			// These are unstable and break conditional logic field matching.
+			// Fall back to the block name to ensure a stable ASCII slug.
+			if ( false !== strpos( $slug, '%' ) ) {
+				$block_name = is_string( $block['blockName'] ) ? $block['blockName'] : '';
+				// Strip the 'srfm/' namespace to match JS-side cleanForSlug() output.
+				$block_name = (string) preg_replace( '/^srfm\//', '', $block_name );
+				$slug       = sanitize_title( $block_name );
+			}
 		}
 
 		if ( ! empty( $prefix ) ) {
@@ -1239,7 +1479,7 @@ class Helper {
 	 * @since 1.1.1
 	 * @return bool Returns true if all conditions are met or the single key-value pair is valid, otherwise false.
 	 */
-	public static function validate_request_context( $value, $key = 'post_type', array $conditions = [] ) {
+	public static function validate_request_context( $value, $key = 'post_type', $conditions = [] ) {
 		// If conditions are provided, validate all key-value pairs in the conditions array.
 		if ( ! empty( $conditions ) ) {
 			foreach ( $conditions as $condition_key => $condition_value ) {
@@ -1330,9 +1570,40 @@ class Helper {
 			$utm_args = [];
 		}
 
+		// SRFM-2709: deterministic UTM attribution — start.
+		// When the caller opts into UTM tracking by passing any utm_args, fill in
+		// SureForms' deterministic source/campaign defaults. Caller-provided keys
+		// (including the placement passed via utm_medium) always win.
+		if ( ! empty( $utm_args ) ) {
+			$utm_args = array_merge(
+				[
+					'utm_source'   => 'sureforms_plugin',
+					'utm_campaign' => 'core_plugin',
+				],
+				$utm_args
+			);
+		}
+		// SRFM-2709: deterministic UTM attribution — end.
+
 		if ( class_exists( 'BSF_UTM_Analytics' ) ) {
 			$url = \BSF_UTM_Analytics::get_utm_ready_link( $url, 'sureforms', $utm_args );
 		}
+
+		// SRFM-2709: post-BSF_UTM_Analytics fallback — start.
+		// BSF_UTM_Analytics returns the URL unchanged when no install referer is
+		// recorded. Merge any caller UTM keys still missing from the final URL.
+		if ( ! empty( $utm_args ) ) {
+			$existing = [];
+			$query    = wp_parse_url( $url, PHP_URL_QUERY );
+			if ( is_string( $query ) && '' !== $query ) {
+				parse_str( $query, $existing );
+			}
+			$missing = array_diff_key( $utm_args, $existing );
+			if ( ! empty( $missing ) ) {
+				$url = add_query_arg( $missing, $url );
+			}
+		}
+		// SRFM-2709: post-BSF_UTM_Analytics fallback — end.
 
 		return esc_url( $url );
 	}
@@ -1469,11 +1740,13 @@ class Helper {
 	/**
 	 * Strips JavaScript attributes from HTML content.
 	 *
-	 * @param string $html The HTML content to process.
+	 * @param string $html               The HTML content to process.
+	 * @param bool   $remove_link_target Optional. When true, removes target and strips noopener/noreferrer from rel on links. Default false.
 	 * @since 1.7.1
+	 * @since 2.5.2 Added $remove_link_target parameter.
 	 * @return string The cleaned HTML content without JavaScript attributes.
 	 */
-	public static function strip_js_attributes( $html ) {
+	public static function strip_js_attributes( $html, $remove_link_target = false ) {
 		$dom = new \DOMDocument();
 
 		// Suppress warnings due to malformed HTML.
@@ -1507,6 +1780,27 @@ class Helper {
 					foreach ( iterator_to_array( $element->attributes ) as $attr ) {
 						if ( $attr instanceof \DOMAttr && stripos( $attr->name, 'on' ) === 0 ) {
 							$element->removeAttribute( $attr->name );
+						}
+					}
+				}
+			}
+		}
+
+		// 3. Optionally remove target and target-related rel values (noopener, noreferrer) from links.
+		if ( $remove_link_target ) {
+			$links = $xpath->query( '//a[@target]' );
+			if ( $links instanceof \DOMNodeList ) {
+				foreach ( $links as $link ) {
+					if ( $link instanceof \DOMElement ) {
+						$link->removeAttribute( 'target' );
+						$rel = $link->getAttribute( 'rel' );
+						if ( $rel ) {
+							$cleaned_rel = trim( (string) preg_replace( '/\s+/', ' ', (string) preg_replace( '/\b(noopener|noreferrer)\b/i', '', $rel ) ) );
+							if ( $cleaned_rel ) {
+								$link->setAttribute( 'rel', $cleaned_rel );
+							} else {
+								$link->removeAttribute( 'rel' );
+							}
 						}
 					}
 				}
@@ -1556,21 +1850,43 @@ class Helper {
 	}
 
 	/**
-	 * Check if the starter template premium plugin is installed and return its file path.
+	 * Return the first installed plugin from a list, or a default if none exist.
 	 *
-	 * @since 1.7.3
+	 * @since 2.0.0
 	 *
-	 * @return string The plugin file path if premium is installed, otherwise the default starter sites plugin file path.
+	 * @param array<string> $plugins_to_check Plugin file paths to check, in priority order.
+	 * @param string        $default          Optional fallback plugin file path. Default empty string.
+	 *
+	 * @return string First installed plugin file path, or the default.
 	 */
-	public static function check_starter_template_plugin() {
+	public static function get_plugin_if_installed( $plugins_to_check, $default = '' ) {
 		if ( ! function_exists( 'get_plugins' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
+
 		$plugins = get_plugins();
 
-		$premium = 'astra-pro-sites/astra-pro-sites.php';
+		foreach ( self::get_array_value( $plugins_to_check ) as $plugin_file ) {
+			if ( isset( $plugins[ $plugin_file ] ) ) {
+				return $plugin_file;
+			}
+		}
 
-		return isset( $plugins[ $premium ] ) ? $premium : 'astra-sites/astra-sites.php';
+		return $default;
+	}
+
+	/**
+	 * Check which Starter Templates plugin is installed and return its main plugin file path.
+	 *
+	 * @since 1.7.3
+	 *
+	 * @return string The main plugin file path of the installed Starter Templates plugin.
+	 */
+	public static function check_starter_template_plugin() {
+		return self::get_plugin_if_installed(
+			[ 'astra-pro-sites/astra-pro-sites.php' ],
+			'astra-sites/astra-sites.php'
+		);
 	}
 
 	/**
@@ -1582,53 +1898,179 @@ class Helper {
 	 * @return array<mixed>
 	 */
 	public static function sureforms_get_integration() {
-		$suretrigger_connected  = apply_filters( 'suretriggers_is_user_connected', '' );
+		$suretrigger_connected  = apply_filters( 'suretriggers_is_user_connected', '' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- SureTriggers' own filter; the name must match SureTriggers exactly to integrate.
 		$logo_sure_triggers     = file_get_contents( plugin_dir_path( SRFM_FILE ) . 'images/suretriggers.svg' );
 		$logo_full              = file_get_contents( plugin_dir_path( SRFM_FILE ) . 'images/suretriggers_full.svg' );
 		$logo_sure_mails        = file_get_contents( plugin_dir_path( SRFM_FILE ) . 'images/suremails.svg' );
 		$logo_uae               = file_get_contents( plugin_dir_path( SRFM_FILE ) . 'images/uae.svg' );
 		$logo_starter_templates = file_get_contents( plugin_dir_path( SRFM_FILE ) . 'images/starterTemplates.svg' );
-		return apply_filters(
-			'srfm_integrated_plugins',
-			[
-				'sure_mails'        => [
-					'title'    => __( 'SureMail', 'sureforms' ),
-					'subtitle' => __( 'Free and easy SMTP mails plugin.', 'sureforms' ),
-					'status'   => self::get_plugin_status( 'suremails/suremails.php' ),
-					'slug'     => 'suremails',
-					'path'     => 'suremails/suremails.php',
-					'logo'     => self::encode_svg( is_string( $logo_sure_mails ) ? $logo_sure_mails : '' ),
-				],
-				'sure_triggers'     => [
-					'title'          => __( 'OttoKit', 'sureforms' ),
-					'subtitle'       => __( 'No-code automation tool for WordPress.', 'sureforms' ),
-					'description'    => __( 'OttoKit is a powerful automation platform that helps you connect your various plugins and apps together. It allows you to automate repetitive tasks, so you can focus on more important work.', 'sureforms' ),
-					'status'         => self::get_plugin_status( 'suretriggers/suretriggers.php' ),
-					'slug'           => 'suretriggers',
-					'path'           => 'suretriggers/suretriggers.php',
-					'logo'           => self::encode_svg( is_string( $logo_sure_triggers ) ? $logo_sure_triggers : '' ),
-					'logo_full'      => self::encode_svg( is_string( $logo_full ) ? $logo_full : '' ),
-					'connected'      => $suretrigger_connected,
-					'connection_url' => admin_url( 'admin.php?page=suretriggers' ),
-				],
-				'uae'               => [
-					'title'    => __( 'Ultimate Addons for Elementor', 'sureforms' ),
-					'subtitle' => __( 'Build modern websites with elementor addons.', 'sureforms' ),
-					'status'   => self::get_plugin_status( 'header-footer-elementor/header-footer-elementor.php' ),
-					'slug'     => 'header-footer-elementor',
-					'path'     => 'header-footer-elementor/header-footer-elementor.php',
-					'logo'     => self::encode_svg( is_string( $logo_uae ) ? $logo_uae : '' ),
-				],
-				'starter_templates' => [
-					'title'    => __( 'Starter Templates', 'sureforms' ),
-					'subtitle' => __( 'Build your dream website in minutes with AI.', 'sureforms' ),
-					'status'   => self::get_plugin_status( self::check_starter_template_plugin() ),
-					'slug'     => 'astra-sites',
-					'path'     => self::check_starter_template_plugin(),
-					'logo'     => self::encode_svg( is_string( $logo_starter_templates ) ? $logo_starter_templates : '' ),
-				],
-			]
-		);
+		$logo_sure_rank         = file_get_contents( plugin_dir_path( SRFM_FILE ) . 'images/surerank.svg' );
+		$logo_sure_contact      = file_get_contents( plugin_dir_path( SRFM_FILE ) . 'images/surecontact.svg' );
+		$logo_sure_donation     = file_get_contents( plugin_dir_path( SRFM_FILE ) . 'images/suredonation.svg' );
+
+		$integrations = [
+			'sure_donation'     => [
+				'title'                 => __( 'SureDonation', 'sureforms' ),
+				'singleLineDescription' => __( 'Start Collecting Donations Today', 'sureforms' ),
+				'subtitle'              => __( 'Want to accept donations too? SureDonation makes it easy to collect contributions right on your WordPress site.', 'sureforms' ),
+				'status'                => self::get_plugin_status( 'suredonation/suredonation.php' ),
+				'slug'                  => 'suredonation',
+				'path'                  => 'suredonation/suredonation.php',
+				'logo'                  => self::encode_svg( is_string( $logo_sure_donation ) ? $logo_sure_donation : '' ),
+			],
+			'sure_contact'      => [
+				'title'                 => __( 'SureContact', 'sureforms' ),
+				'singleLineDescription' => __( 'Turn Emails Into Revenue with a CRM Built for Your Website!', 'sureforms' ),
+				'subtitle'              => __( 'Send newsletters, run campaigns, set up automations, manage contacts, and see exactly how much revenue your emails generate, all in one place.', 'sureforms' ),
+				'status'                => self::get_plugin_status( 'surecontact/surecontact.php' ),
+				'slug'                  => 'surecontact',
+				'path'                  => 'surecontact/surecontact.php',
+				'logo'                  => self::encode_svg( is_string( $logo_sure_contact ) ? $logo_sure_contact : '' ),
+			],
+			'sure_mails'        => [
+				'title'                 => __( 'SureMail', 'sureforms' ),
+				'singleLineDescription' => __( 'Boost Your Email Deliverability Instantly!', 'sureforms' ),
+				'subtitle'              => __( 'Access a powerful, easy-to-use email delivery service that ensures your emails land in inboxes, not spam folders. Automate your WordPress email workflows confidently with SureMail.', 'sureforms' ),
+				'status'                => self::get_plugin_status( 'suremails/suremails.php' ),
+				'slug'                  => 'suremails',
+				'path'                  => 'suremails/suremails.php',
+				'logo'                  => self::encode_svg( is_string( $logo_sure_mails ) ? $logo_sure_mails : '' ),
+			],
+			'sure_triggers'     => [
+				'title'                 => __( 'OttoKit', 'sureforms' ),
+				'singleLineDescription' => __( 'Automate your WordPress workflows effortlessly.', 'sureforms' ),
+				'subtitle'              => __( 'Connect your WordPress plugins and favourite apps, automate tasks, and sync data effortlessly using OttoKit’s clean, visual workflow builder — no coding or complex setup required.', 'sureforms' ),
+				'status'                => self::get_plugin_status( 'suretriggers/suretriggers.php' ),
+				'slug'                  => 'suretriggers',
+				'path'                  => 'suretriggers/suretriggers.php',
+				'logo'                  => self::encode_svg( is_string( $logo_sure_triggers ) ? $logo_sure_triggers : '' ),
+				'logo_full'             => self::encode_svg( is_string( $logo_full ) ? $logo_full : '' ),
+				'connected'             => $suretrigger_connected,
+				'connection_url'        => admin_url( 'admin.php?page=suretriggers' ),
+			],
+			'starter_templates' => [
+				'title'                 => __( 'Starter Templates', 'sureforms' ),
+				'singleLineDescription' => __( 'Launch Beautiful Websites in Minutes!', 'sureforms' ),
+				'subtitle'              => __( 'Choose from professionally designed templates, import with one click, and customize effortlessly to match your brand.', 'sureforms' ),
+				'status'                => self::get_plugin_status( self::check_starter_template_plugin() ),
+				'slug'                  => 'astra-sites',
+				'path'                  => self::check_starter_template_plugin(),
+				'logo'                  => self::encode_svg( is_string( $logo_starter_templates ) ? $logo_starter_templates : '' ),
+			],
+		];
+
+		$elementor_installed = self::get_plugin_if_installed( [ 'elementor/elementor.php' ] );
+
+		if ( $elementor_installed ) {
+			$integrations['uae'] = [
+				'title'                 => __( 'Ultimate Addons for Elementor', 'sureforms' ),
+				'singleLineDescription' => __( 'Power Up Elementor to Build Stunning Websites Faster!', 'sureforms' ),
+				'subtitle'              => __( 'Enhance Elementor with powerful widgets and templates. Build stunning, high-performing websites faster with creative design elements and seamless customization.', 'sureforms' ),
+				'status'                => self::get_plugin_status( 'header-footer-elementor/header-footer-elementor.php' ),
+				'slug'                  => 'header-footer-elementor',
+				'path'                  => 'header-footer-elementor/header-footer-elementor.php',
+				'logo'                  => self::encode_svg( is_string( $logo_uae ) ? $logo_uae : '' ),
+			];
+		} else {
+			$integrations['sure_rank'] = [
+				'title'                 => __( 'SureRank', 'sureforms' ),
+				'singleLineDescription' => __( 'Elevate Your SEO and Climb Search Rankings Effortlessly!', 'sureforms' ),
+				'subtitle'              => __( 'Boost your website\'s visibility with smart SEO automation. Optimize content, track keyword performance, and get actionable insights, all inside WordPress.', 'sureforms' ),
+				'status'                => self::get_plugin_status( 'surerank/surerank.php' ),
+				'slug'                  => 'surerank',
+				'path'                  => 'surerank/surerank.php',
+				'logo'                  => self::encode_svg( is_string( $logo_sure_rank ) ? $logo_sure_rank : '' ),
+			];
+		}
+
+		return apply_filters( 'srfm_integrated_plugins', $integrations );
+	}
+
+	/**
+	 * Get the current rotating plugin for the banner.
+	 *
+	 * Plugins rotate every 2 days. Only non-activated plugins are shown.
+	 * Returns false if all plugins are activated.
+	 *
+	 * @since 2.0.0
+	 * @return array<string, mixed>|false The current plugin data or false if all plugins are activated.
+	 */
+	public static function get_rotating_plugin_banner() {
+		$all_plugins = self::sureforms_get_integration();
+
+		if ( ! is_array( $all_plugins ) ) {
+			return false;
+		}
+
+		$available_plugins = [];
+
+		// Only include non-activated plugins.
+		foreach ( $all_plugins as $plugin ) {
+			if ( ! is_array( $plugin ) ) {
+				continue;
+			}
+			if ( isset( $plugin['status'] ) && is_string( $plugin['status'] ) && 'Activated' !== $plugin['status'] ) {
+				$available_plugins[] = $plugin;
+			}
+		}
+
+		// Re-index the array to have sequential numeric keys.
+		$available_plugins = array_values( $available_plugins );
+		$total_plugins     = count( $available_plugins );
+
+		// Hide section if all plugins are active.
+		if ( 0 === $total_plugins ) {
+			return false;
+		}
+
+		// Get stored rotation data.
+		$rotation_data = self::get_srfm_option( 'plugin_banner_rotation', [] );
+
+		if ( ! is_array( $rotation_data ) ) {
+			$rotation_data = [];
+		}
+
+		// Initialize rotation data if empty.
+		if ( empty( $rotation_data ) ) {
+			$current_time = time();
+			self::update_srfm_option(
+				'plugin_banner_rotation',
+				[
+					'last_rotation_date' => $current_time,
+					'plugin_index'       => 0,
+				]
+			);
+			return isset( $available_plugins[0] ) && is_array( $available_plugins[0] ) ? $available_plugins[0] : false;
+		}
+
+		$last_rotation_date = isset( $rotation_data['last_rotation_date'] ) && is_int( $rotation_data['last_rotation_date'] ) ? $rotation_data['last_rotation_date'] : 0;
+		$plugin_index       = isset( $rotation_data['plugin_index'] ) && is_numeric( $rotation_data['plugin_index'] ) ? intval( $rotation_data['plugin_index'] ) : 0;
+
+		$current_time        = time();
+		$days_since_rotation = ( $current_time - $last_rotation_date ) / DAY_IN_SECONDS;
+
+		// Rotate every 2 days.
+		if ( $days_since_rotation >= 2 ) {
+			// Rotate to next plugin.
+			++$plugin_index;
+			$plugin_index %= $total_plugins;
+
+			// Update the rotation data.
+			self::update_srfm_option(
+				'plugin_banner_rotation',
+				[
+					'last_rotation_date' => $current_time,
+					'plugin_index'       => $plugin_index,
+				]
+			);
+		}
+
+		// Ensure the index is within bounds.
+		if ( $plugin_index >= $total_plugins ) {
+			$plugin_index = 0;
+		}
+
+		return isset( $available_plugins[ $plugin_index ] ) && is_array( $available_plugins[ $plugin_index ] ) ? $available_plugins[ $plugin_index ] : false;
 	}
 
 	/**
@@ -1703,6 +2145,27 @@ class Helper {
 	}
 
 	/**
+	 * Whether SureForms promotional content should be hidden.
+	 *
+	 * Covers review requests, cross-sell banners and announcements. The free
+	 * plugin never hides them on its own; SureForms Pro's Distraction Free mode
+	 * turns this on through the filter.
+	 *
+	 * @since 2.12.8
+	 * @return bool
+	 */
+	public static function hide_promotions() {
+		/**
+		 * Filter whether SureForms hides its promotional content in wp-admin.
+		 *
+		 * @since 2.12.8
+		 *
+		 * @param bool $hide Default false.
+		 */
+		return (bool) apply_filters( 'srfm_hide_promotions', false );
+	}
+
+	/**
 	 * Verifies the request by checking the nonce and user capabilities.
 	 *
 	 * @param string $request_type The type of request, either 'rest' or 'ajax'.
@@ -1769,34 +2232,69 @@ class Helper {
 	}
 
 	/**
-	 * Check if any of the top 10 popular WordPress SMTP plugins is active using array_intersect.
+	 * The active caching plugin, if there is one.
+	 *
+	 * Caching matters to SureForms because a cached page serves the same HTML to
+	 * everyone: the submission token is embedded at render time, and an
+	 * aggressively cached or JS-combining setup can serve a stale token or reorder
+	 * the scripts a form depends on. This is what surfaces that to the site owner
+	 * before it turns into "my form stopped working".
+	 *
+	 * @since 2.12.6
+	 * @return string Human-readable plugin name, or '' when none is active.
+	 */
+	public static function get_active_caching_plugin() {
+		$entry = self::get_active_caching_plugin_entry();
+
+		return null === $entry ? '' : $entry[0];
+	}
+
+	/**
+	 * Setup guide for the active caching plugin.
+	 *
+	 * Six of the recognised plugins have a guide of their own; the rest, and any
+	 * site with none detected, get the general one. Sending someone to a page that
+	 * names the plugin they actually run is the difference between advice they can
+	 * follow and advice they have to translate.
+	 *
+	 * Falls back to the general guide rather than returning nothing, so the notice
+	 * always has somewhere to send them.
+	 *
+	 * @since 2.12.7
+	 * @param string $medium Placement the link is rendered in, used as utm_medium.
+	 *                       Two surfaces show this guide -- the dashboard notice and
+	 *                       the onboarding step -- and a shared value would make the
+	 *                       two indistinguishable in reporting, which is the whole
+	 *                       point of the attribution.
+	 * @return string Absolute documentation URL.
+	 */
+	public static function get_caching_plugin_doc_url( $medium = 'form_checks_notice' ) {
+		$entry = self::get_active_caching_plugin_entry();
+		$slug  = null === $entry || '' === $entry[1] ? 'how-to-set-up-sureforms-with-caching-plugins' : $entry[1];
+
+		// Through the central builder rather than hardcoding the domain, so the
+		// link carries the same UTM attribution as every other doc link and a
+		// domain change is one edit. utm_content is the slug, so the caller can be
+		// told which guide people actually open.
+		return self::get_sureforms_website_url(
+			'docs/' . $slug . '/',
+			[
+				'utm_medium'  => self::get_string_value( $medium ),
+				'utm_content' => $slug,
+			]
+		);
+	}
+
+	/**
+	 * Check whether anything beyond PHP's own mail() carries wp_mail().
 	 *
 	 * @since 1.9.1
-	 * @return bool True if any SMTP plugin is active, false otherwise.
+	 * @since 2.12.9 Delegates to Email_Delivery\Mailer, which also recognises a
+	 *              redefined wp_mail() and no longer counts the Newsletter plugin.
+	 * @return bool True if a mail plugin or wp_mail() override is active.
 	 */
 	public static function is_any_smtp_plugin_active() {
-		$smtp_plugins = [
-			'wp-mail-smtp/wp_mail_smtp.php',
-			'post-smtp/postman-smtp.php',
-			'easy-wp-smtp/easy-wp-smtp.php',
-			'wp-smtp/wp-smtp.php',
-			'newsletter/plugin.php',
-			'fluent-smtp/fluent-smtp.php',
-			'pepipost-smtp/pepipost-smtp.php',
-			'mail-bank/wp-mail-bank.php',
-			'smtp-mailer/smtp-mailer.php',
-			'suremails/suremails.php',
-			'site-mailer/site-mailer.php',
-		];
-
-		$active_plugins = (array) get_option( 'active_plugins', [] );
-		// For multisite, merge sitewide active plugins.
-		if ( is_multisite() ) {
-			$network_plugins = (array) get_site_option( 'active_sitewide_plugins', [] );
-			$active_plugins  = array_merge( $active_plugins, array_keys( $network_plugins ) );
-		}
-
-		return (bool) array_intersect( $smtp_plugins, $active_plugins );
+		return Mailer::has_mailer();
 	}
 
 	/**
@@ -1821,7 +2319,7 @@ class Helper {
 		}
 
 		// Apply the filter with additional arguments.
-		$filtered = apply_filters( $filter_name, $default, ...$args );
+		$filtered = apply_filters( $filter_name, $default, ...$args ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound -- Generic dynamic-filter dispatcher; the caller supplies the (already prefixed) hook name.
 
 		// Return filtered result if it's a non-empty array.
 		return is_array( $filtered ) && ! empty( $filtered ) ? $filtered : $default;
@@ -1936,10 +2434,13 @@ class Helper {
 	/**
 	 * Get the timestamp from a string.
 	 *
-	 * @param string $date The date in a specific format (e.g., '2025.10.01').
-	 * @param string $hours The hours in a specific format (e.g., '12').
-	 * @param string $minutes The minutes in a specific format (e.g., '00').
-	 * @param string $meridiem The meridiem in a specific format (e.g., 'AM' or 'PM').
+	 * This function uses WordPress's configured timezone (from Settings → General → Timezone)
+	 * to ensure consistent behavior regardless of the server's timezone settings.
+	 *
+	 * @param string $date The date in YYYY-MM-DD format (e.g., '2026-01-10').
+	 * @param string $hours The hours in 12-hour format (e.g., '12', '01'-'12').
+	 * @param string $minutes The minutes (e.g., '00', '00'-'59').
+	 * @param string $meridiem The meridiem (e.g., 'AM' or 'PM').
 	 *
 	 * @since 1.10.1
 	 * @return int|false The timestamp if successful, false otherwise.
@@ -1957,14 +2458,416 @@ class Helper {
 
 		$time_string = $date . ' ' . $hours . ':' . $minutes . ' ' . $meridiem;
 
-		// Convert to timestamp.
-		$timestamp = strtotime( $time_string );
+		// Convert to timestamp using WordPress timezone.
+		// This ensures the date/time is interpreted in the site's configured timezone,
+		// not the server's timezone or PHP's default timezone.
+		try {
+			$datetime = date_create( $time_string, wp_timezone() );
 
-		if ( false !== $timestamp && is_int( $timestamp ) && $timestamp > 0 ) {
-			return $timestamp;
+			if ( false === $datetime ) {
+				return false;
+			}
+
+			$timestamp = $datetime->getTimestamp();
+
+			if ( is_int( $timestamp ) && $timestamp > 0 ) {
+				return $timestamp;
+			}
+		} catch ( \Exception $e ) {
+			// If timezone conversion fails, return false.
+			return false;
 		}
 
 		// If conversion fails, return false.
 		return false;
 	}
+
+	/**
+	 * Generate a unique ID for the saved form.
+	 * Also ensures that the generated ID does not already exist in the database table.
+	 *
+	 * @param class-string $class  The class name where the get method is defined to check for existing IDs.
+	 * @param int<1, max>  $length The length of the random bytes to generate. Default is 8.
+	 * @return string
+	 * @since 2.2.0
+	 */
+	public static function generate_unique_id( $class, $length = 8 ) {
+		// Ensure length is at least 1.
+		$length = max( 1, $length );
+
+		do {
+			$id = bin2hex( random_bytes( $length ) );
+		} while ( is_callable( [ $class, 'get' ] ) && call_user_func( [ $class, 'get' ], $id ) );
+		return $id;
+	}
+
+	/**
+	 * Log error messages to the error log.
+	 *
+	 * This function checks if error_log function exists, validates the message,
+	 * and logs it with the print_r second argument set to true.
+	 *
+	 * Logging is disabled by default. To enable logging, add this to wp-config.php:
+	 * define( 'SRFM_LOG', true );
+	 *
+	 * @param mixed  $message The error message to log. Can be string or any type.
+	 * @param string $prefix Optional prefix to add before the message. Default: 'Log :'.
+	 *
+	 * @since 2.0.0
+	 * @return void
+	 */
+	public static function srfm_log( $message, $prefix = 'Log :' ) {
+		// Check if logging is enabled via SRFM_LOG constant.
+		if ( ! defined( 'SRFM_LOG' ) ) {
+			return;
+		}
+		unset( $message, $prefix );
+	}
+
+	/**
+	 * Encodes data to base64 after JSON encoding with validation.
+	 *
+	 * This function checks if the data is non-empty and valid for JSON encoding.
+	 * If data is not valid, returns an empty string.
+	 * Otherwise, it attempts to JSON encode and then base64 encode the result.
+	 *
+	 * @param mixed $data The data to JSON encode and then base64 encode.
+	 * @return string The base64-encoded JSON string, or empty string on failure.
+	 */
+	public static function srfm_base64_json_encode( $data ) {
+		if ( empty( $data ) || ! is_array( $data ) ) {
+			return '';
+		}
+
+		$json = wp_json_encode( $data );
+		if ( false === $json || '' === $json ) {
+			return '';
+		}
+
+		// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+		return base64_encode( $json );
+	}
+
+	/**
+	 * Get the visitor's IP address.
+	 *
+	 * Centralised IP detection that checks common proxy headers before
+	 * falling back to REMOTE_ADDR. Handles comma-separated IPs that
+	 * load-balancers / CDNs may append (takes the first, i.e. client IP).
+	 *
+	 * NOTE: Existing callers (Smart_Tags::get_the_user_ip, Front_End::get_user_ip,
+	 * inline reads in Form_Submit) can be migrated to this method in the future
+	 * to avoid duplicating the same header-chain logic.
+	 *
+	 * @since 2.8.0
+	 * @return string Validated IP address, or empty string if unavailable.
+	 */
+	public static function get_visitor_ip() {
+		$headers = [
+			'HTTP_CLIENT_IP',
+			'HTTP_X_FORWARDED_FOR',
+			'HTTP_X_REAL_IP',
+			'HTTP_X_FORWARDED',
+			'HTTP_FORWARDED_FOR',
+			'HTTP_FORWARDED',
+			'REMOTE_ADDR',
+		];
+
+		foreach ( $headers as $header ) {
+			if ( empty( $_SERVER[ $header ] ) ) {
+				continue;
+			}
+
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validated by FILTER_VALIDATE_IP below.
+			$raw = wp_unslash( $_SERVER[ $header ] );
+
+			// Proxies may send comma-separated IPs; the first is the original client.
+			if ( false !== strpos( $raw, ',' ) ) {
+				$raw = trim( explode( ',', $raw )[0] );
+			}
+
+			$ip = filter_var( $raw, FILTER_VALIDATE_IP );
+			if ( false !== $ip ) {
+				/**
+				 * Filters the detected visitor IP address.
+				 *
+				 * @since 2.8.0
+				 *
+				 * @param string $ip Validated IP address.
+				 */
+				return apply_filters( 'srfm_visitor_ip', $ip );
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Detect the visitor's 2-letter country code via server-side IP geolocation.
+	 *
+	 * Prefers a CDN/server-provided country header (Cloudflare, CloudFront, mod_geoip)
+	 * when present — free, instant and cache-safe. Otherwise calls ipapi.co once per
+	 * visitor IP and caches the result in a transient for 24 hours so subsequent
+	 * lookups for the same IP resolve instantly. Failures are cached for a short TTL
+	 * (see get_geo_failure_ttl()) to avoid retry storms while still self-healing, and
+	 * a site-wide hourly cap (filterable via `srfm_geo_api_hourly_cap`, default 40)
+	 * bounds outbound calls. Private/reserved IPs are rejected up front.
+	 *
+	 * Intended to be called per-visitor (e.g. via the geo-country REST route) so
+	 * the result is correct on full-page-cached sites instead of being baked into
+	 * the cached HTML.
+	 *
+	 * Local testing: private/loopback IPs (e.g. 127.0.0.1) cannot be geolocated, so
+	 * inject a public IP via the `srfm_visitor_ip` filter to exercise detection:
+	 *
+	 *     add_filter( 'srfm_visitor_ip', static fn() => '8.8.8.8' ); // US; try 1.1.1.1 etc.
+	 *
+	 * @param string $fallback Country code returned when detection is unavailable.
+	 * @since 2.11.1
+	 * @return string Lowercase 2-letter country code.
+	 */
+	public static function get_geo_country( $fallback = 'us' ) {
+		// Prefer a CDN/server-provided country header — free, instant, per-visitor
+		// and cache-safe. It is independent of the connecting IP (it still resolves
+		// when the visitor IP is private/loopback, e.g. local dev or behind a
+		// proxy), so it must be checked before the IP-based path below.
+		$cdn_country = self::get_cdn_country();
+		if ( '' !== $cdn_country ) {
+			return $cdn_country;
+		}
+
+		$ip = self::get_visitor_ip();
+		if ( empty( $ip ) ) {
+			return $fallback;
+		}
+
+		// Reject private/reserved IPs: ipapi.co cannot geolocate them, and accepting
+		// them would let spoofed X-Forwarded-For headers flood the transient cache.
+		if ( ! filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
+			return $fallback;
+		}
+
+		// Versioned key (v2) so stale failure transients written by older code
+		// (which used the byte-identical 'srfm_geo_' key and a 1h TTL) don't shadow
+		// the current CDN/fallback logic for the failure-TTL window after an upgrade.
+		$cache_key = 'srfm_geo_v2_' . md5( $ip );
+		$cached    = get_transient( $cache_key );
+		if ( is_string( $cached ) && '' !== $cached ) {
+			return $cached;
+		}
+
+		// Site-wide hourly cap on outbound ipapi calls; the counter rolls over
+		// every hour (key includes YmdH) so it never needs an explicit reset.
+		$quota_key = 'srfm_geo_quota_' . gmdate( 'YmdH' );
+		$quota_cap = self::get_integer_value( apply_filters( 'srfm_geo_api_hourly_cap', 40 ) );
+		$count     = self::get_integer_value( get_transient( $quota_key ) );
+		if ( $count >= $quota_cap ) {
+			self::srfm_log( $quota_cap, 'SRFM geo lookup skipped (hourly cap reached):' );
+			// Do NOT cache a per-IP transient here: the hourly counter already
+			// blocks outbound calls, and writing per IP is the one path not bounded
+			// by the cap — it would let spoofed X-Forwarded-For headers churn
+			// wp_options / the object cache under sustained traffic.
+			return $fallback;
+		}
+		set_transient( $quota_key, $count + 1, HOUR_IN_SECONDS );
+
+		// Pass the visitor's IP explicitly via /{ip}/json/ — the request originates
+		// from the server, so the bare /json/ endpoint would return the host's country.
+		$url = 'https://ipapi.co/' . rawurlencode( $ip ) . '/json/';
+
+		// ipapi.co's free (keyless) tier is heavily rate-limited, so unauthenticated
+		// lookups are best-effort and often fail to the configured fallback. Sites
+		// that need reliable IP-based detection can supply a paid ipapi.co key via
+		// this filter; CDN-fronted sites resolve earlier via get_cdn_country() and
+		// never reach this call.
+		$api_key = self::get_string_value( apply_filters( 'srfm_ipapi_api_key', '' ) );
+		if ( '' !== $api_key ) {
+			$url = add_query_arg( 'key', rawurlencode( $api_key ), $url );
+		}
+
+		$response = wp_remote_get(
+			$url,
+			[
+				'timeout'    => 3,
+				'user-agent' => 'SureForms/' . SRFM_VER . ' (+https://sureforms.com)',
+			]
+		);
+
+		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+			$detail = is_wp_error( $response ) ? $response->get_error_message() : wp_remote_retrieve_response_code( $response );
+			self::srfm_log( $detail, 'SRFM geo lookup failed (transport):' );
+			set_transient( $cache_key, $fallback, self::get_geo_failure_ttl() );
+			return $fallback;
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		// ipapi.co's free tier returns HTTP 200 with a JSON error body
+		// (e.g. {"error":true,"reason":"RateLimited"}) when throttled — treat as a failure.
+		if ( is_array( $body ) && ! empty( $body['error'] ) ) {
+			$reason = ! empty( $body['reason'] ) && is_string( $body['reason'] ) ? $body['reason'] : 'unknown';
+			self::srfm_log( $reason, 'SRFM geo lookup failed (ipapi error):' );
+			set_transient( $cache_key, $fallback, self::get_geo_failure_ttl() );
+			return $fallback;
+		}
+
+		if ( ! is_array( $body ) || empty( $body['country_code'] ) || ! is_string( $body['country_code'] ) ) {
+			self::srfm_log( wp_remote_retrieve_response_code( $response ), 'SRFM geo lookup failed (no country_code):' );
+			set_transient( $cache_key, $fallback, self::get_geo_failure_ttl() );
+			return $fallback;
+		}
+
+		$country = strtolower( $body['country_code'] );
+
+		// Validate the external API response is a valid 2-letter country code.
+		if ( ! preg_match( '/^[a-z]{2}$/', $country ) ) {
+			self::srfm_log( $country, 'SRFM geo lookup failed (invalid country code):' );
+			set_transient( $cache_key, $fallback, self::get_geo_failure_ttl() );
+			return $fallback;
+		}
+
+		set_transient( $cache_key, $country, DAY_IN_SECONDS );
+
+		return $country;
+	}
+
+	/**
+	 * Read a visitor country code from a CDN / server geo header, if present.
+	 *
+	 * Many hosts sit behind Cloudflare, CloudFront or a geo-aware web server that
+	 * injects the visitor's country as a request header. This is free, instant,
+	 * per-visitor and works on full-page-cached sites, so we prefer it over an
+	 * outbound API call. Returns '' when no usable header is present.
+	 *
+	 * NOTE: these headers are client-spoofable when the site is NOT actually behind
+	 * the named CDN/proxy. The value is used only as a phone-field UI default (the
+	 * pre-selected flag), never for access control, so spoofing has no security
+	 * impact here — at worst a visitor sees a different default country.
+	 *
+	 * @since 2.11.1
+	 * @return string Lowercase 2-letter country code, or '' when unavailable.
+	 */
+	private static function get_cdn_country() {
+		$headers = [
+			'HTTP_CF_IPCOUNTRY',              // Cloudflare.
+			'HTTP_CLOUDFRONT_VIEWER_COUNTRY', // AWS CloudFront.
+			'GEOIP_COUNTRY_CODE',             // Apache/Nginx mod_geoip / MaxMind.
+			'HTTP_X_GEO_COUNTRY',             // Some CDNs / reverse proxies.
+			'HTTP_X_COUNTRY_CODE',            // Some CDNs.
+		];
+
+		foreach ( $headers as $header ) {
+			if ( empty( $_SERVER[ $header ] ) ) {
+				continue;
+			}
+
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Validated by the regex below.
+			$code = strtolower( trim( sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) ) ) );
+
+			// Cloudflare sends 'xx' for unknown and 't1' for Tor; reject non-ISO values.
+			if ( preg_match( '/^[a-z]{2}$/', $code ) && 'xx' !== $code && 't1' !== $code ) {
+				return $code;
+			}
+		}
+
+		/**
+		 * Filters the CDN-derived visitor country code, before the ipapi.co fallback.
+		 *
+		 * Lets sites short-circuit detection with a server-side country code (e.g.
+		 * from a custom header) without any outbound API call.
+		 *
+		 * @since 2.11.1
+		 *
+		 * @param string $code Lowercase 2-letter country code, or '' if none found.
+		 */
+		return apply_filters( 'srfm_cdn_country', '' );
+	}
+
+	/**
+	 * TTL (in seconds) for caching a failed geo lookup.
+	 *
+	 * Short by default so a transient blip (rate-limit, timeout) self-heals on the
+	 * next visit instead of pinning the fallback country for a full hour, while
+	 * still preventing per-request retry storms. Filterable via `srfm_geo_failure_ttl`.
+	 *
+	 * @since 2.11.1
+	 * @return int
+	 */
+	private static function get_geo_failure_ttl() {
+		return self::get_integer_value( apply_filters( 'srfm_geo_failure_ttl', 5 * MINUTE_IN_SECONDS ) );
+	}
+
+	/**
+	 * Caching plugins SureForms recognises, and the guide for each.
+	 *
+	 * `path => [ display name, doc slug ]`. An empty slug means there is no
+	 * plugin-specific guide and the general one applies. Name and slug live in one
+	 * array on purpose: keyed separately they drift, and a doc link that silently
+	 * degrades to the generic page is the kind of regression nobody reports.
+	 *
+	 * Order is precedence: the first active plugin in this list wins. The six with
+	 * their own guide are listed first on purpose, so a site running two caching
+	 * plugins is pointed at the specific guide rather than whichever plugin the
+	 * old alphabetical order happened to reach first. That flips the winner on a
+	 * few pairs -- WP Fastest Cache over WP Super Cache, SiteGround Optimizer and
+	 * Autoptimize over their partners -- and in each case the new winner is the
+	 * one that has something to say. Reordering this array changes which guide a
+	 * two-plugin site sees.
+	 *
+	 * @since 2.12.7
+	 * @return array<string,array{0:string,1:string}>
+	 */
+	private static function get_known_caching_plugins() {
+		return [
+			'litespeed-cache/litespeed-cache.php'        => [ 'LiteSpeed Cache', 'how-to-set-up-sureforms-with-litespeed-cache' ],
+			'wp-rocket/wp-rocket.php'                    => [ 'WP Rocket', 'how-to-set-up-sureforms-with-wp-rocket' ],
+			'w3-total-cache/w3-total-cache.php'          => [ 'W3 Total Cache', 'how-to-set-up-sureforms-with-w3-total-cache' ],
+			'wp-fastest-cache/wpFastestCache.php'        => [ 'WP Fastest Cache', 'how-to-set-up-sureforms-with-wp-fastest-cache' ],
+			'sg-cachepress/sg-cachepress.php'            => [ 'SiteGround Optimizer', 'how-to-set-up-sureforms-with-siteground-optimizer' ],
+			'autoptimize/autoptimize.php'                => [ 'Autoptimize', 'how-to-set-up-sureforms-with-autoptimize' ],
+			'wp-super-cache/wp-cache.php'                => [ 'WP Super Cache', '' ],
+			'wp-optimize/wp-optimize.php'                => [ 'WP-Optimize', '' ],
+			'cache-enabler/cache-enabler.php'            => [ 'Cache Enabler', '' ],
+			'comet-cache/comet-cache.php'                => [ 'Comet Cache', '' ],
+			'hummingbird-performance/wp-hummingbird.php' => [ 'Hummingbird', '' ],
+			'breeze/breeze.php'                          => [ 'Breeze', '' ],
+			'nitropack/main.php'                         => [ 'NitroPack', '' ],
+			'swift-performance-lite/performance.php'     => [ 'Swift Performance Lite', '' ],
+			'wp-cloudflare-page-cache/wp-cloudflare-page-cache.php' => [ 'Super Page Cache', '' ],
+			'flying-press/flying-press.php'              => [ 'FlyingPress', '' ],
+			'redis-cache/redis-cache.php'                => [ 'Redis Object Cache', '' ],
+			'powered-cache/powered-cache.php'            => [ 'Powered Cache', '' ],
+			'docket-cache/docket-cache.php'              => [ 'Docket Cache', '' ],
+			'seraphinite-accelerator/plugin_root.php'    => [ 'Seraphinite Accelerator', '' ],
+		];
+	}
+
+	/**
+	 * The active caching plugin's entry, if there is one.
+	 *
+	 * Detection is by plugin path, mirroring is_any_smtp_plugin_active(), including
+	 * the multisite network-active merge. First match in
+	 * get_known_caching_plugins() wins; that array's order is the precedence.
+	 *
+	 * @since 2.12.7
+	 * @return array{0:string,1:string}|null Name and doc slug, or null when none is active.
+	 */
+	private static function get_active_caching_plugin_entry() {
+		$active_plugins = (array) get_option( 'active_plugins', [] );
+
+		// For multisite, merge sitewide active plugins.
+		if ( is_multisite() ) {
+			$network_plugins = (array) get_site_option( 'active_sitewide_plugins', [] );
+			$active_plugins  = array_merge( $active_plugins, array_keys( $network_plugins ) );
+		}
+
+		foreach ( self::get_known_caching_plugins() as $path => $entry ) {
+			if ( in_array( $path, $active_plugins, true ) ) {
+				return $entry;
+			}
+		}
+
+		return null;
+	}
+
 }

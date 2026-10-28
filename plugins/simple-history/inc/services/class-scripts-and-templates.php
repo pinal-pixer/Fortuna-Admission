@@ -15,17 +15,38 @@ class Scripts_And_Templates extends Service {
 	public function loaded() {
 		add_action( 'admin_footer', array( $this, 'add_logger_javascript_in_admin_footer' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
+		add_filter( 'admin_body_class', array( $this, 'add_premium_status_body_class' ) );
+	}
+
+	/**
+	 * Add a body class indicating whether the premium add-on is active.
+	 *
+	 * Lets CSS reserve the right popover height during loading without
+	 * waiting for the REST response. Free installs need ~480px (tall
+	 * teaser); premium installs need ~340px (compact card).
+	 *
+	 * @param string $classes Existing space-separated body classes.
+	 * @return string Modified body classes.
+	 */
+	public function add_premium_status_body_class( $classes ) {
+		if ( Helpers::is_premium_add_on_active() ) {
+			$classes .= ' sh-has-premium';
+		}
+
+		return $classes;
 	}
 
 	/**
 	 * Output logger JavaScript into admin footer.
 	 */
 	public function add_logger_javascript_in_admin_footer() {
-		if ( Helpers::is_on_our_own_pages() ) {
-			// Call plugins so they can add their js.
-			foreach ( $this->simple_history->get_instantiated_loggers() as $one_logger ) {
-				$one_logger['instance']->admin_js();
-			}
+		if ( ! Helpers::is_on_our_own_pages() ) {
+			return;
+		}
+
+		// Call plugins so they can add their js.
+		foreach ( $this->simple_history->get_instantiated_loggers() as $one_logger ) {
+			$one_logger['instance']->admin_js();
 		}
 	}
 
@@ -68,7 +89,7 @@ class Scripts_And_Templates extends Service {
 		wp_enqueue_script(
 			'simple_history_script',
 			SIMPLE_HISTORY_DIR_URL . 'js/scripts.js',
-			array( 'jquery', 'backbone', 'wp-util' ),
+			array( 'jquery', 'backbone', 'wp-util', 'wp-api-fetch' ),
 			SIMPLE_HISTORY_VERSION,
 			true
 		);
