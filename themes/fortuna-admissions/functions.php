@@ -448,6 +448,9 @@ function fa_enqueue_recaptcha() {
 
 add_action('wp_enqueue_scripts', 'fa_enqueue_recaptcha');
 
+add_action('admin_post_nopriv_law_consultation_submit', 'law_consultation_submit');
+add_action('admin_post_law_consultation_submit', 'law_consultation_submit');
+
 function law_consultation_submit() {
 
     if ( ! isset($_POST['law_consultation_submit']) ) {
