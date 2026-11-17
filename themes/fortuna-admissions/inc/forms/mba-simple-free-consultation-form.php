@@ -267,6 +267,7 @@
             <option value="Bangladesh">Bangladesh</option>
             <option value="Belgium">Belgium</option>
             <option value="Brazil">Brazil</option>
+            <option value="Brunei">Brunei</option>
             <option value="Bulgaria">Bulgaria</option>
 
             <option value="Chile">Chile</option>
@@ -305,6 +306,7 @@
             <option value="Japan">Japan</option>
             <option value="Jordan">Jordan</option>
 
+            <option value="Kazakhstan">Kazakhstan</option>
             <option value="Kenya">Kenya</option>
             <option value="Kuwait">Kuwait</option>
 
@@ -313,6 +315,7 @@
             <option value="Lithuania">Lithuania</option>
             <option value="Luxembourg">Luxembourg</option>
 
+            <option value="Macau">Macau</option>
             <option value="Malaysia">Malaysia</option>
             <option value="Malta">Malta</option>
             <option value="Mexico">Mexico</option>
@@ -324,12 +327,15 @@
             <option value="Nigeria">Nigeria</option>
             <option value="Norway">Norway</option>
 
+            <option value="Oman">Oman</option>
+
             <option value="Pakistan">Pakistan</option>
             <option value="Panama">Panama</option>
             <option value="Peru">Peru</option>
             <option value="Philippines">Philippines</option>
             <option value="Poland">Poland</option>
             <option value="Portugal">Portugal</option>
+            <option value="Puerto Rico">Puerto Rico</option>
 
             <option value="Qatar">Qatar</option>
 
@@ -337,6 +343,7 @@
             <option value="Russia">Russia</option>
 
             <option value="Saudi Arabia">Saudi Arabia</option>
+            <option value="Serbia">Serbia</option>
             <option value="Singapore">Singapore</option>
             <option value="Slovakia">Slovakia</option>
             <option value="Slovenia">Slovenia</option>

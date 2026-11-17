@@ -448,6 +448,59 @@ function fa_enqueue_recaptcha() {
 
 add_action('wp_enqueue_scripts', 'fa_enqueue_recaptcha');
 
+/**
+ * Output the Ortto fortuna capture code in <head> on pages that render
+ * one of our consultation form shortcodes.
+ */
+function fa_ortto_capture_head() {
+
+    if ( is_admin() ) {
+        return;
+    }
+
+    $post = get_post();
+
+    if ( ! $post ) {
+        return;
+    }
+
+    $shortcodes = array(
+        'law_free_consultation_form',
+        'ug_free_consultation_form',
+        'mim_free_consultation_form',
+        'mba_simple_free_consultation_form',
+        'mba_full_free_consultation_form',
+    );
+
+    $has_form = false;
+    foreach ( $shortcodes as $tag ) {
+        if ( has_shortcode( $post->post_content, $tag ) ) {
+            $has_form = true;
+            break;
+        }
+    }
+
+    if ( ! $has_form ) {
+        return;
+    }
+    ?>
+    <!-- Ortto fortuna capture code -->
+    <script>
+    window.ap3c = window.ap3c || {};
+    var ap3c = window.ap3c;
+    ap3c.cmd = ap3c.cmd || [];
+    ap3c.cmd.push(function() {
+        ap3c.init('Y5mSy2h04G7O6FQAZm9ydHVuYQ', 'https://capture-api-us.ortto.app/');
+        ap3c.track({v: 0});
+    });
+    ap3c.activity = function(act) { ap3c.act = (ap3c.act || []); ap3c.act.push(act); };
+    var s, t; s = document.createElement('script'); s.type = 'text/javascript'; s.src = "https://cdn3l.ink/app.js";
+    t = document.getElementsByTagName('script')[0]; t.parentNode.insertBefore(s, t);
+    </script>
+    <?php
+}
+add_action('wp_head', 'fa_ortto_capture_head');
+
 add_action('admin_post_nopriv_law_consultation_submit', 'law_consultation_submit');
 add_action('admin_post_law_consultation_submit', 'law_consultation_submit');
 
