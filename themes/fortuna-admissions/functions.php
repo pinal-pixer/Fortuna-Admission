@@ -1179,6 +1179,10 @@ function mba_simple_consultation_submit() {
         ? sanitize_textarea_field( wp_unslash($_POST['additional_information']) )
         : '';
 
+    $code = isset($_POST['code'])
+        ? sanitize_text_field( wp_unslash($_POST['code']) )
+        : '';
+
     $resume_url = '';
 
     if (
@@ -1219,6 +1223,7 @@ function mba_simple_consultation_submit() {
         'additional_information' => $additional_information,
         'resume_url'             => $resume_url,
         'form_stage'             => 'partial',
+        'code'                   => $code,
     );
 
     $submission_id = fa_save_form_submission( 'mba', $data );
@@ -1434,6 +1439,10 @@ function mba_full_consultation_submit() {
         ? sanitize_text_field( wp_unslash($_POST['fortuna_service']) )
         : '';
 
+    $code = isset($_POST['code'])
+        ? sanitize_text_field( wp_unslash($_POST['code']) )
+        : '';
+
     $data = array(
         'first_name'             => $first_name,
         'last_name'              => $last_name,
@@ -1461,6 +1470,7 @@ function mba_full_consultation_submit() {
         'mba_start_date'         => $mba_start_date,
         'previously_applied_mba' => $previously_applied_mba,
         'fortuna_service'        => $fortuna_service,
+        'code'                   => $code,
     );
 
     $submission_id = fa_save_form_submission( 'mba', $data );
