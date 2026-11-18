@@ -449,38 +449,13 @@ function fa_enqueue_recaptcha() {
 add_action('wp_enqueue_scripts', 'fa_enqueue_recaptcha');
 
 /**
- * Output the Ortto fortuna capture code in <head> on pages that render
- * one of our consultation form shortcodes.
+ * Output the Ortto fortuna capture code in <head> on every front-end page.
+ * Ortto requires the snippet on all pages so anonymous visitor sessions
+ * are tracked continuously and can be stitched to form submissions.
  */
 function fa_ortto_capture_head() {
 
     if ( is_admin() ) {
-        return;
-    }
-
-    $post = get_post();
-
-    if ( ! $post ) {
-        return;
-    }
-
-    $shortcodes = array(
-        'law_free_consultation_form',
-        'ug_free_consultation_form',
-        'mim_free_consultation_form',
-        'mba_simple_free_consultation_form',
-        'mba_full_free_consultation_form',
-    );
-
-    $has_form = false;
-    foreach ( $shortcodes as $tag ) {
-        if ( has_shortcode( $post->post_content, $tag ) ) {
-            $has_form = true;
-            break;
-        }
-    }
-
-    if ( ! $has_form ) {
         return;
     }
     ?>
@@ -1439,6 +1414,10 @@ function mba_full_consultation_submit() {
         ? sanitize_text_field( wp_unslash($_POST['fortuna_service']) )
         : '';
 
+    $hear_about_us = isset($_POST['hear_about_us'])
+        ? sanitize_text_field( wp_unslash($_POST['hear_about_us']) )
+        : '';
+
     $code = isset($_POST['code'])
         ? sanitize_text_field( wp_unslash($_POST['code']) )
         : '';
@@ -1451,6 +1430,7 @@ function mba_full_consultation_submit() {
         'sms_consent'            => $sms_consent,
         'resume_url'             => $resume_url,
         'country'                => $country,
+        'hear_about_us'          => $hear_about_us,
         'referred_by_name'       => $referred_by_name,
         'current_employer'       => $current_employer,
         'job_title_function'     => $job_title_function,

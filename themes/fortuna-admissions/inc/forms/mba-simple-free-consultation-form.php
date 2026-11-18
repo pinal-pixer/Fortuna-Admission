@@ -443,7 +443,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const form = document.querySelector(".mba-simple-consultation-form");
     if (!form) return;
 
-    const sharedTextFields = ["first_name", "last_name", "email", "phone", "country"];
+    const sharedTextFields = ["first_name", "last_name", "email", "phone", "country", "hear_about_us"];
     const redirectTo = "/mba/free-consultation-step-2/";
     const ajaxUrl = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
     const tokenField = form.querySelector('input[name="g-recaptcha-response"]');

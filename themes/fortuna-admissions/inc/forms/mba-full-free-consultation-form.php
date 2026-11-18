@@ -2,12 +2,13 @@
 // Prefill shared fields from URL query params (passed by Form 1 on redirect).
 // Rendering server-side means values are in the HTML on first paint — no JS delay.
 $fa_prefill = array(
-    'first_name'  => isset($_GET['first_name'])  ? sanitize_text_field( wp_unslash($_GET['first_name']) )  : '',
-    'last_name'   => isset($_GET['last_name'])   ? sanitize_text_field( wp_unslash($_GET['last_name']) )   : '',
-    'email'       => isset($_GET['email'])       ? sanitize_email( wp_unslash($_GET['email']) )            : '',
-    'phone'       => isset($_GET['phone'])       ? sanitize_text_field( wp_unslash($_GET['phone']) )       : '',
-    'country'     => isset($_GET['country'])     ? sanitize_text_field( wp_unslash($_GET['country']) )     : '',
-    'sms_consent' => isset($_GET['sms_consent']) ? sanitize_text_field( wp_unslash($_GET['sms_consent']) ) : '',
+    'first_name'    => isset($_GET['first_name'])    ? sanitize_text_field( wp_unslash($_GET['first_name']) )    : '',
+    'last_name'     => isset($_GET['last_name'])     ? sanitize_text_field( wp_unslash($_GET['last_name']) )     : '',
+    'email'         => isset($_GET['email'])         ? sanitize_email( wp_unslash($_GET['email']) )              : '',
+    'phone'         => isset($_GET['phone'])         ? sanitize_text_field( wp_unslash($_GET['phone']) )         : '',
+    'country'       => isset($_GET['country'])       ? sanitize_text_field( wp_unslash($_GET['country']) )       : '',
+    'sms_consent'   => isset($_GET['sms_consent'])   ? sanitize_text_field( wp_unslash($_GET['sms_consent']) )   : '',
+    'hear_about_us' => isset($_GET['hear_about_us']) ? sanitize_text_field( wp_unslash($_GET['hear_about_us']) ) : '',
 );
 ?>
 <style>
@@ -197,6 +198,7 @@ $fa_prefill = array(
     <input type="hidden" name="phone"       value="<?php echo esc_attr($fa_prefill['phone']); ?>">
     <input type="hidden" name="sms_consent" value="<?php echo esc_attr($fa_prefill['sms_consent']); ?>">
     <input type="hidden" name="country"     value="<?php echo esc_attr($fa_prefill['country']); ?>">
+    <input type="hidden" name="hear_about_us" value="<?php echo esc_attr($fa_prefill['hear_about_us']); ?>">
 
     <!-- Resume: input kept in DOM (hidden) so the sessionStorage restore from Form 1 still populates it on submit -->
     <input
@@ -511,7 +513,7 @@ $fa_prefill = array(
     // Clean prefill params from URL so email/phone don't sit in the address bar or history.
     if (window.location.search && window.history && window.history.replaceState) {
         const url = new URL(window.location.href);
-        ["first_name", "last_name", "email", "phone", "country", "sms_consent"].forEach(function (k) {
+        ["first_name", "last_name", "email", "phone", "country", "sms_consent", "hear_about_us"].forEach(function (k) {
             url.searchParams.delete(k);
         });
         window.history.replaceState({}, "", url.pathname + (url.search ? url.search : "") + url.hash);
