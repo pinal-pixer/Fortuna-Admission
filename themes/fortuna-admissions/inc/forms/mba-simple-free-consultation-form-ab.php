@@ -1,0 +1,666 @@
+<?php
+// A/B STAGING COPY of mba-simple-free-consultation-form.php.
+// Identical UI to the live form, with unique action / nonce / reCAPTCHA / redirect
+// names so staging traffic is fully isolated from the live Step 1 pipeline.
+// Only the A/B test runs through this file — live visitors still hit the
+// original shortcode and handler.
+?>
+<style>
+.mba-simple-consultation-form-ab {
+    max-width: 100%;
+}
+
+.mba-simple-consultation-form-ab .form-row {
+    display: flex;
+    gap: 25px;
+    margin-bottom: 20px;
+}
+
+.mba-simple-consultation-form-ab .form-group {
+    flex: 1;
+}
+
+.mba-simple-consultation-form-ab .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 20px;
+}
+
+.mba-simple-consultation-form-ab .form-group input[type="text"],
+.mba-simple-consultation-form-ab .form-group input[type="email"],
+.mba-simple-consultation-form-ab .form-group input[type="tel"],
+.mba-simple-consultation-form-ab .form-group input[type="url"],
+.mba-simple-consultation-form-ab .form-group input[type="file"],
+.mba-simple-consultation-form-ab .form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.mba-simple-consultation-form-ab .form-group textarea {
+    resize: vertical;
+}
+
+.mba-simple-consultation-form-ab button {
+    padding: 14px 30px;
+    background: linear-gradient(
+        90deg,
+        var(--ast-global-color-0) 0%,
+        var(--ast-global-color-1) 100%
+    );
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.mba-simple-consultation-form-ab button:hover {
+    background: var(--ast-global-color-0);
+}
+
+.mba-simple-consultation-form-ab .bottom-margin {
+    margin-bottom: 20px;
+}
+
+.mba-simple-consultation-form-ab .asterisk {
+    color: #CC2A24;
+}
+
+.mba-simple-consultation-form-ab .last-name-label {
+    visibility: hidden;
+}
+
+.mba-simple-consultation-form-ab select {
+    width: 100%;
+    padding: 8px 45px 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    background: #fff
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")
+        no-repeat right 8px center;
+    background-size: 18px;
+}
+
+.mba-simple-consultation-form-ab .form-group select:focus {
+    outline: none;
+    border-color: #5b9dd9;
+}
+
+.mba-simple-consultation-form-ab .consent-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: -14px 0 20px;
+}
+
+.mba-simple-consultation-form-ab .consent-group input[type="checkbox"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.mba-simple-consultation-form-ab .consent-group label {
+    margin-bottom: 0;
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 18px;
+    color: #555;
+    cursor: pointer;
+}
+
+.mba-simple-consultation-form-ab .intro-text {
+    display: block;
+    margin: 0;
+    margin-bottom: 6px;
+    font-size: 12px;
+    line-height: 16px;
+    color: #555;
+    font-weight: 400;
+}
+
+@media (max-width: 768px) {
+    .mba-simple-consultation-form-ab .form-row {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .mba-simple-consultation-form-ab .last-name-label {
+        display: none !important;
+    }
+}
+</style>
+
+<?php fa_ab_print_variation_bootstrap(); ?>
+
+<form class="mba-simple-consultation-form-ab" action="#" method="post" enctype="multipart/form-data">
+
+    <input type="hidden" name="g-recaptcha-response" value="">
+    <input type="hidden" name="action" value="mba_simple_consultation_submit_ab">
+    <input type="hidden" name="completed_full_form" value="False">
+    <input type="hidden" name="code" value="MBAMain">
+    <input type="hidden" name="ab_variation" value="">
+    <?php wp_nonce_field('mba_simple_consultation_nonce_ab', 'mba_simple_consultation_nonce_field_ab'); ?>
+
+    <!-- Name -->
+    <div class="form-row">
+        <div class="form-group">
+            <label for="first-name-ab">
+                Name <span class="asterisk">*</span>
+            </label>
+            <input
+                type="text"
+                id="first-name-ab"
+                name="first_name"
+                placeholder="First"
+                autocomplete="given-name"
+                aria-label="First name"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="last-name-ab" class="last-name-label">Name</label>
+            <input
+                type="text"
+                id="last-name-ab"
+                name="last_name"
+                placeholder="Last"
+                autocomplete="family-name"
+                aria-label="Last name"
+            >
+        </div>
+    </div>
+
+    <!-- Email / Phone -->
+    <div class="form-row">
+        <div class="form-group">
+            <label for="email-ab">
+                Email <span class="asterisk">*</span>
+            </label>
+            <input
+                type="email"
+                id="email-ab"
+                name="email"
+                autocomplete="email"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="phone-ab">Phone</label>
+            <input
+                type="tel"
+                id="phone-ab"
+                name="phone"
+                autocomplete="tel"
+            >
+        </div>
+    </div>
+
+    <div class="consent-group" id="mba_simple_sms_consent_group_ab" style="display: none;">
+        <input
+            type="checkbox"
+            name="sms_consent"
+            id="mba_simple_sms_consent_ab"
+            value="Yes"
+        >
+        <label for="mba_simple_sms_consent_ab">
+            I agree to receive promotional messages from Fortuna Admissions at the phone number provided.
+        </label>
+    </div>
+
+    <!-- Intro text -->
+    <p class="intro-text">
+        To help make your free consultation as beneficial as possible, please provide either your Resume or LinkedIn profile.
+    </p>
+
+    <!-- Resume / LinkedIn -->
+    <div class="form-row">
+        <div class="form-group">
+            <label for="resume-ab">Resume</label>
+            <input
+                type="file"
+                id="resume-ab"
+                name="resume"
+                accept=".pdf,.doc,.docx"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="linkedin-ab">LinkedIn Profile</label>
+            <input
+                type="url"
+                id="linkedin-ab"
+                name="linkedin"
+            >
+        </div>
+    </div>
+
+    <!-- Country -->
+    <div class="form-group bottom-margin">
+        <label for="country-ab">
+            Country of Residence <span class="asterisk">*</span>
+        </label>
+        <select id="country-ab" name="country" autocomplete="country-name" required>
+
+            <option value="">Select Country</option>
+
+            <option value="United States">United States</option>
+            <option value="United Kingdom">United Kingdom</option>
+            <option value="Canada">Canada</option>
+            <option value="China">China</option>
+            <option value="India">India</option>
+
+            <option disabled>-----------------------------------</option>
+
+            <option value="Afghanistan">Afghanistan</option>
+            <option value="Albania">Albania</option>
+            <option value="Algeria">Algeria</option>
+            <option value="Andorra">Andorra</option>
+            <option value="Angola">Angola</option>
+            <option value="Argentina">Argentina</option>
+            <option value="Armenia">Armenia</option>
+            <option value="Australia">Australia</option>
+            <option value="Austria">Austria</option>
+            <option value="Azerbaijan">Azerbaijan</option>
+
+            <option value="Bahrain">Bahrain</option>
+            <option value="Bangladesh">Bangladesh</option>
+            <option value="Belgium">Belgium</option>
+            <option value="Brazil">Brazil</option>
+            <option value="Brunei">Brunei</option>
+            <option value="Bulgaria">Bulgaria</option>
+
+            <option value="Chile">Chile</option>
+            <option value="Colombia">Colombia</option>
+            <option value="Costa Rica">Costa Rica</option>
+            <option value="Croatia">Croatia</option>
+            <option value="Cyprus">Cyprus</option>
+            <option value="Czech Republic">Czech Republic</option>
+
+            <option value="Denmark">Denmark</option>
+            <option value="Dominican Republic">Dominican Republic</option>
+
+            <option value="Ecuador">Ecuador</option>
+            <option value="Egypt">Egypt</option>
+            <option value="Estonia">Estonia</option>
+            <option value="Ethiopia">Ethiopia</option>
+
+            <option value="Finland">Finland</option>
+            <option value="France">France</option>
+
+            <option value="Georgia">Georgia</option>
+            <option value="Germany">Germany</option>
+            <option value="Ghana">Ghana</option>
+            <option value="Greece">Greece</option>
+            <option value="Guatemala">Guatemala</option>
+
+            <option value="Hong Kong">Hong Kong</option>
+            <option value="Hungary">Hungary</option>
+
+            <option value="Iceland">Iceland</option>
+            <option value="Indonesia">Indonesia</option>
+            <option value="Ireland">Ireland</option>
+            <option value="Israel">Israel</option>
+            <option value="Italy">Italy</option>
+
+            <option value="Japan">Japan</option>
+            <option value="Jordan">Jordan</option>
+
+            <option value="Kazakhstan">Kazakhstan</option>
+            <option value="Kenya">Kenya</option>
+            <option value="Kuwait">Kuwait</option>
+
+            <option value="Latvia">Latvia</option>
+            <option value="Lebanon">Lebanon</option>
+            <option value="Lithuania">Lithuania</option>
+            <option value="Luxembourg">Luxembourg</option>
+
+            <option value="Macau">Macau</option>
+            <option value="Malaysia">Malaysia</option>
+            <option value="Malta">Malta</option>
+            <option value="Mexico">Mexico</option>
+            <option value="Monaco">Monaco</option>
+            <option value="Morocco">Morocco</option>
+
+            <option value="Netherlands">Netherlands</option>
+            <option value="New Zealand">New Zealand</option>
+            <option value="Nigeria">Nigeria</option>
+            <option value="Norway">Norway</option>
+
+            <option value="Oman">Oman</option>
+
+            <option value="Pakistan">Pakistan</option>
+            <option value="Panama">Panama</option>
+            <option value="Peru">Peru</option>
+            <option value="Philippines">Philippines</option>
+            <option value="Poland">Poland</option>
+            <option value="Portugal">Portugal</option>
+            <option value="Puerto Rico">Puerto Rico</option>
+
+            <option value="Qatar">Qatar</option>
+
+            <option value="Romania">Romania</option>
+            <option value="Russia">Russia</option>
+
+            <option value="Saudi Arabia">Saudi Arabia</option>
+            <option value="Serbia">Serbia</option>
+            <option value="Singapore">Singapore</option>
+            <option value="Slovakia">Slovakia</option>
+            <option value="Slovenia">Slovenia</option>
+            <option value="South Africa">South Africa</option>
+            <option value="South Korea">South Korea</option>
+            <option value="Spain">Spain</option>
+            <option value="Sri Lanka">Sri Lanka</option>
+            <option value="Sweden">Sweden</option>
+            <option value="Switzerland">Switzerland</option>
+
+            <option value="Taiwan">Taiwan</option>
+            <option value="Thailand">Thailand</option>
+            <option value="Turkey">Turkey</option>
+
+            <option value="Ukraine">Ukraine</option>
+            <option value="United Arab Emirates">United Arab Emirates</option>
+            <option value="Uruguay">Uruguay</option>
+
+            <option value="Venezuela">Venezuela</option>
+            <option value="Vietnam">Vietnam</option>
+
+            <option value="Other">Other</option>
+        </select>
+    </div>
+
+    <!-- How did you hear -->
+    <div class="form-row">
+    <div class="form-group">
+
+        <label for="hear-about-ab">
+            How did you hear about Fortuna? <span class="asterisk">*</span>
+        </label>
+
+        <select id="hear-about-ab" name="hear_about_us" required>
+
+            <option value="">Select an option</option>
+
+            <option value="Personal Recommendation">Personal Recommendation</option>
+
+            <option value="Search Engine">Search Engine</option>
+
+            <option value="Google Ad">Google Ad</option>
+
+            <option value="ChatGPT or other AI">ChatGPT or other AI</option>
+
+            <option value="Poets&Quants">Poets&Quants</option>
+
+            <option value="GMAT Club">GMAT Club</option>
+
+            <option value="YouTube">YouTube</option>
+
+            <option value="LinkedIn">LinkedIn</option>
+
+            <option value="Instagram">Instagram</option>
+
+            <option value="Facebook">Facebook</option>
+
+            <option value="Reddit">Reddit</option>
+
+            <option value="Centre Court MBA Festival">
+                Centre Court MBA Festival
+            </option>
+
+            <option value="Beat The GMAT">
+                Beat The GMAT
+            </option>
+
+            <option value="Other">Other</option>
+
+        </select>
+
+    </div>
+</div>
+
+    <!-- Additional information -->
+    <div class="form-group bottom-margin">
+        <label for="additional-info-ab">
+            Please provide any further information that will be helpful context ahead of our free consultation call
+        </label>
+
+        <textarea
+            id="additional-info-ab"
+            name="additional_information"
+            rows="5"
+        ></textarea>
+    </div>
+
+    <!-- Submit -->
+    <button type="submit">Next</button>
+
+</form>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const form = document.querySelector(".mba-simple-consultation-form-ab");
+    if (!form) return;
+
+    const sharedTextFields = ["first_name", "last_name", "email", "phone", "country", "hear_about_us"];
+    const redirectTo = "/mba/free-consultation-step-2-ab/";
+    const ajaxUrl = "<?php echo esc_url(admin_url('admin-ajax.php')); ?>";
+    const tokenField = form.querySelector('input[name="g-recaptcha-response"]');
+    const abVariationField = form.querySelector('input[name="ab_variation"]');
+    const abVariation = (typeof window.faAbResolveVariation === "function")
+        ? window.faAbResolveVariation()
+        : "A";
+    if (abVariationField) abVariationField.value = abVariation;
+
+    // Show SMS consent when a phone number is entered; auto-check the box so the
+    // user opts in by default (matching MIM/UG behaviour).
+    const phoneInput   = form.querySelector('input[name="phone"]');
+    const consentCb    = document.getElementById("mba_simple_sms_consent_ab");
+    const consentGroup = document.getElementById("mba_simple_sms_consent_group_ab");
+
+    if (phoneInput && consentCb && consentGroup) {
+        phoneInput.addEventListener("input", function () {
+            if (phoneInput.value.trim().length > 0) {
+                consentGroup.style.display = "";
+                consentCb.checked = true;
+            } else {
+                consentGroup.style.display = "none";
+                consentCb.checked = false;
+            }
+        });
+    }
+
+    // Build the Form 2 URL with shared field values as query params so the next page
+    // can render them server-side into the input `value` attributes — instant fill.
+    function buildRedirectUrl() {
+        const params = new URLSearchParams();
+
+        sharedTextFields.forEach(function (fieldName) {
+            const f = form.querySelector('[name="' + fieldName + '"]');
+            if (f && f.value) {
+                params.set(fieldName, f.value);
+            }
+        });
+
+        if (consentCb) {
+            params.set("sms_consent", consentCb.checked ? "Yes" : "No");
+        }
+
+        params.set("ab_variation", abVariation);
+
+        const qs = params.toString();
+        return qs ? redirectTo + "?" + qs : redirectTo;
+    }
+
+    // Persist resume (if any) into sessionStorage so Form 2 can restore it,
+    // then continue to Form 2.
+    function persistResumeAndRedirect(targetUrl) {
+        const resumeInput = form.querySelector('input[name="resume"]');
+        const file = resumeInput && resumeInput.files && resumeInput.files[0];
+
+        if (!file) {
+            sessionStorage.removeItem("mba_resume_ab");
+            window.location.href = targetUrl;
+            return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = function () {
+            try {
+                sessionStorage.setItem("mba_resume_ab", JSON.stringify({
+                    name: file.name,
+                    type: file.type,
+                    data: reader.result
+                }));
+            } catch (err) {
+                sessionStorage.removeItem("mba_resume_ab");
+            }
+            window.location.href = targetUrl;
+        };
+
+        reader.onerror = function () {
+            window.location.href = targetUrl;
+        };
+
+        reader.readAsDataURL(file);
+    }
+
+    function sendPartialSubmission() {
+        const fd = new FormData();
+
+        const textFields = [
+            "action",
+            "mba_simple_consultation_nonce_field_ab",
+            "_wp_http_referer",
+            "g-recaptcha-response",
+            "completed_full_form",
+            "code",
+            "ab_variation",
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "linkedin",
+            "country",
+            "hear_about_us",
+            "additional_information"
+        ];
+
+        textFields.forEach(function (name) {
+            const el = form.querySelector('[name="' + name + '"]');
+            if (!el) return;
+            if (el.type === "checkbox") {
+                if (el.checked) fd.set(name, el.value || "on");
+            } else {
+                fd.set(name, el.value || "");
+            }
+        });
+
+        if (consentCb) {
+            fd.set("sms_consent", consentCb.checked ? "Yes" : "No");
+        }
+
+        const controller = (typeof AbortController !== "undefined") ? new AbortController() : null;
+        const timeoutId = setTimeout(function () {
+            if (controller) controller.abort();
+        }, 3500);
+
+        return fetch(ajaxUrl, {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin",
+            signal: controller ? controller.signal : undefined
+        }).then(function (res) {
+            clearTimeout(timeoutId);
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json().catch(function () { return { success: true }; });
+        }).catch(function (err) {
+            clearTimeout(timeoutId);
+            return { success: false, error: err && err.message ? err.message : "network" };
+        });
+    }
+
+    function resetSubmitButton() {
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Next";
+        }
+    }
+
+    function showStep1Error(message) {
+        resetSubmitButton();
+        alert(message || "We couldn't save your details. Please check your connection and try again.");
+    }
+
+    function submitAndRedirect(token) {
+        if (tokenField) tokenField.value = token || "";
+
+        sendPartialSubmission().then(function (result) {
+            if (!result || result.success === false) {
+                showStep1Error();
+                return;
+            }
+            persistResumeAndRedirect(buildRedirectUrl());
+        });
+    }
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const btn = form.querySelector('button[type="submit"]');
+
+        if (btn) {
+            btn.disabled    = true;
+            btn.textContent = "Please wait...";
+        }
+
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+            event: "MBASimpleFormSubmitAB",
+            mba_ab_variation: abVariation
+        });
+
+        let submitted = false;
+        function go(token) {
+            if (submitted) return;
+            submitted = true;
+            submitAndRedirect(token);
+        }
+
+        if (typeof grecaptcha !== "undefined") {
+            try {
+                grecaptcha.ready(function () {
+                    grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
+                        action: "mba_simple_consultation_ab"
+                    }).then(function (token) {
+                        go(token || "");
+                    }).catch(function () { go(""); });
+                });
+                setTimeout(function () { go(""); }, 2500);
+            } catch (err) {
+                go("");
+            }
+        } else {
+            go("");
+        }
+    });
+});
+</script>

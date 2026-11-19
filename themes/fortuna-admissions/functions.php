@@ -31,6 +31,7 @@ add_action( 'wp_enqueue_scripts', 'child_enqueue_styles', 15 );
 require_once('inc/menu-walker.php');
 require_once('inc/shortcodes.php');
 require_once('inc/form-submissions.php');
+require_once('inc/ab-testing.php');
 require_once('blocks/index.php');
 
 /*------------------------------------*\
@@ -423,6 +424,47 @@ function mba_full_free_consultation_form_shortcode() {
     ob_start();
 
     $form_file = get_stylesheet_directory() . '/inc/forms/mba-full-free-consultation-form.php';
+
+    if ( file_exists( $form_file ) ) {
+        require $form_file;
+    }
+
+    return ob_get_clean();
+}
+
+/*
+ * ============================================================================
+ * MBA A/B STAGING SHORTCODES
+ * ----------------------------------------------------------------------------
+ * Parallel to the live shortcodes above, served from *-ab.php files so the
+ * live flow stays untouched. Use these on the staging page only:
+ *   [mba_simple_free_consultation_form_ab]   ← Step 1 (staging)
+ *   [mba_full_free_consultation_form_ab]     ← Step 2 (staging)
+ * ============================================================================
+ */
+
+add_shortcode('mba_simple_free_consultation_form_ab', 'mba_simple_free_consultation_form_ab_shortcode');
+
+function mba_simple_free_consultation_form_ab_shortcode() {
+
+    ob_start();
+
+    $form_file = get_stylesheet_directory() . '/inc/forms/mba-simple-free-consultation-form-ab.php';
+
+    if ( file_exists( $form_file ) ) {
+        require $form_file;
+    }
+
+    return ob_get_clean();
+}
+
+add_shortcode('mba_full_free_consultation_form_ab', 'mba_full_free_consultation_form_ab_shortcode');
+
+function mba_full_free_consultation_form_ab_shortcode() {
+
+    ob_start();
+
+    $form_file = get_stylesheet_directory() . '/inc/forms/mba-full-free-consultation-form-ab.php';
 
     if ( file_exists( $form_file ) ) {
         require $form_file;
@@ -1634,6 +1676,489 @@ function mba_full_consultation_submit() {
             } else {
                 fa_update_podio_status( $submission_id, 'failed', 'HTTP ' . $podio_code );
                 error_log( 'MBA Full Consultation: Podio webhook HTTP ' . $podio_code . ' | body: ' . wp_remote_retrieve_body( $response ) );
+            }
+        }
+    }
+
+    exit;
+}
+
+/*
+ * ============================================================================
+ * MBA A/B STAGING — Form 1 & Form 2 handlers
+ * ----------------------------------------------------------------------------
+ * Parallel to the live handlers above. Only requests from the *-ab shortcodes
+ * reach here. The live handlers are not touched. Podio webhook URL is
+ * filterable (`fa_ab_podio_webhook_url`) in case staging should be isolated
+ * from the production Podio pipeline.
+ * ============================================================================
+ */
+
+add_action('wp_ajax_nopriv_mba_simple_consultation_submit_ab', 'mba_simple_consultation_submit_ab');
+add_action('wp_ajax_mba_simple_consultation_submit_ab', 'mba_simple_consultation_submit_ab');
+
+function mba_simple_consultation_submit_ab() {
+
+    $raw_email = isset($_POST['email']) ? sanitize_email( wp_unslash($_POST['email']) ) : '';
+    $raw_first = isset($_POST['first_name']) ? sanitize_text_field( wp_unslash($_POST['first_name']) ) : '';
+
+    if (
+        ! isset($_POST['mba_simple_consultation_nonce_field_ab']) ||
+        ! wp_verify_nonce(
+            sanitize_text_field( wp_unslash($_POST['mba_simple_consultation_nonce_field_ab']) ),
+            'mba_simple_consultation_nonce_ab'
+        )
+    ) {
+        fa_log_form_error(
+            'mba', 'step1-ab', 'nonce_failed',
+            'AB Step 1 nonce verification failed — likely a cached page or expired session.',
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
+        wp_send_json_error(
+            array( 'message' => 'Security verification failed.' ),
+            403
+        );
+    }
+
+    $first_name = $raw_first;
+
+    $last_name = isset($_POST['last_name'])
+        ? sanitize_text_field( wp_unslash($_POST['last_name']) )
+        : '';
+
+    $email = $raw_email;
+
+    if ( empty($first_name) || empty($email) || ! is_email($email) ) {
+        fa_log_form_error(
+            'mba', 'step1-ab', 'missing_required',
+            'AB Step 1 submitted without required first_name or valid email.',
+            array( 'first_name' => $first_name, 'email' => $email, 'last_name' => $last_name )
+        );
+        wp_send_json_error(
+            array( 'message' => 'Missing required fields.' ),
+            400
+        );
+    }
+
+    $phone = isset($_POST['phone'])
+        ? sanitize_text_field( wp_unslash($_POST['phone']) )
+        : '';
+
+    $sms_consent = isset($_POST['sms_consent']) && $_POST['sms_consent'] === 'Yes'
+        ? 'Yes'
+        : 'No';
+
+    $country = isset($_POST['country'])
+        ? sanitize_text_field( wp_unslash($_POST['country']) )
+        : '';
+
+    $linkedin_url = isset($_POST['linkedin'])
+        ? esc_url_raw( wp_unslash($_POST['linkedin']) )
+        : '';
+
+    $hear_about_us = isset($_POST['hear_about_us'])
+        ? sanitize_text_field( wp_unslash($_POST['hear_about_us']) )
+        : '';
+
+    $additional_information = isset($_POST['additional_information'])
+        ? sanitize_textarea_field( wp_unslash($_POST['additional_information']) )
+        : '';
+
+    $code = isset($_POST['code'])
+        ? sanitize_text_field( wp_unslash($_POST['code']) )
+        : '';
+
+    $ab_variation = isset($_POST['ab_variation'])
+        ? fa_ab_sanitize_variation( wp_unslash($_POST['ab_variation']) )
+        : 'A';
+
+    $resume_url = '';
+
+    if (
+        isset($_FILES['resume']) &&
+        ! empty($_FILES['resume']['name'])
+    ) {
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+
+        $upload_overrides = array(
+            'test_form' => false,
+            'mimes' => array(
+                'pdf'  => 'application/pdf',
+                'doc'  => 'application/msword',
+                'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ),
+        );
+
+        $uploaded_file = wp_handle_upload(
+            $_FILES['resume'],
+            $upload_overrides
+        );
+
+        if ( ! empty($uploaded_file['error']) ) {
+            fa_log_form_error(
+                'mba', 'step1-ab', 'resume_upload_failed',
+                'AB Step 1 resume upload failed: ' . (string) $uploaded_file['error'],
+                array( 'first_name' => $first_name, 'email' => $email )
+            );
+        } elseif ( ! empty($uploaded_file['url']) ) {
+            $resume_url = esc_url_raw( $uploaded_file['url'] );
+        }
+    }
+
+    $data = array(
+        'first_name'             => $first_name,
+        'last_name'              => $last_name,
+        'email'                  => $email,
+        'phone'                  => $phone,
+        'sms_consent'            => $sms_consent,
+        'country'                => $country,
+        'linkedin_url'           => $linkedin_url,
+        'hear_about_us'          => $hear_about_us,
+        'additional_information' => $additional_information,
+        'resume_url'             => $resume_url,
+        'form_stage'             => 'partial',
+        'code'                   => $code,
+        'ab_variation'           => $ab_variation,
+    );
+
+    $submission_id = fa_save_form_submission( 'mba', $data );
+    if ( $submission_id ) {
+        update_post_meta( $submission_id, '_fa_form_stage', 'step1-ab' );
+    }
+
+    fa_send_json_and_continue( true, array( 'message' => 'Partial submission received.' ) );
+
+    $podio_url = apply_filters(
+        'fa_ab_podio_webhook_url',
+        'https://workflow-automation.podio.com/catch/y73oog24iwh3c7g',
+        'step1',
+        $data
+    );
+
+    $response = wp_remote_post(
+        $podio_url,
+        array(
+            'method'  => 'POST',
+            'body'    => $data,
+            'timeout' => 30,
+        )
+    );
+
+    if ( $submission_id ) {
+        if ( is_wp_error( $response ) ) {
+            fa_update_podio_status( $submission_id, 'failed', $response->get_error_message() );
+            error_log( 'MBA Simple Consultation (AB): Podio webhook error: ' . $response->get_error_message() );
+        } else {
+            $podio_code = wp_remote_retrieve_response_code( $response );
+            if ( $podio_code >= 200 && $podio_code < 300 ) {
+                fa_update_podio_status( $submission_id, 'success' );
+            } else {
+                fa_update_podio_status( $submission_id, 'failed', 'HTTP ' . $podio_code );
+                error_log( 'MBA Simple Consultation (AB): Podio webhook HTTP ' . $podio_code . ' | body: ' . wp_remote_retrieve_body( $response ) );
+            }
+        }
+    }
+
+    exit;
+}
+
+add_action('wp_ajax_nopriv_mba_full_consultation_submit_ab', 'mba_full_consultation_submit_ab');
+add_action('wp_ajax_mba_full_consultation_submit_ab', 'mba_full_consultation_submit_ab');
+
+function mba_full_consultation_submit_ab() {
+
+    $raw_email = isset($_POST['email']) ? sanitize_email( wp_unslash($_POST['email']) ) : '';
+    $raw_first = isset($_POST['first_name']) ? sanitize_text_field( wp_unslash($_POST['first_name']) ) : '';
+
+    if (
+        ! isset($_POST['mba_full_consultation_nonce_field_ab']) ||
+        ! wp_verify_nonce(
+            sanitize_text_field( wp_unslash($_POST['mba_full_consultation_nonce_field_ab']) ),
+            'mba_full_consultation_nonce_ab'
+        )
+    ) {
+        fa_log_form_error(
+            'mba', 'step2-ab', 'nonce_failed',
+            'AB Step 2 nonce verification failed — likely a cached page or expired session.',
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
+        wp_send_json_error(
+            array( 'message' => 'Security verification failed. Please refresh the page and try again.' ),
+            403
+        );
+    }
+
+    $first_name = $raw_first;
+
+    $last_name = isset($_POST['last_name'])
+        ? sanitize_text_field( wp_unslash($_POST['last_name']) )
+        : '';
+
+    $email = $raw_email;
+
+    $phone = isset($_POST['phone'])
+        ? sanitize_text_field( wp_unslash($_POST['phone']) )
+        : '';
+
+    $hear_about_us = isset($_POST['hear_about_us'])
+        ? sanitize_text_field( wp_unslash($_POST['hear_about_us']) )
+        : '';
+
+    if ( empty($first_name) || empty($email) ) {
+        fa_log_form_error(
+            'mba', 'step2-ab', 'missing_step1_data',
+            'AB Step 2 submitted without first_name/email from Step 1 — likely a refresh or direct-navigation case.',
+            array( 'first_name' => $first_name, 'email' => $email )
+        );
+        wp_send_json_error(
+            array( 'message' => 'Your contact details from Step 1 are missing. Please return to the first page and start again.' ),
+            400
+        );
+    }
+
+    if ( ! is_email($email) ) {
+        fa_log_form_error(
+            'mba', 'step2-ab', 'invalid_email',
+            'AB Step 2 submitted with an invalid email address.',
+            array( 'first_name' => $first_name, 'email' => $email )
+        );
+        wp_send_json_error(
+            array( 'message' => 'Please enter a valid email address.' ),
+            400
+        );
+    }
+
+    $sms_consent = isset($_POST['sms_consent']) && $_POST['sms_consent'] === 'Yes'
+        ? 'Yes'
+        : 'No';
+
+    $resume_url = '';
+
+    if (
+        isset($_FILES['resume']) &&
+        ! empty($_FILES['resume']['name'])
+    ) {
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+
+        $upload_overrides = array(
+            'test_form' => false,
+            'mimes' => array(
+                'pdf'  => 'application/pdf',
+                'doc'  => 'application/msword',
+                'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ),
+        );
+
+        $uploaded_file = wp_handle_upload(
+            $_FILES['resume'],
+            $upload_overrides
+        );
+
+        if ( isset($uploaded_file['error']) ) {
+            fa_log_form_error(
+                'mba', 'step2-ab', 'resume_upload_failed',
+                'AB Step 2 resume upload failed: ' . (string) $uploaded_file['error'],
+                array( 'first_name' => $first_name, 'email' => $email )
+            );
+            wp_send_json_error(
+                array( 'message' => 'Resume upload failed. Please try again.' ),
+                400
+            );
+        }
+
+        if ( ! empty($uploaded_file['url']) ) {
+            $resume_url = esc_url_raw( $uploaded_file['url'] );
+        }
+    }
+
+    $country = isset($_POST['country'])
+        ? sanitize_text_field( wp_unslash($_POST['country']) )
+        : '';
+
+    $referred_by_name = isset($_POST['referred_by_name'])
+        ? sanitize_text_field( wp_unslash($_POST['referred_by_name']) )
+        : '';
+
+    $current_employer = isset($_POST['current_employer'])
+        ? sanitize_text_field( wp_unslash($_POST['current_employer']) )
+        : '';
+
+    $job_title_function = isset($_POST['job_title_function'])
+        ? sanitize_text_field( wp_unslash($_POST['job_title_function']) )
+        : '';
+
+    $current_industry = isset($_POST['current_industry'])
+        ? sanitize_text_field( wp_unslash($_POST['current_industry']) )
+        : '';
+
+    $undergrad_university = isset($_POST['undergrad_university'])
+        ? sanitize_text_field( wp_unslash($_POST['undergrad_university']) )
+        : '';
+
+    $degree_major = isset($_POST['degree_major'])
+        ? sanitize_text_field( wp_unslash($_POST['degree_major']) )
+        : '';
+
+    $gpa = isset($_POST['gpa'])
+        ? sanitize_text_field( wp_unslash($_POST['gpa']) )
+        : '';
+
+    $graduation_year = isset($_POST['graduation_year'])
+        ? sanitize_text_field( wp_unslash($_POST['graduation_year']) )
+        : '';
+
+    $tests_taken = isset($_POST['tests_taken'])
+        ? sanitize_text_field( wp_unslash($_POST['tests_taken']) )
+        : '';
+
+    $gmat_score = isset($_POST['gmat_score'])
+        ? sanitize_text_field( wp_unslash($_POST['gmat_score']) )
+        : '';
+
+    $gmat_quant = isset($_POST['gmat_quant'])
+        ? sanitize_text_field( wp_unslash($_POST['gmat_quant']) )
+        : '';
+
+    $gmat_verbal = isset($_POST['gmat_verbal'])
+        ? sanitize_text_field( wp_unslash($_POST['gmat_verbal']) )
+        : '';
+
+    $gre_score = isset($_POST['gre_score'])
+        ? sanitize_text_field( wp_unslash($_POST['gre_score']) )
+        : '';
+
+    $gre_quant = isset($_POST['gre_quant'])
+        ? sanitize_text_field( wp_unslash($_POST['gre_quant']) )
+        : '';
+
+    $gre_verbal = isset($_POST['gre_verbal'])
+        ? sanitize_text_field( wp_unslash($_POST['gre_verbal']) )
+        : '';
+
+    $business_schools = isset($_POST['business_schools']) && is_array($_POST['business_schools'])
+        ? array_map( 'sanitize_text_field', wp_unslash($_POST['business_schools']) )
+        : array();
+
+    $mba_start_date = isset($_POST['mba_start_date'])
+        ? sanitize_text_field( wp_unslash($_POST['mba_start_date']) )
+        : '';
+
+    $previously_applied_mba = isset($_POST['previously_applied_mba'])
+        ? sanitize_text_field( wp_unslash($_POST['previously_applied_mba']) )
+        : '';
+
+    $fortuna_service = isset($_POST['fortuna_service'])
+        ? sanitize_text_field( wp_unslash($_POST['fortuna_service']) )
+        : '';
+
+    $code = isset($_POST['code'])
+        ? sanitize_text_field( wp_unslash($_POST['code']) )
+        : '';
+
+    $ab_variation = isset($_POST['ab_variation'])
+        ? fa_ab_sanitize_variation( wp_unslash($_POST['ab_variation']) )
+        : 'A';
+
+    // Variation B: if the visitor's country is eligible, resolve the coach's
+    // Appointlet URL so Podio sees who was routed and the front-end can
+    // render the calendar in place of the standard thank-you redirect.
+    // Everyone else falls through to the control flow (no calendar_url in the
+    // response → JS redirects as before).
+    $ab_coach_name   = '';
+    $ab_calendar_url = '';
+
+    if ( $ab_variation === 'B' && fa_ab_is_country_eligible( $country ) ) {
+        $coach = fa_ab_get_coach_for_country( $country );
+        if ( $coach && ! empty( $coach['appointlet_url'] ) ) {
+            $ab_coach_name   = $coach['name'];
+            $ab_calendar_url = fa_ab_build_booking_url(
+                $coach['appointlet_url'],
+                $first_name,
+                $last_name,
+                $email
+            );
+        }
+    }
+
+    $data = array(
+        'first_name'             => $first_name,
+        'last_name'              => $last_name,
+        'email'                  => $email,
+        'phone'                  => $phone,
+        'sms_consent'            => $sms_consent,
+        'resume_url'             => $resume_url,
+        'country'                => $country,
+        'hear_about_us'          => $hear_about_us,
+        'referred_by_name'       => $referred_by_name,
+        'current_employer'       => $current_employer,
+        'job_title_function'     => $job_title_function,
+        'current_industry'       => $current_industry,
+        'undergrad_university'   => $undergrad_university,
+        'degree_major'           => $degree_major,
+        'gpa'                    => $gpa,
+        'graduation_year'        => $graduation_year,
+        'tests_taken'            => $tests_taken,
+        'gmat_score'             => $gmat_score,
+        'gmat_quant'             => $gmat_quant,
+        'gmat_verbal'            => $gmat_verbal,
+        'gre_score'              => $gre_score,
+        'gre_quant'              => $gre_quant,
+        'gre_verbal'             => $gre_verbal,
+        'business_schools'       => implode(', ', $business_schools),
+        'mba_start_date'         => $mba_start_date,
+        'previously_applied_mba' => $previously_applied_mba,
+        'fortuna_service'        => $fortuna_service,
+        'code'                   => $code,
+        'ab_variation'           => $ab_variation,
+        'ab_coach'               => $ab_coach_name,
+    );
+
+    $submission_id = fa_save_form_submission( 'mba', $data );
+    if ( $submission_id ) {
+        update_post_meta( $submission_id, '_fa_form_stage', 'step2-ab' );
+    }
+
+    $response_payload = array(
+        'message'   => 'Thanks for sharing this very helpful background information, which will be invaluable for our call together. We will be in touch soon.',
+        'variation' => $ab_variation,
+    );
+
+    if ( ! empty( $ab_calendar_url ) ) {
+        $response_payload['calendar_url'] = $ab_calendar_url;
+        $response_payload['coach_name']   = $ab_coach_name;
+    }
+
+    fa_send_json_and_continue( true, $response_payload );
+
+    $podio_url = apply_filters(
+        'fa_ab_podio_webhook_url',
+        'https://workflow-automation.podio.com/catch/y73oog24iwh3c7g',
+        'step2',
+        $data
+    );
+
+    $response = wp_remote_post(
+        $podio_url,
+        array(
+            'method'  => 'POST',
+            'body'    => $data,
+            'timeout' => 30,
+        )
+    );
+
+    if ( $submission_id ) {
+        if ( is_wp_error( $response ) ) {
+            fa_update_podio_status( $submission_id, 'failed', $response->get_error_message() );
+            error_log( 'MBA Full Consultation (AB): Podio webhook error: ' . $response->get_error_message() );
+        } else {
+            $podio_code = wp_remote_retrieve_response_code( $response );
+            if ( $podio_code >= 200 && $podio_code < 300 ) {
+                fa_update_podio_status( $submission_id, 'success' );
+            } else {
+                fa_update_podio_status( $submission_id, 'failed', 'HTTP ' . $podio_code );
+                error_log( 'MBA Full Consultation (AB): Podio webhook HTTP ' . $podio_code . ' | body: ' . wp_remote_retrieve_body( $response ) );
             }
         }
     }
