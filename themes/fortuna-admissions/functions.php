@@ -450,8 +450,12 @@ add_action('wp_enqueue_scripts', 'fa_enqueue_recaptcha');
 
 /**
  * Output the Ortto fortuna capture code in <head> on every front-end page.
- * Ortto requires the snippet on all pages so anonymous visitor sessions
- * are tracked continuously and can be stitched to form submissions.
+ *
+ * The script must run immediately on page load (not on user interaction) so
+ * Ortto's tracked-form check can detect it. The data-no-defer / data-no-minify
+ * / data-no-optimize attributes, together with the wphb_delay_js_exclusions
+ * filter below, keep WP Hummingbird's Delay JS feature from rewriting the tag
+ * to type="wphb-delay-type".
  */
 function fa_ortto_capture_head() {
 
@@ -460,7 +464,7 @@ function fa_ortto_capture_head() {
     }
     ?>
     <!-- Ortto fortuna capture code -->
-    <script>
+    <script id="ortto-ap3c-init" type="text/javascript" data-no-defer="1" data-no-minify="1" data-no-optimize="1" data-cfasync="false">
     window.ap3c = window.ap3c || {};
     var ap3c = window.ap3c;
     ap3c.cmd = ap3c.cmd || [];
@@ -469,12 +473,36 @@ function fa_ortto_capture_head() {
         ap3c.track({v: 0});
     });
     ap3c.activity = function(act) { ap3c.act = (ap3c.act || []); ap3c.act.push(act); };
-    var s, t; s = document.createElement('script'); s.type = 'text/javascript'; s.src = "https://cdn3l.ink/app.js";
+    var s, t; s = document.createElement('script'); s.type = 'text/javascript'; s.src = "https://cdn3l.ink/app.js"; s.setAttribute('data-no-defer', '1'); s.setAttribute('data-cfasync', 'false');
     t = document.getElementsByTagName('script')[0]; t.parentNode.insertBefore(s, t);
     </script>
     <?php
 }
-add_action('wp_head', 'fa_ortto_capture_head');
+add_action('wp_head', 'fa_ortto_capture_head', 1);
+
+/**
+ * Exclude the Ortto capture scripts from WP Hummingbird's Delay JS feature.
+ * Without this, Hummingbird rewrites the script type to "wphb-delay-type",
+ * which blocks execution until the first user interaction and causes Ortto
+ * to report the tracking script as missing.
+ */
+function fa_ortto_hummingbird_delay_js_exclusions( $exclusions ) {
+
+    $ortto_exclusions = array(
+        'ap3c',
+        'cdn3l.ink',
+        'capture-api-us.ortto.app',
+        'ortto-ap3c-init',
+    );
+
+    if ( is_array( $exclusions ) ) {
+        return array_merge( $exclusions, $ortto_exclusions );
+    }
+
+    return $ortto_exclusions;
+}
+add_filter( 'wphb_delay_js_exclusions', 'fa_ortto_hummingbird_delay_js_exclusions' );
+add_filter( 'wphb_minify_resource_exclusions', 'fa_ortto_hummingbird_delay_js_exclusions' );
 
 add_action('admin_post_nopriv_law_consultation_submit', 'law_consultation_submit');
 add_action('admin_post_law_consultation_submit', 'law_consultation_submit');
