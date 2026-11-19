@@ -513,6 +513,9 @@ function law_consultation_submit() {
         return;
     }
 
+    $raw_email = isset($_POST['email']) ? sanitize_email( wp_unslash($_POST['email']) ) : '';
+    $raw_first = isset($_POST['first_name']) ? sanitize_text_field( wp_unslash($_POST['first_name']) ) : '';
+
     /**
      * Nonce Verification
      */
@@ -523,6 +526,11 @@ function law_consultation_submit() {
             'law_consultation_nonce'
         )
     ) {
+        fa_log_form_error(
+            'law', 'single', 'nonce_failed',
+            'Nonce verification failed — likely a cached page or expired session.',
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
         wp_die('Security verification failed.');
     }
 
@@ -530,6 +538,11 @@ function law_consultation_submit() {
      * Honeypot Spam Check
      */
     if ( ! empty($_POST['website']) ) {
+        fa_log_form_error(
+            'law', 'single', 'honeypot_triggered',
+            'Honeypot field "website" was filled — likely bot submission.',
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
         wp_die('Spam detected.');
     }
 
@@ -555,6 +568,11 @@ function law_consultation_submit() {
     );
 
     if ( is_wp_error( $verify ) ) {
+        fa_log_form_error(
+            'law', 'single', 'recaptcha_unreachable',
+            'Unable to reach Google reCAPTCHA: ' . $verify->get_error_message(),
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
         wp_die('Unable to verify reCAPTCHA.');
     }
 
@@ -568,6 +586,11 @@ function law_consultation_submit() {
         $result['score'] < 0.5 ||
         $result['action'] !== 'law_consultation'
     ) {
+        fa_log_form_error(
+            'law', 'single', 'recaptcha_failed',
+            'reCAPTCHA failed — score=' . ($result['score'] ?? 'n/a') . ' action=' . ($result['action'] ?? 'n/a'),
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
         wp_die('reCAPTCHA verification failed.');
     }
 
@@ -588,6 +611,9 @@ function law_consultation_submit() {
      * Save to WordPress (backup layer)
      */
     $submission_id = fa_save_form_submission( 'law', $data );
+    if ( $submission_id ) {
+        update_post_meta( $submission_id, '_fa_form_stage', 'single' );
+    }
 
     /**
      * Send to Podio
@@ -633,6 +659,9 @@ function ug_consultation_submit() {
         return;
     }
 
+    $raw_email = isset($_POST['student_email']) ? sanitize_email( wp_unslash($_POST['student_email']) ) : '';
+    $raw_first = isset($_POST['student_first_name']) ? sanitize_text_field( wp_unslash($_POST['student_first_name']) ) : '';
+
     /**
      * Nonce Verification
      */
@@ -643,7 +672,11 @@ function ug_consultation_submit() {
             'ug_consultation_nonce'
         )
     ) {
-        error_log('UG Consultation: Nonce verification failed. IP: ' . $_SERVER['REMOTE_ADDR']);
+        fa_log_form_error(
+            'ug', 'single', 'nonce_failed',
+            'Nonce verification failed — likely a cached page or expired session.',
+            array( 'student_first' => $raw_first, 'student_email' => $raw_email )
+        );
         wp_safe_redirect(home_url('/college/free-consultation/?error=security'));
         exit;
     }
@@ -652,6 +685,11 @@ function ug_consultation_submit() {
      * Honeypot Spam Check
      */
     if ( ! empty($_POST['website']) ) {
+        fa_log_form_error(
+            'ug', 'single', 'honeypot_triggered',
+            'Honeypot field "website" was filled — likely bot submission.',
+            array( 'student_first' => $raw_first, 'student_email' => $raw_email )
+        );
         wp_safe_redirect(home_url('/college/free-consultation/?error=spam'));
         exit;
     }
@@ -678,7 +716,11 @@ function ug_consultation_submit() {
     );
 
     if ( is_wp_error( $verify ) ) {
-        error_log('UG Consultation: reCAPTCHA API error: ' . $verify->get_error_message() . ' IP: ' . $_SERVER['REMOTE_ADDR']);
+        fa_log_form_error(
+            'ug', 'single', 'recaptcha_unreachable',
+            'Unable to reach Google reCAPTCHA: ' . $verify->get_error_message(),
+            array( 'student_first' => $raw_first, 'student_email' => $raw_email )
+        );
         wp_safe_redirect(home_url('/college/free-consultation/?error=recaptcha'));
         exit;
     }
@@ -693,12 +735,10 @@ function ug_consultation_submit() {
         $result['score'] < 0.5 ||
         $result['action'] !== 'ug_consultation'
     ) {
-        error_log(
-            'UG Consultation: reCAPTCHA failed. IP: ' . $_SERVER['REMOTE_ADDR'] .
-            ' | success: ' . ( isset($result['success']) ? var_export($result['success'], true) : 'n/a' ) .
-            ' | score: ' . ( isset($result['score']) ? $result['score'] : 'n/a' ) .
-            ' | action: ' . ( isset($result['action']) ? $result['action'] : 'n/a' ) .
-            ' | error-codes: ' . ( isset($result['error-codes']) ? implode(',', $result['error-codes']) : 'none' )
+        fa_log_form_error(
+            'ug', 'single', 'recaptcha_failed',
+            'reCAPTCHA failed — score=' . ($result['score'] ?? 'n/a') . ' action=' . ($result['action'] ?? 'n/a') . ' codes=' . ( isset($result['error-codes']) ? implode(',', $result['error-codes']) : 'none' ),
+            array( 'student_first' => $raw_first, 'student_email' => $raw_email )
         );
         wp_safe_redirect(home_url('/college/free-consultation/?error=recaptcha'));
         exit;
@@ -741,6 +781,9 @@ function ug_consultation_submit() {
      * Save to WordPress (backup layer)
      */
     $submission_id = fa_save_form_submission( 'ug', $data );
+    if ( $submission_id ) {
+        update_post_meta( $submission_id, '_fa_form_stage', 'single' );
+    }
 
     /**
      * Send to Podio
@@ -792,6 +835,9 @@ function mim_consultation_submit() {
         return;
     }
 
+    $raw_email = isset($_POST['email']) ? sanitize_email( wp_unslash($_POST['email']) ) : '';
+    $raw_first = isset($_POST['first_name']) ? sanitize_text_field( wp_unslash($_POST['first_name']) ) : '';
+
     /**
      * ============================================
      * NONCE VERIFICATION
@@ -806,6 +852,11 @@ function mim_consultation_submit() {
             'mim_consultation_nonce'
         )
     ) {
+        fa_log_form_error(
+            'mim', 'single', 'nonce_failed',
+            'Nonce verification failed — likely a cached page or expired session.',
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
         wp_die('Security verification failed.');
     }
 
@@ -815,6 +866,11 @@ function mim_consultation_submit() {
      * ============================================
      */
     if ( ! empty($_POST['website']) ) {
+        fa_log_form_error(
+            'mim', 'single', 'honeypot_triggered',
+            'Honeypot field "website" was filled — likely bot submission.',
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
         wp_die('Spam detected.');
     }
 
@@ -891,6 +947,18 @@ function mim_consultation_submit() {
         empty($linkedin_url) ||
         empty($code)
     ) {
+        fa_log_form_error(
+            'mim', 'single', 'missing_required',
+            'Required field(s) missing: ' . implode(', ', array_filter(array(
+                empty($first_name) ? 'first_name' : null,
+                empty($last_name) ? 'last_name' : null,
+                empty($email) ? 'email' : null,
+                empty($hear_about_us) ? 'hear_about_us' : null,
+                empty($linkedin_url) ? 'linkedin_url' : null,
+                empty($code) ? 'code' : null,
+            ))),
+            array( 'first_name' => $first_name, 'last_name' => $last_name, 'email' => $email, 'linkedin_url' => $linkedin_url )
+        );
         wp_die('Please complete all required fields.');
     }
 
@@ -900,6 +968,11 @@ function mim_consultation_submit() {
      * ============================================
      */
     if ( ! is_email($email) ) {
+        fa_log_form_error(
+            'mim', 'single', 'invalid_email',
+            'Submitted email failed is_email() validation.',
+            array( 'first_name' => $first_name, 'email' => $email )
+        );
         wp_die('Please enter a valid email address.');
     }
 
@@ -932,6 +1005,11 @@ function mim_consultation_submit() {
         );
 
         if ( isset($uploaded_file['error']) ) {
+            fa_log_form_error(
+                'mim', 'single', 'resume_upload_failed',
+                'Resume upload failed: ' . (string) $uploaded_file['error'],
+                array( 'first_name' => $first_name, 'email' => $email )
+            );
             wp_die('Resume upload failed. Please try again.');
         }
 
@@ -969,6 +1047,9 @@ function mim_consultation_submit() {
         'mim',
         $payload
     );
+    if ( $submission_id ) {
+        update_post_meta( $submission_id, '_fa_form_stage', 'single' );
+    }
 
     /**
      * ============================================
@@ -1126,6 +1207,9 @@ add_action('wp_ajax_mba_simple_consultation_submit', 'mba_simple_consultation_su
 
 function mba_simple_consultation_submit() {
 
+    $raw_email = isset($_POST['email']) ? sanitize_email( wp_unslash($_POST['email']) ) : '';
+    $raw_first = isset($_POST['first_name']) ? sanitize_text_field( wp_unslash($_POST['first_name']) ) : '';
+
     if (
         ! isset($_POST['mba_simple_consultation_nonce_field']) ||
         ! wp_verify_nonce(
@@ -1133,25 +1217,31 @@ function mba_simple_consultation_submit() {
             'mba_simple_consultation_nonce'
         )
     ) {
+        fa_log_form_error(
+            'mba', 'step1', 'nonce_failed',
+            'Nonce verification failed — likely a cached page or expired session.',
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
         wp_send_json_error(
             array( 'message' => 'Security verification failed.' ),
             403
         );
     }
 
-    $first_name = isset($_POST['first_name'])
-        ? sanitize_text_field( wp_unslash($_POST['first_name']) )
-        : '';
+    $first_name = $raw_first;
 
     $last_name = isset($_POST['last_name'])
         ? sanitize_text_field( wp_unslash($_POST['last_name']) )
         : '';
 
-    $email = isset($_POST['email'])
-        ? sanitize_email( wp_unslash($_POST['email']) )
-        : '';
+    $email = $raw_email;
 
     if ( empty($first_name) || empty($email) || ! is_email($email) ) {
+        fa_log_form_error(
+            'mba', 'step1', 'missing_required',
+            'Step 1 submitted without required first_name or valid email.',
+            array( 'first_name' => $first_name, 'email' => $email, 'last_name' => $last_name )
+        );
         wp_send_json_error(
             array( 'message' => 'Missing required fields.' ),
             400
@@ -1209,7 +1299,13 @@ function mba_simple_consultation_submit() {
             $upload_overrides
         );
 
-        if ( empty($uploaded_file['error']) && ! empty($uploaded_file['url']) ) {
+        if ( ! empty($uploaded_file['error']) ) {
+            fa_log_form_error(
+                'mba', 'step1', 'resume_upload_failed',
+                'Resume upload failed during Step 1: ' . (string) $uploaded_file['error'],
+                array( 'first_name' => $first_name, 'email' => $email )
+            );
+        } elseif ( ! empty($uploaded_file['url']) ) {
             $resume_url = esc_url_raw( $uploaded_file['url'] );
         }
     }
@@ -1230,6 +1326,9 @@ function mba_simple_consultation_submit() {
     );
 
     $submission_id = fa_save_form_submission( 'mba', $data );
+    if ( $submission_id ) {
+        update_post_meta( $submission_id, '_fa_form_stage', 'step1' );
+    }
 
     // Respond to the browser first so the redirect to Form 2 isn't blocked
     // on the Podio round-trip. The webhook call below runs after the client
@@ -1280,6 +1379,9 @@ add_action('wp_ajax_mba_full_consultation_submit', 'mba_full_consultation_submit
 
 function mba_full_consultation_submit() {
 
+    $raw_email = isset($_POST['email']) ? sanitize_email( wp_unslash($_POST['email']) ) : '';
+    $raw_first = isset($_POST['first_name']) ? sanitize_text_field( wp_unslash($_POST['first_name']) ) : '';
+
     if (
         ! isset($_POST['mba_full_consultation_nonce_field']) ||
         ! wp_verify_nonce(
@@ -1287,40 +1389,51 @@ function mba_full_consultation_submit() {
             'mba_full_consultation_nonce'
         )
     ) {
+        fa_log_form_error(
+            'mba', 'step2', 'nonce_failed',
+            'Nonce verification failed on Step 2 — likely a cached page or expired session.',
+            array( 'first_name' => $raw_first, 'email' => $raw_email )
+        );
         wp_send_json_error(
             array( 'message' => 'Security verification failed. Please refresh the page and try again.' ),
             403
         );
     }
 
-    $first_name = isset($_POST['first_name'])
-        ? sanitize_text_field( wp_unslash($_POST['first_name']) )
-        : '';
+    $first_name = $raw_first;
 
     $last_name = isset($_POST['last_name'])
         ? sanitize_text_field( wp_unslash($_POST['last_name']) )
         : '';
 
-    $email = isset($_POST['email'])
-        ? sanitize_email( wp_unslash($_POST['email']) )
-        : '';
+    $email = $raw_email;
 
     $phone = isset($_POST['phone'])
         ? sanitize_text_field( wp_unslash($_POST['phone']) )
         : '';
-  
+
   	$hear_about_us = isset($_POST['hear_about_us'])
         ? sanitize_text_field( wp_unslash($_POST['hear_about_us']) )
         : '';
 
     if ( empty($first_name) || empty($email) ) {
+        fa_log_form_error(
+            'mba', 'step2', 'missing_step1_data',
+            'Step 2 submitted without first_name/email from Step 1 — likely a refresh or direct-navigation case.',
+            array( 'first_name' => $first_name, 'email' => $email )
+        );
         wp_send_json_error(
-            array( 'message' => 'Please complete all required fields.' ),
+            array( 'message' => 'Your contact details from Step 1 are missing. Please return to the first page and start again.' ),
             400
         );
     }
 
     if ( ! is_email($email) ) {
+        fa_log_form_error(
+            'mba', 'step2', 'invalid_email',
+            'Step 2 submitted with an invalid email address.',
+            array( 'first_name' => $first_name, 'email' => $email )
+        );
         wp_send_json_error(
             array( 'message' => 'Please enter a valid email address.' ),
             400
@@ -1355,6 +1468,11 @@ function mba_full_consultation_submit() {
         );
 
         if ( isset($uploaded_file['error']) ) {
+            fa_log_form_error(
+                'mba', 'step2', 'resume_upload_failed',
+                'Resume upload failed during Step 2: ' . (string) $uploaded_file['error'],
+                array( 'first_name' => $first_name, 'email' => $email )
+            );
             wp_send_json_error(
                 array( 'message' => 'Resume upload failed. Please try again.' ),
                 400
@@ -1482,6 +1600,9 @@ function mba_full_consultation_submit() {
     );
 
     $submission_id = fa_save_form_submission( 'mba', $data );
+    if ( $submission_id ) {
+        update_post_meta( $submission_id, '_fa_form_stage', 'step2' );
+    }
 
     // Respond to the browser first so the redirect to the thank-you page
     // isn't blocked on the Podio round-trip. The webhook call below runs

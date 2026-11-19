@@ -522,38 +522,90 @@ document.addEventListener("DOMContentLoaded", function () {
         reader.readAsDataURL(file);
     }
 
-    // Send Form 1 data to the server so the Podio webhook fires with the
-    // partial submission. We do NOT block the redirect on the response —
-    // `keepalive: true` lets the request survive page navigation.
+    // Send Form 1 data to the server. We wait for the response (with a hard
+    // timeout) before redirecting so Step 1 is always recorded. The resume
+    // file is intentionally excluded from this payload — it travels to Step 2
+    // via sessionStorage and is uploaded on the Step 2 submit. This avoids the
+    // browser's 64 KB `keepalive` body cap that was silently dropping Step 1
+    // requests with resumes attached.
     function sendPartialSubmission() {
-        const fd = new FormData(form);
+        const fd = new FormData();
 
-        // FormData omits unchecked checkboxes — send explicit Yes/No so the
-        // server captures the user's consent choice either way.
+        // Copy text fields only — skip the file input.
+        const textFields = [
+            "action",
+            "mba_simple_consultation_nonce_field",
+            "_wp_http_referer",
+            "g-recaptcha-response",
+            "completed_full_form",
+            "code",
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "linkedin",
+            "country",
+            "hear_about_us",
+            "additional_information"
+        ];
+
+        textFields.forEach(function (name) {
+            const el = form.querySelector('[name="' + name + '"]');
+            if (!el) return;
+            if (el.type === "checkbox") {
+                if (el.checked) fd.set(name, el.value || "on");
+            } else {
+                fd.set(name, el.value || "");
+            }
+        });
+
         if (consentCb) {
             fd.set("sms_consent", consentCb.checked ? "Yes" : "No");
         }
 
-        try {
-            return fetch(ajaxUrl, {
-                method: "POST",
-                body: fd,
-                keepalive: true,
-                credentials: "same-origin"
-            }).catch(function () {});
-        } catch (err) {
-            return Promise.resolve();
+        const controller = (typeof AbortController !== "undefined") ? new AbortController() : null;
+        const timeoutId = setTimeout(function () {
+            if (controller) controller.abort();
+        }, 3500);
+
+        return fetch(ajaxUrl, {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin",
+            signal: controller ? controller.signal : undefined
+        }).then(function (res) {
+            clearTimeout(timeoutId);
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json().catch(function () { return { success: true }; });
+        }).catch(function (err) {
+            clearTimeout(timeoutId);
+            return { success: false, error: err && err.message ? err.message : "network" };
+        });
+    }
+
+    function resetSubmitButton() {
+        const btn = form.querySelector('button[type="submit"]');
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Next";
         }
+    }
+
+    function showStep1Error(message) {
+        resetSubmitButton();
+        alert(message || "We couldn't save your details. Please check your connection and try again.");
     }
 
     function submitAndRedirect(token) {
         if (tokenField) tokenField.value = token || "";
 
-        // Fire the partial submission — `keepalive: true` in sendPartialSubmission()
-        // lets the request finish after we navigate, so we don't wait for the response.
-        sendPartialSubmission();
-
-        persistResumeAndRedirect(buildRedirectUrl());
+        sendPartialSubmission().then(function (result) {
+            if (!result || result.success === false) {
+                showStep1Error();
+                return;
+            }
+            persistResumeAndRedirect(buildRedirectUrl());
+        });
     }
 
     form.addEventListener("submit", function (e) {
@@ -576,23 +628,31 @@ document.addEventListener("DOMContentLoaded", function () {
             event: "MBASimpleFormSubmit"
         });
 
-        // Kick off reCAPTCHA in the background but do NOT block the redirect on it.
-        // The partial submission uses `keepalive: true`, so it survives navigation;
-        // if the token resolves before we've navigated it's attached, otherwise the
-        // request goes out without one.
+        // Resolve reCAPTCHA token before submitting; fall back after 2.5s so a
+        // slow/failed grecaptcha never blocks the user forever.
+        let submitted = false;
+        function go(token) {
+            if (submitted) return;
+            submitted = true;
+            submitAndRedirect(token);
+        }
+
         if (typeof grecaptcha !== "undefined") {
             try {
                 grecaptcha.ready(function () {
                     grecaptcha.execute("6LevnXYtAAAAAMJD8mj2aeDja_yK6R20db50KgpD", {
                         action: "mba_simple_consultation"
                     }).then(function (token) {
-                        if (tokenField) tokenField.value = token || "";
-                    }).catch(function () {});
+                        go(token || "");
+                    }).catch(function () { go(""); });
                 });
-            } catch (err) {}
+                setTimeout(function () { go(""); }, 2500);
+            } catch (err) {
+                go("");
+            }
+        } else {
+            go("");
         }
-
-        submitAndRedirect("");
     });
 });
 </script>
