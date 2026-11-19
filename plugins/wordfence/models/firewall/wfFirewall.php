@@ -84,18 +84,23 @@ class wfFirewall
 	}
 	
 	/**
-	 * Tests the WAF configuration and returns true if successful.
+	 * Tests whether the active WAF configuration can be read.
 	 * 
 	 * @return bool
 	 */
 	public function testConfig() {
 		try {
+			if (!wfWAF::getInstance() || (class_exists('wfDummyWaf', false) && wfWAF::getInstance() instanceof wfDummyWaf)) {
+				return false;
+			}
 			wfWAF::getInstance()->getStorageEngine()->isDisabled();
 		}
 		catch (Exception $e) {
 			return false;
 		}
-		
+		catch (Throwable $e) {
+			return false;
+		}
 		return true;
 	}
 	
@@ -392,7 +397,7 @@ class wfFirewall
 			$reenbleCount = count($rules) - $enabledCount;
 			return array(
 				'percentage' => ($round ? round($percentEnabled, 2) : $percentEnabled),
-				'title'      => sprintf(_n('Re-enable %d firewall rule.', 'Re-enable %d firewall rules.', $reenbleCount, 'wordfence'), number_format_i18n($reenbleCount)),
+				'title'      => sprintf(/* translators: rule count */ _n('Re-enable %d firewall rule.', 'Re-enable %d firewall rules.', $reenbleCount, 'wordfence'), number_format_i18n($reenbleCount)),
 			);
 		}
 		catch (Exception $e) {

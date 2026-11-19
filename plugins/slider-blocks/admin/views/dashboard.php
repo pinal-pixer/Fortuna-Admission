@@ -439,6 +439,15 @@ require GUTSLIDER_DIR . '/admin/views/header.php';
 				</section>
 			<?php endif; ?>
 
+			<?php
+			/**
+			 * Fires in the dashboard sidebar, before Help & support.
+			 *
+			 * @since 3.4.0
+			 */
+			do_action( 'gutslider_dashboard_sidebar' );
+			?>
+
 			<section class="gs-card gs-card--flush">
 				<header class="gs-card__head gs-card__head--tight">
 					<h2 class="gs-card__heading"><?php esc_html_e( 'Help & support', 'slider-blocks' ); ?></h2>

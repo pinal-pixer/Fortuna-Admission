@@ -229,6 +229,25 @@ final class PostSlider {
 	 * ------------------------------------------------------------------ */
 
 	/**
+	 * Term ids from a saved term list: `[{ value, label }]` as the editor saves it, or plain ids.
+	 *
+	 * @param mixed $terms Saved terms.
+	 * @return int[]
+	 */
+	private static function term_ids( $terms ) {
+		if ( ! is_array( $terms ) ) {
+			return array();
+		}
+		$ids = array_map(
+			static function ( $term ) {
+				return absint( is_array( $term ) ? ( $term['value'] ?? 0 ) : $term );
+			},
+			$terms
+		);
+		return array_values( array_filter( $ids ) );
+	}
+
+	/**
 	 * WP_Query arguments from the block's saved query settings.
 	 *
 	 * @param array $attributes Block attributes.
@@ -292,6 +311,10 @@ final class PostSlider {
 			if ( $ids ) {
 				$args['post__in']       = $ids;
 				$args['posts_per_page'] = count( $ids );
+				// "Picked order": the order the posts were picked in.
+				if ( 'post__in' === $orderby ) {
+					$args['orderby'] = 'post__in';
+				}
 			}
 		}
 
@@ -304,7 +327,7 @@ final class PostSlider {
 
 			foreach ( $selected as $taxonomy => $terms ) {
 				$taxonomy = sanitize_key( $taxonomy );
-				$term_ids = is_array( $terms ) ? array_filter( array_map( 'absint', wp_list_pluck( $terms, 'value' ) ) ) : array();
+				$term_ids = self::term_ids( $terms );
 				if ( $term_ids && taxonomy_exists( $taxonomy ) ) {
 					$tax_query[] = array(
 						'taxonomy' => $taxonomy,
@@ -337,7 +360,7 @@ final class PostSlider {
 		if ( ! $is_specific && ! empty( $attributes['excludeTerms'] ) && is_array( $attributes['excludeTerms'] ) ) {
 			foreach ( $attributes['excludeTerms'] as $taxonomy => $terms ) {
 				$taxonomy = sanitize_key( $taxonomy );
-				$term_ids = is_array( $terms ) ? array_filter( array_map( 'absint', wp_list_pluck( $terms, 'value' ) ) ) : array();
+				$term_ids = self::term_ids( $terms );
 				if ( $term_ids && taxonomy_exists( $taxonomy ) ) {
 					$tax_query[] = array(
 						'taxonomy' => $taxonomy,

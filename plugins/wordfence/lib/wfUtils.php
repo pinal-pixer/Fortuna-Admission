@@ -104,7 +104,7 @@ class wfUtils {
 			if($noSeconds){
 				return __("less than a minute", 'wordfence');
 			} else {
-				return sprintf(/* translators: Number of seconds. */ __("%d seconds", 'wordfence'), floor($secs));
+				return sprintf(/* translators: Time duration (plural). */ __("%d seconds", 'wordfence'), floor($secs));
 			}
 		}
 	}
@@ -898,8 +898,14 @@ class wfUtils {
 	 * @return string
 	 */
 	public static function inet_aton($ip) {
-		$ip = preg_replace('/(?<=^|\.)0+([1-9])/', '$1', $ip);
-		return sprintf("%u", ip2long($ip));
+		try {
+			$ip = preg_replace('/(?<=^|\.)0+([1-9])/', '$1', $ip);
+			return sprintf("%u", ip2long($ip));
+		}
+		catch (Throwable $t) {
+			//Ignore -- fall through to default
+		}
+		return '0';
 	}
 
 	/**
@@ -923,9 +929,14 @@ class wfUtils {
 	 * @return string
 	 */
 	public static function inet_pton($ip) {
-		// convert the 4 char IPv4 to IPv6 mapped version.
-		$pton = str_pad(self::hasIPv6Support() ? @inet_pton($ip) : self::_inet_pton($ip), 16,
-			"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\x00\x00\x00\x00", STR_PAD_LEFT);
+		$default = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\x00\x00\x00\x00";
+		try {
+			// convert the 4 char IPv4 to IPv6 mapped version.
+			$pton = str_pad(self::hasIPv6Support() ? @inet_pton($ip) : self::_inet_pton($ip), 16, $default, STR_PAD_LEFT);
+		}
+		catch (Throwable $t) {
+			$pton = $default;
+		}
 		return $pton;
 	}
 
@@ -1066,6 +1077,16 @@ class wfUtils {
 			}
 			return WP_CONTENT_DIR . '/plugins/';
 		}
+	}
+	
+	/**
+	 * Convenience function to generate an admin URL using the appropriate function depending on multisite status.
+	 *
+	 * @param string $path
+	 * @return string
+	 */
+	public static function maybeNetworkAdminURL($path) {
+		return function_exists('network_admin_url') && is_multisite() ? network_admin_url($path) : admin_url($path);
 	}
 	public static function makeRandomIP(){
 		return rand(11,230) . '.' . rand(0,255) . '.' . rand(0,255) . '.' . rand(0,255);
@@ -1250,7 +1271,7 @@ class wfUtils {
 					$sp = explode($char, $item);
 					$sp = array_reverse($sp);
 					foreach($sp as $j){
-						$j = trim($j);
+						$j = trim($j, " \t\n\r\0\x0B\x0C");
 						if (!self::isValidIP($j)) {
 							$j = preg_replace('/:\d+$/', '', $j); //Strip off port
 						}
@@ -1326,7 +1347,7 @@ class wfUtils {
 					$sp = explode($char, $item);
 					$sp = array_reverse($sp);
 					foreach($sp as $index => $j){
-						$j = trim($j);
+						$j = trim($j, " \t\n\r\0\x0B\x0C");
 						if (!self::isValidIP($j)) {
 							$j = preg_replace('/:\d+$/', '', $j); //Strip off port
 						}
@@ -1651,25 +1672,32 @@ class wfUtils {
 		}
 		return false; //Returns an array with a valid IP and the server variable, or false.
 	}
+	
+	/**
+	 * Returns an array of IPs seen by the server. The structure of the return value is an array of arrays where each
+	 * child array has the structure ['ip' => <ip address>, 'selected' => <whether this one is considered the client ip>]
+	 *
+	 * @return array|false May return false if there are no IPs (e.g., a CLI request)
+	 */
 	public static function getIPPreview($howGet = null, $trustedProxies = null) {
 		$ip = self::getIPAndServerVariable($howGet, $trustedProxies);
 		if (is_array($ip)) {
 			list($IP, $variable) = $ip;
 			if (isset($_SERVER[$variable]) && strpos($_SERVER[$variable], ',') !== false) {
 				$items = preg_replace('/[\s,]/', '', explode(',', $_SERVER[$variable]));
-				$output = '';
+				$output = array();
 				foreach ($items as $i) {
 					if ($IP == $i) {
-						$output .= ', <strong>' . esc_html($i) . '</strong>';
+						$output[] = array('ip' => $i, 'selected' => true);
 					}
 					else {
-						$output .= ', ' . esc_html($i); 
+						$output[] = array('ip' => $i, 'selected' => false);
 					}
 				}
 				
-				return substr($output, 2);
+				return $output;
 			}
-			return '<strong>' . esc_html($IP) . '</strong>';
+			return array(array('ip' => $IP, 'selected' => true));
 		}
 		return false;
 	}
@@ -2572,6 +2600,30 @@ class wfUtils {
 		remove_filter( 'wp_mail_content_type', 'wfUtils::set_html_content_type' );
 		return $result;
 	}
+	
+	/**
+	 * Convenience method to send an email via `wp_mail` and avoid an exception of another plugin overrides the call
+	 * and throws one (Core does not currently throw any).
+	 *
+	 * @param $to
+	 * @param $subject
+	 * @param $message
+	 * @param $headers
+	 * @param $attachments
+	 * @return bool
+	 */
+	public static function maybe_wp_mail($to, $subject, $message, $headers = '', $attachments = array()) {
+		try {
+			return wp_mail($to, $subject, $message, $headers, $attachments);
+		}
+		catch (Exception $e) {
+			wordfence::status(2, 'error', 'Wordfence failed to send email: ' . $e->getMessage());
+		}
+		catch (Throwable $t) {
+			wordfence::status(2, 'error', 'Wordfence failed to send email: ' . $t->getMessage());
+		}
+		return false;
+	}
 
 	/**
 	 * @param string $readmePath
@@ -2761,6 +2813,50 @@ class wfUtils {
 			}
 		}
 		return $output;
+	}
+	
+	/**
+	 * A custom version of `esc_attr` that allows the escaping behavior to be customized
+	 *
+	 * @param string $text
+	 * @param int $quote_style
+	 * @param string $charset
+	 * @param bool $double_encode
+	 *
+	 * @return string
+	 */
+	public static function esc_attr( $text, $quote_style = ENT_QUOTES, $charset = 'UTF-8', $double_encode = false ) {
+		$original = $text;
+		$text = wp_check_invalid_utf8((string) $text);
+		
+		if (0 === strlen($text)) { return ''; }
+		else if (!preg_match( '/[&<>"\']/', $text ) ) { return $text; }
+		
+		if (!in_array($quote_style, array(ENT_NOQUOTES, ENT_COMPAT, ENT_QUOTES, 'single', 'double'), true)) {
+			$quote_style = ENT_QUOTES;
+		}
+		
+		$_quote_style = $quote_style;
+		
+		if ('double' === $quote_style) {
+			$quote_style  = ENT_COMPAT;
+			$_quote_style = ENT_COMPAT;
+		}
+		else if ('single' === $quote_style) {
+			$quote_style = ENT_NOQUOTES;
+		}
+		
+		if (!$double_encode) {
+			$text = wp_kses_normalize_entities($text, ($quote_style & ENT_XML1) ? 'xml' : 'html');
+		}
+		
+		$text = htmlspecialchars($text, $quote_style, $charset, $double_encode);
+		
+		if ('single' === $_quote_style) {
+			$text = str_replace( "'", '&#039;', $text );
+		}
+		
+		return apply_filters('attribute_escape', $text, $original);
 	}
 	
 	public static function requestDetectProxyCallback($timeout = 2, $blocking = true, $forceCheck = false) {
@@ -3421,6 +3517,20 @@ class wfUtils {
 		return $a1 == $a2;
 	}
 	
+	/**
+	 * Returns true if $maybeSubset is contained within $set.
+	 *
+	 * @param array $set
+	 * @param array $maybeSubset
+	 * @return bool
+	 */
+	public static function is_subset($set, $maybeSubset) {
+		if (!is_array($set) || !is_array($maybeSubset)) {
+			return false;
+		}
+		return count(array_intersect($set, $maybeSubset)) == count($maybeSubset);
+	}
+	
 	public static function array_first($array) {
 		if (empty($array)) {
 			return null;
@@ -3942,16 +4052,16 @@ class wfUtils {
 	}
 	
 	/**
-	 * Returns whether or not MySQLi should be used directly when needed. Returns true if there's a valid DB handle,
+	 * Returns whether or not MySQLi should be used directly when needed. Returns true if there's a MySQLi DB handle,
 	 * our database test succeeded, our constant is not set to prevent it, and then either $wpdb indicates it's using
-	 * mysqli (older WordPress versions) or we're on PHP 7+ (only mysqli is ever used).
+	 * mysqli (older WordPress versions) or we're on PHP 7+.
 	 * 
 	 * @return bool
 	 */
 	public static function useMySQLi() {
 		global $wpdb;
 		$dbh = $wpdb->dbh;
-		$useMySQLi = (is_object($dbh) && (PHP_MAJOR_VERSION >= 7 || $wpdb->use_mysqli) && wfConfig::get('allowMySQLi', true) && WORDFENCE_ALLOW_DIRECT_MYSQLI);
+		$useMySQLi = (is_object($dbh) && $dbh instanceof mysqli && (PHP_MAJOR_VERSION >= 7 || $wpdb->use_mysqli) && wfConfig::get('allowMySQLi', true) && WORDFENCE_ALLOW_DIRECT_MYSQLI);
 		return $useMySQLi;
 	}
 }

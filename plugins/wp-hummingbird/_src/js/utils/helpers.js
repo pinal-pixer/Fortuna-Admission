@@ -10,12 +10,23 @@ export const getString = ( str ) => {
 	return wphb.strings[ str ] || '';
 };
 
-/**
- * Get a link to a HB screen
- *
- * @param {string} screen Screen slug
- * @return {string} URL
- */
-export const getLink = ( screen ) => {
-	return wphb.links[ screen ] || '';
+export const currentPage = () => {
+	const url = window.location.href;
+	const urlparse = new URL( url );
+	const page = urlparse.searchParams.get( 'page' );
+	if ( page ) {
+		switch ( page ) {
+			case 'wphb':
+				return 'Dashboard';
+			case 'wphb-caching':
+				return 'Caching';
+			case 'wphb-minification':
+				return 'Asset Optimization';
+			case 'wphb-advanced':
+				return 'Advanced Tools';
+			case 'wphb-settings':
+				return 'Settings';
+		}
+	}
+	return 'External';
 };

@@ -1,0 +1,42 @@
+{
+    "packages": {
+        "60": {
+            "name": "soflyy/addon-installer-sdk",
+            "version": "v1.3.2",
+            "version_normalized": "1.3.2.0",
+            "source": {
+                "type": "git",
+                "url": "git@github.com:soflyy/pmxi-addon-installer-sdk.git",
+                "reference": "fa73c18ab172d6cc7edbd3ec373c07811687350d"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/soflyy/pmxi-addon-installer-sdk/zipball/fa73c18ab172d6cc7edbd3ec373c07811687350d",
+                "reference": "fa73c18ab172d6cc7edbd3ec373c07811687350d",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.4"
+            },
+            "time": "2026-10-09T05:14:28+00:00",
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "PMUI_Vendor\\Soflyy\\AddonInstaller\\": "src/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "SDK for Soflyy Pro plugins to auto-install free companion plugins from WordPress.org",
+            "support": {
+                "source": "https://github.com/soflyy/pmxi-addon-installer-sdk/tree/v1.3.2",
+                "issues": "https://github.com/soflyy/pmxi-addon-installer-sdk/issues"
+            },
+            "install-path": "../soflyy/addon-installer-sdk"
+        }
+    },
+    "dev": false,
+    "dev-package-names": []
+}

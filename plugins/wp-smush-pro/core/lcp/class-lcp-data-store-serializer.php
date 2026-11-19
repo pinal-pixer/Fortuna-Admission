@@ -15,20 +15,23 @@ class LCP_Data_Store_Serializer {
 	}
 
 	public function serialize( $object ) {
+		if ( ! ( $object instanceof LCP_Data_Store ) ) {
+			return array();
+		}
+
 		$data = $object->to_array();
 
-		if ( $object instanceof LCP_Data_Store_Post_Meta ) {
-			return array(
-				'type' => 'post-meta',
-				'data' => $data,
-			);
-		} else {
+		if ( $object instanceof LCP_Data_Store_Option ) {
 			return array(
 				'type' => 'option',
 				'data' => $data,
 			);
 		}
 
+		return array(
+			'type' => $object->get_type(),
+			'data' => $data,
+		);
 	}
 
 	public function deserialize( $serialized ) {
@@ -39,16 +42,19 @@ class LCP_Data_Store_Serializer {
 			return null;
 		}
 
-		switch ( $type ) {
-			case 'post-meta':
-				$object = new LCP_Data_Store_Post_Meta();
-				break;
+		$type_class_map = array(
+			'post-meta' => LCP_Data_Store_Post_Meta::class,
+			'term-meta' => LCP_Data_Store_Term_Meta::class,
+			'user-meta' => LCP_Data_Store_User_Meta::class,
+			// Option-backed stores (home/archive variants) are serialized as "option".
+			'option'    => LCP_Data_Store_Option::class,
+		);
 
-			case 'option':
-			default:
-				$object = new LCP_Data_Store_Option();
+		if ( ! isset( $type_class_map[ $type ] ) ) {
+			return null;
 		}
 
+		$object = new $type_class_map[ $type ]();
 		$object->from_array( $data );
 		return $object;
 	}

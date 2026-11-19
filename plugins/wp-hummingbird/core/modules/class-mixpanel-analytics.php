@@ -13,6 +13,7 @@ use Hummingbird\Core\Module_Server;
 use Hummingbird\Core\Settings;
 use Hummingbird\Core\Traits\Module as ModuleContract;
 use Hummingbird\Core\Utils;
+use InvalidArgumentException;
 use WPMUDEV_Analytics_V4;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -21,6 +22,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Class Mixpanel_Analytics
+ *
+ * Checks the usage-tracking opt-in, sends events, and knows which admin page a request came from; event shapes live in the `Mixpanel\*_Events` builders.
  */
 class Mixpanel_Analytics extends Module {
 	use ModuleContract;
@@ -33,11 +36,70 @@ class Mixpanel_Analytics extends Module {
 	const PROJECT_TOKEN = '5d545622e3a040aca63f2089b0e6cae7';
 
 	/**
+	 * Event builder class per area; each one owns that area's event names and properties.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @var array<string, class-string<Mixpanel\Events>>
+	 */
+	const EVENT_BUILDERS = array(
+		'general'            => Mixpanel\General_Events::class,
+		'asset_optimization' => Mixpanel\Asset_Optimization_Events::class,
+		'page_cache'         => Mixpanel\Page_Caching_Events::class,
+		'performance'        => Mixpanel\Performance_Events::class,
+	);
+
+	/**
+	 * Admin page slug => `Location` value sent with setting changes.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @var array<string, string>
+	 */
+	const LOCATIONS = array(
+		'wphb'              => 'dash_widget',
+		'wphb-minification' => 'ao_page',
+		'wphb-caching'      => 'pagecaching_page',
+		'wphb-setup'        => 'setup_wizard',
+	);
+
+	/**
+	 * Admin page slug (or `slug:tab`) => page label used as the Safe Mode event's `Location`.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @var array<string, string>
+	 */
+	const PAGE_LABELS = array(
+		'wphb'                           => 'Dashboard',
+		'wphb-minification'              => 'Asset Optimization',
+		'wphb-caching'                   => 'Page Caching',
+		'wphb-caching:others'            => 'Other Caching',
+		'wphb-cdn'                       => 'CDN',
+		'wphb-advanced'                  => 'Uptime',
+		'wphb-advanced:database_cleanup' => 'Database Cleanup',
+		'wphb-advanced:tools'            => 'Tools',
+		'wphb-advanced:alerts_reports'   => 'Reports & Alerts',
+		'wphb-settings:other'            => 'Other Settings',
+		'wphb-settings:configs'          => 'Configs',
+		'wphb-settings:permissions'      => 'Permissions',
+	);
+
+	/**
 	 * WPMUDEV Analytics class.
 	 *
 	 * @var WPMUDEV_Analytics_V4
 	 */
 	private $analytics;
+
+	/**
+	 * Instantiated event builders, by area.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @var array<string, Mixpanel\Events>
+	 */
+	private $events = array();
 
 	/**
 	 * Initialize module.
@@ -46,8 +108,11 @@ class Mixpanel_Analytics extends Module {
 	 */
 	public function init() {
 		add_filter( 'wp_hummingbird_is_active_module_mixpanel_analytics', array( $this, 'module_status' ) );
-		add_action( 'wphb_mixpanel_usage_tracking_value_update', array( $this, 'wphb_track_opt_toggle' ), 10, 2 );
+		add_action( 'wphb_mixpanel_usage_tracking_value_update', array( $this, 'wphb_track_opt_toggle' ), 10, 3 );
 		add_action( 'wp_ajax_wphb_track_deactivation', array( $this, 'wphb_track_deactivation' ) );
+		add_action( 'admin_init', array( $this, 'wphb_track_plugin_activation' ) );
+		add_action( 'wp_ajax_wphb_analytics_track_event', array( $this, 'wphb_handle_track_request_for_mixpanel' ) );
+		add_action( 'wp_ajax_wphb_react_ui_error', array( $this, 'wphb_track_react_ui_error' ) );
 	}
 
 	/**
@@ -56,19 +121,39 @@ class Mixpanel_Analytics extends Module {
 	 * @since 3.9.4
 	 */
 	public function run() {
-		add_action( 'wp_ajax_wphb_analytics_track_event', array( $this, 'wphb_handle_track_request_for_mixpanel' ) );
+		if ( defined( 'WPHB_BASENAME' ) ) {
+			$plugin_basename = WPHB_BASENAME;
+			add_action( "deactivate_$plugin_basename", array( $this, 'track_plugin_deactivation' ) );
+		}
 	}
 
 	/**
-	 * Track Mixpanel event when user toggles the tracking option.
+	 * Track the usage-tracking toggle; sent even when opted out, so the Opt Out event itself still goes out.
 	 *
-	 * @param bool $is_mixpanel_value_updated Mixpanel value updated.
-	 * @param bool $opted_value Opted value.
+	 * @param bool   $is_mixpanel_value_updated Mixpanel value updated.
+	 * @param bool   $opted_value Opted value.
+	 * @param string $location Location of the toggle action.
 	 */
-	public function wphb_track_opt_toggle( $is_mixpanel_value_updated, $opted_value ) {
+	public function wphb_track_opt_toggle( $is_mixpanel_value_updated, $opted_value, $location = 'settings' ) {
 		if ( $is_mixpanel_value_updated ) {
-			$this->track( $opted_value ? 'Opt In' : 'Opt Out' );
+			$this->send( $opted_value ? 'Opt In' : 'Opt Out', $this->get_opt_properties( $location ) );
 		}
+	}
+
+	/**
+	 * Properties of the Opt In and Opt Out events: where it happened and which plugins were active.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @param string $location Location of the toggle action.
+	 *
+	 * @return array
+	 */
+	private function get_opt_properties( $location ) {
+		return array(
+			'Location'       => $location,
+			'active_plugins' => $this->get_active_plugins(),
+		);
 	}
 
 	/**
@@ -85,15 +170,183 @@ class Mixpanel_Analytics extends Module {
 	}
 
 	/**
-	 * Track Mixpanel event.
+	 * Event builder for an area.
 	 *
-	 * @param string $event Mixpanel event name.
+	 * @since 4.0.1
+	 *
+	 * @param string $area One of the EVENT_BUILDERS keys.
+	 *
+	 * @return Mixpanel\Events
+	 *
+	 * @throws InvalidArgumentException When the area is not registered.
+	 */
+	public function events( $area ) {
+		if ( ! isset( self::EVENT_BUILDERS[ $area ] ) ) {
+			throw new InvalidArgumentException( sprintf( 'Unknown Mixpanel event area: %s', esc_html( $area ) ) );
+		}
+
+		if ( ! isset( $this->events[ $area ] ) ) {
+			$class                 = self::EVENT_BUILDERS[ $area ];
+			$this->events[ $area ] = new $class( $this );
+		}
+
+		return $this->events[ $area ];
+	}
+
+	/**
+	 * Record an event, subject to the usage-tracking opt-in.
+	 *
+	 * @since 4.0.1 Public and gated; 3.x had every caller check the opt-in itself.
+	 *
+	 * @param string $event      Mixpanel event name.
 	 * @param array  $properties Mixpanel event properties.
 	 *
-	 * @return array
+	 * @return bool Whether the event was sent.
 	 */
-	private function track( $event, $properties = array() ) {
-		return $this->get_analytics()->track( $event, $properties );
+	public function track( $event, $properties = array() ) {
+		if ( ! $this->is_active() ) {
+			return false;
+		}
+
+		return $this->send( $event, $properties );
+	}
+
+	/**
+	 * Send an event without checking the opt-in; only for Opt Out, the deactivation survey and a submitted Hub disconnect.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @param string $event      Mixpanel event name.
+	 * @param array  $properties Mixpanel event properties.
+	 *
+	 * @return bool Whether the event was sent. Analytics never surfaces errors.
+	 */
+	public function send( $event, $properties = array() ) {
+		try {
+			$this->get_analytics()->track( $event, $properties );
+
+			return true;
+		} catch ( \Throwable $e ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'Hummingbird Mixpanel: ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			}
+
+			return false;
+		}
+	}
+
+	/**
+	 * Track a feature being switched on or off; does nothing when the state did not change.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @param string $feature     Feature name as Mixpanel knows it.
+	 * @param bool   $was_enabled State before the change.
+	 * @param bool   $is_enabled  State after the change.
+	 *
+	 * @return bool Whether an event was sent.
+	 */
+	public function track_feature_toggle( $feature, $was_enabled, $is_enabled ) {
+		if ( (bool) $was_enabled === (bool) $is_enabled ) {
+			return false;
+		}
+
+		return $this->track(
+			$is_enabled ? 'plugin_feature_activate' : 'plugin_feature_deactivate',
+			array( 'feature' => $feature )
+		);
+	}
+
+	/**
+	 * Where the current request was made from, as the `Location` property.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @return string A LOCATIONS value, or 'na' outside the plugin pages (cron, CLI, other screens).
+	 */
+	public function get_location() {
+		$page = $this->get_request_page();
+
+		return isset( self::LOCATIONS[ $page['slug'] ] ) ? self::LOCATIONS[ $page['slug'] ] : 'na';
+	}
+
+	/**
+	 * Label of the plugin page (and tab) the current request was made from.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @return string A PAGE_LABELS value, or 'na' outside the plugin pages.
+	 */
+	public function get_page_label() {
+		$page = $this->get_request_page();
+
+		if ( '' === $page['view'] ) {
+			$page['view'] = $this->get_default_view( $page['slug'] );
+		}
+
+		foreach ( array( $page['slug'] . ':' . $page['view'], $page['slug'] ) as $key ) {
+			if ( isset( self::PAGE_LABELS[ $key ] ) ) {
+				return self::PAGE_LABELS[ $key ];
+			}
+		}
+
+		return 'na';
+	}
+
+	/**
+	 * Tab a page opens on when its URL names none: the first tab the React sidebar shows for that site.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @param string $slug Page slug.
+	 *
+	 * @return string Tab id, or '' for pages without tabs.
+	 */
+	private function get_default_view( $slug ) {
+		$is_subsite = is_multisite() && ! Utils::is_referrer_network_admin();
+
+		if ( 'wphb-settings' === $slug ) {
+			// Network admin opens on Permissions; a subsite has neither Permissions nor Configs.
+			if ( is_multisite() && ! $is_subsite ) {
+				return 'permissions';
+			}
+
+			return $is_subsite ? 'other' : 'configs';
+		}
+
+		if ( 'wphb-advanced' === $slug ) {
+			// Subsites have no Uptime tab.
+			return $is_subsite ? 'database_cleanup' : 'uptime';
+		}
+
+		return '';
+	}
+
+	/**
+	 * Page slug and tab the request came from, read from the referrer the same way Utils::is_referrer_network_admin() does.
+	 *
+	 * @since 4.0.1
+	 *
+	 * @return array{slug: string, view: string} Empty strings when unknown.
+	 */
+	private function get_request_page() {
+		$page    = array(
+			'slug' => '',
+			'view' => '',
+		);
+		$referer = wp_get_raw_referer();
+		$query   = $referer ? wp_parse_url( $referer, PHP_URL_QUERY ) : '';
+
+		if ( ! $query ) {
+			return $page;
+		}
+
+		wp_parse_str( $query, $args );
+
+		$page['slug'] = isset( $args['page'] ) && is_string( $args['page'] ) ? sanitize_key( $args['page'] ) : '';
+		$page['view'] = isset( $args['view'] ) && is_string( $args['view'] ) ? sanitize_key( $args['view'] ) : '';
+
+		return $page;
 	}
 
 	/**
@@ -248,7 +501,7 @@ class Mixpanel_Analytics extends Module {
 	}
 
 	/**
-	 * Handle track request for Mixpanel.
+	 * Legacy tracking endpoint, still used by the Gutenberg block; the React UI uses `wphb_react_analytics_track`.
 	 *
 	 * @return void
 	 */
@@ -269,20 +522,36 @@ class Mixpanel_Analytics extends Module {
 	}
 
 	/**
-	 * Maybe track additional event.
+	 * Track an uncaught React UI error.
 	 *
 	 * @return void
 	 */
-	private function maybe_track_additional_event() {
-		$event_name = isset( $_POST['additionalEvent'] ) ? $this->wphb_sanitize_data( wp_unslash( $_POST['additionalEvent'] ) ) : '';
-		$properties = isset( $_POST['additionalProperties'] ) ? $this->wphb_sanitize_data( wp_unslash( $_POST['additionalProperties'] ) ) : array();
+	public function wphb_track_react_ui_error() {
+		check_ajax_referer( 'wphb-fetch' );
 
-		if ( ! empty( $event_name ) && ! empty( $properties ) ) {
-			$this->track(
-				$event_name,
-				$properties
-			);
+		if ( ! current_user_can( Utils::get_admin_capability() ) ) {
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions', 'wphb' ) ), 403 );
 		}
+
+		$code            = isset( $_POST['code'] ) ? sanitize_text_field( wp_unslash( $_POST['code'] ) ) : 'UnknownError';
+		$message         = isset( $_POST['message'] ) ? sanitize_text_field( wp_unslash( $_POST['message'] ) ) : '';
+		$stack           = isset( $_POST['stack'] ) ? sanitize_textarea_field( wp_unslash( $_POST['stack'] ) ) : '';
+		$component_stack = isset( $_POST['component_stack'] ) ? sanitize_textarea_field( wp_unslash( $_POST['component_stack'] ) ) : '';
+		$page            = isset( $_POST['page'] ) ? sanitize_text_field( wp_unslash( $_POST['page'] ) ) : '';
+
+		$this->track(
+			'hb_error_encountered',
+			array(
+				'Error Type'      => 'react_ui',
+				'Error Code'      => $code,
+				'Error Message'   => $message,
+				'Stack Trace'     => $stack,
+				'Component Stack' => $component_stack,
+				'Page'            => $page,
+			)
+		);
+
+		wp_send_json_success();
 	}
 
 	/**
@@ -334,27 +603,7 @@ class Mixpanel_Analytics extends Module {
 	}
 
 	/**
-	 * Track event for setup performance test.
-	 *
-	 * @return void
-	 */
-	public function track_event_for_setup_performance_test() {
-		if ( ! $this->is_active() ) {
-			return;
-		}
-
-		$this->track(
-			'plugin_scan_started',
-			array(
-				'score_mobile_previous'  => '-',
-				'score_desktop_previous' => '-',
-				'Location'               => 'setup_wizard',
-			)
-		);
-	}
-
-	/**
-	 * Track HB deactivation.
+	 * Track the deactivation survey; sent even when opted out, as in 3.x.
 	 */
 	public function wphb_track_deactivation() {
 		check_ajax_referer( 'wphb-fetch', 'nonce' );
@@ -372,7 +621,7 @@ class Mixpanel_Analytics extends Module {
 			)
 		);
 
-		$this->track( $event_name, $properties );
+		$this->send( $event_name, $properties );
 
 		wp_send_json_success();
 	}
@@ -401,104 +650,52 @@ class Mixpanel_Analytics extends Module {
 	 * @return string
 	 */
 	private function get_plugin_name( $plugin_file ) {
+		// The deactivation hook can run outside wp-admin (Hub, WP-CLI), where this function is not loaded.
+		if ( ! function_exists( 'get_plugin_data' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
 		$plugin_data = get_plugin_data( $plugin_file );
 
 		return ! empty( $plugin_data['Name'] ) ? $plugin_data['Name'] : ''; // Return plugin name if available, otherwise empty string.
 	}
 
 	/**
-	 * Track feature activation.
-	 *
-	 * @param string $feature Feature name.
+	 * Track plugin activation event.
 	 *
 	 * @return void
 	 */
-	private function track_feature_activation( $feature ) {
-		if ( ! $this->is_active() ) {
-			return;
-		}
+	public function wphb_track_plugin_activation() {
+		if ( get_site_option( 'wphb-track-plugin-activation' ) ) {
+			delete_site_option( 'wphb-track-plugin-activation' );
 
-		$this->track( 'plugin_feature_activate', array( 'feature' => $feature ) );
+			$tracking_value = Settings::get_setting( 'tracking', 'settings' );
+			if ( $tracking_value ) {
+				$this->wphb_track_opt_toggle( true, true, 'reactivate' );
+			}
+		}
 	}
 
 	/**
-	 * Track feature deactivation.
-	 *
-	 * @param string $feature Feature name.
-	 *
-	 * @return void
+	 * Track deactivation location.
 	 */
-	private function track_feature_deactivation( $feature ) {
-		if ( ! $this->is_active() ) {
-			return;
-		}
-
-		$this->track( 'plugin_feature_deactivate', array( 'feature' => $feature ) );
+	public function track_plugin_deactivation() {
+		$this->send( 'Opt Out', $this->get_opt_properties( $this->get_deactivation_location() ) );
 	}
 
 	/**
-	 * Track feature event with activation/deactivation handling.
+	 * Get deactivation location.
 	 *
-	 * @param string $feature_name Feature name.
-	 * @param string $event_name   Event name to track.
-	 * @param array  $properties   Event properties.
-	 *
-	 * @return void
+	 * @return string
 	 */
-	private function track_feature_event( $feature_name, $event_name, $properties ) {
-		if ( ! $this->is_active() ) {
-			return;
+	private function get_deactivation_location() {
+		$is_hub_request = ! empty( $_REQUEST['wpmudev-hub'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.NonceVerification.Missing
+		if ( $is_hub_request ) {
+			return 'deactivate_hub';
 		}
 
-		if ( isset( $properties['update_type'] ) && 'activate' === $properties['update_type'] ) {
-			$this->track_feature_activation( $feature_name );
-		}
+		$is_dashboard_request = wp_doing_ajax() && ! empty( $_REQUEST['action'] ) && 'wdp-project-deactivate' === wp_unslash( $_REQUEST['action'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.NonceVerification.Missing
 
-		if ( isset( $properties['update_type'] ) && 'deactivate' === $properties['update_type'] ) {
-			$this->track_feature_deactivation( $feature_name );
-		}
-
-		$this->track( $event_name, $properties );
-	}
-
-	/**
-	 * Track JS Delay event.
-	 *
-	 * @param string $update_type Update type ('activate' or 'deactivate').
-	 * @param string $location    Location where the event occurred.
-	 *
-	 * @return void
-	 */
-	public function track_delay_js_event( $update_type, $location ) {
-		$options    = Utils::get_module( 'minify' )->get_options();
-		$properties = array(
-			'update_type' => $update_type,
-			'Location'    => $location,
-			'Timeout'     => $options['delay_js_timeout'],
-		);
-
-		$this->track_feature_event( 'JS Delay', 'js_delay_updated', $properties );
-	}
-
-	/**
-	 * Track Critical CSS event.
-	 *
-	 * @param string $update_type       Update type ('activate' or 'deactivate').
-	 * @param string $location          Location where the event occurred.
-	 * @param string $settings_modified Settings modified.
-	 * @param string $settings_default  Default settings.
-	 *
-	 * @return void
-	 */
-	public function track_critical_css_event( $update_type, $location, $settings_modified = '', $settings_default = '' ) {
-		$properties = array(
-			'update_type'       => $update_type,
-			'Location'          => $location,
-			'mode'              => Utils::get_module( 'critical_css' )->get_critical_mode_for_mp(),
-			'settings_modified' => $settings_modified,
-			'settings_default'  => $settings_default,
-		);
-
-		$this->track_feature_event( 'Critical Css', 'critical_css_updated', $properties );
+		return $is_dashboard_request ? 'deactivate_dashboard' : 'deactivate_pluginlist';
 	}
 }

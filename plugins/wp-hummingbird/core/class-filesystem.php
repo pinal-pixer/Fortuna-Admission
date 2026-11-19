@@ -166,10 +166,14 @@ class Filesystem {
 			if ( ! WP_Filesystem( $credentials ) ) {
 				// Some problems, exit.
 				ob_start();
-				printf( /* translators: %1$s - code tag, %2$s - closing code tag, still having trouble link */
-					esc_html__( "Hummingbird has encountered an unexpected error while writing a file. To find out more, enable the WordPress debug log by adding the following line to your site’s wp-config.php file:%1\$sdefine('WP_DEBUG', true);%2\$s", 'wphb' ),
-					'<br><code>',
-					'</code><br><br>'
+				echo wp_kses_post(
+					Whitelabel::replace_branding_terms(
+						sprintf( /* translators: %1$s - code tag, %2$s - closing code tag, still having trouble link */
+							esc_html__( "Hummingbird has encountered an unexpected error while writing a file. To find out more, enable the WordPress debug log by adding the following line to your site’s wp-config.php file:%1\$sdefine('WP_DEBUG', true);%2\$s", 'wphb' ),
+							'<br><code>',
+							'</code><br><br>'
+						)
+					)
 				);
 				echo esc_html( '&nbsp;' );
 				Utils::still_having_trouble_link();

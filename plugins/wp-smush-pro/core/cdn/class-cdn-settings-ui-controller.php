@@ -21,6 +21,7 @@ class CDN_Settings_Ui_Controller extends Controller {
 		$this->register_action( 'smush_setting_column_right_inside', array( $this, 'settings_notice' ), 20 );
 	}
 
+
 	/**
 	 * Add settings to settings array.
 	 *
@@ -30,7 +31,7 @@ class CDN_Settings_Ui_Controller extends Controller {
 	 * @since 3.0
 	 */
 	public function register_cdn_settings( $settings ) {
-		$next_gen_cdn_key = Settings::NEXT_GEN_CDN_KEY;
+		$next_gen_cdn_key = Settings::get_next_gen_cdn_key();
 
 		return array_merge(
 			$settings,
@@ -70,7 +71,7 @@ class CDN_Settings_Ui_Controller extends Controller {
 		if (
 			empty( $setting_key )
 			|| ! in_array( $setting_key, $this->settings->get_cdn_fields(), true )
-			|| Settings::NEXT_GEN_CDN_KEY === $setting_key
+			|| Settings::get_next_gen_cdn_key() === $setting_key
 		) {
 			return;
 		}

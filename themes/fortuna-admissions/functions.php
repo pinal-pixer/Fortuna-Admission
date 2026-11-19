@@ -1153,8 +1153,8 @@ function mba_simple_consultation_submit() {
     $additional_information = isset($_POST['additional_information'])
         ? sanitize_textarea_field( wp_unslash($_POST['additional_information']) )
         : '';
-
-    $code = isset($_POST['code'])
+  
+  	$code = isset($_POST['code'])
         ? sanitize_text_field( wp_unslash($_POST['code']) )
         : '';
 
@@ -1198,7 +1198,7 @@ function mba_simple_consultation_submit() {
         'additional_information' => $additional_information,
         'resume_url'             => $resume_url,
         'form_stage'             => 'partial',
-        'code'                   => $code,
+  		'code'                   => $code,
     );
 
     $submission_id = fa_save_form_submission( 'mba', $data );
@@ -1279,6 +1279,10 @@ function mba_full_consultation_submit() {
 
     $phone = isset($_POST['phone'])
         ? sanitize_text_field( wp_unslash($_POST['phone']) )
+        : '';
+  
+  	$hear_about_us = isset($_POST['hear_about_us'])
+        ? sanitize_text_field( wp_unslash($_POST['hear_about_us']) )
         : '';
 
     if ( empty($first_name) || empty($email) ) {
@@ -1413,12 +1417,8 @@ function mba_full_consultation_submit() {
     $fortuna_service = isset($_POST['fortuna_service'])
         ? sanitize_text_field( wp_unslash($_POST['fortuna_service']) )
         : '';
-
-    $hear_about_us = isset($_POST['hear_about_us'])
-        ? sanitize_text_field( wp_unslash($_POST['hear_about_us']) )
-        : '';
-
-    $code = isset($_POST['code'])
+  	
+  	$code = isset($_POST['code'])
         ? sanitize_text_field( wp_unslash($_POST['code']) )
         : '';
 
@@ -1430,7 +1430,7 @@ function mba_full_consultation_submit() {
         'sms_consent'            => $sms_consent,
         'resume_url'             => $resume_url,
         'country'                => $country,
-        'hear_about_us'          => $hear_about_us,
+  		'hear_about_us'          => $hear_about_us,
         'referred_by_name'       => $referred_by_name,
         'current_employer'       => $current_employer,
         'job_title_function'     => $job_title_function,
@@ -1450,7 +1450,7 @@ function mba_full_consultation_submit() {
         'mba_start_date'         => $mba_start_date,
         'previously_applied_mba' => $previously_applied_mba,
         'fortuna_service'        => $fortuna_service,
-        'code'                   => $code,
+  		'code'                   => $code,
     );
 
     $submission_id = fa_save_form_submission( 'mba', $data );
@@ -1748,3 +1748,118 @@ add_action('wp_footer', function () {
     </script>
     <?php
 });
+
+
+
+/**
+ * Automatically preload the first Spectra Container background image.
+ * Works across pages without manually specifying page IDs or image URLs.
+ */
+
+function fortuna_find_hero_background_image( $blocks ) {
+
+    $is_mobile = wp_is_mobile();
+
+    foreach ( $blocks as $block ) {
+
+        $attrs = isset( $block['attrs'] ) ? $block['attrs'] : array();
+        $name  = isset( $block['blockName'] ) ? $block['blockName'] : '';
+
+        // Check Spectra Container blocks only.
+        if ( strpos( $name, 'container' ) !== false ) {
+
+            // Common Spectra background image attributes.
+            $image_keys = $is_mobile
+                ? array(
+                    'backgroundImageMobile',
+                    'backgroundImageTablet',
+                    'backgroundImageDesktop',
+                    'backgroundImage'
+                )
+                : array(
+                    'backgroundImageDesktop',
+                    'backgroundImage',
+                    'backgroundImageTablet'
+                );
+
+            foreach ( $image_keys as $key ) {
+
+                if ( ! empty( $attrs[$key]['url'] ) ) {
+                    return esc_url_raw( $attrs[$key]['url'] );
+                }
+            }
+
+            // Newer Spectra background structure.
+            $background_paths = array(
+                array( 'background', 'media', 'url' ),
+                array( 'responsiveControls', 'lg', 'background', 'media', 'url' ),
+                array( 'responsiveControls', 'sm', 'background', 'media', 'url' )
+            );
+
+            foreach ( $background_paths as $path ) {
+
+                $value = $attrs;
+
+                foreach ( $path as $key ) {
+                    $value = isset( $value[$key] ) ? $value[$key] : null;
+                }
+
+                if ( is_string( $value ) && $value !== '' ) {
+                    return esc_url_raw( $value );
+                }
+            }
+
+            // WordPress native background image structure.
+            if ( ! empty( $attrs['style']['background']['backgroundImage']['url'] ) ) {
+                return esc_url_raw(
+                    $attrs['style']['background']['backgroundImage']['url']
+                );
+            }
+        }
+
+        // Check nested containers.
+        if ( ! empty( $block['innerBlocks'] ) ) {
+            $image = fortuna_find_hero_background_image( $block['innerBlocks'] );
+
+            if ( $image ) {
+                return $image;
+            }
+        }
+    }
+
+    return '';
+}
+
+
+function fortuna_preload_spectra_hero_image() {
+
+    if ( is_admin() || is_feed() ) {
+        return;
+    }
+
+    $post_id = get_queried_object_id();
+
+    if ( ! $post_id ) {
+        return;
+    }
+
+    $post = get_post( $post_id );
+
+    if ( ! $post ) {
+        return;
+    }
+
+    $blocks = parse_blocks( $post->post_content );
+
+    $image_url = fortuna_find_hero_background_image( $blocks );
+
+    if ( $image_url ) {
+        printf(
+            '<link rel="preload" as="image" href="%s" fetchpriority="high">' . "\n",
+            esc_url( $image_url )
+        );
+    }
+}
+
+add_action( 'wp_head', 'fortuna_preload_spectra_hero_image', 1 );
+

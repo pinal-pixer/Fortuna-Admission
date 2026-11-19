@@ -1,7 +1,7 @@
 {
   "apiVersion": 3,
   "name": "gutsliders/content-slider",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "title": "Static",
   "category": "slider-blocks",
   "description": "Show custom static content in sliding or carousel mode.",

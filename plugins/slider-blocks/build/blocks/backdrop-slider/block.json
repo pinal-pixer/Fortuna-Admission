@@ -1,0 +1,48 @@
+{
+  "apiVersion": 3,
+  "name": "gutsliders/backdrop-slider",
+  "version": "3.4.0",
+  "title": "Backdrop",
+  "category": "slider-blocks",
+  "description": "One fixed background (color, gradient, image or video) with slides of any content, or of posts, sliding over it.",
+  "keywords": [
+    "hero",
+    "background",
+    "banner",
+    "query"
+  ],
+  "supports": {
+    "html": false,
+    "anchor": true,
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "example": {
+    "attributes": {
+      "preview": true
+    },
+    "viewportWidth": 640
+  },
+  "textdomain": "slider-blocks",
+  "editorScript": [
+    "file:./index.js",
+    "gutslider-swiper-script",
+    "gutslider-blocks-global-script"
+  ],
+  "editorStyle": [
+    "file:./index.css",
+    "gutslider-swiper-style",
+    "gutslider-blocks-global-style"
+  ],
+  "style": [
+    "file:./style-index.css",
+    "gutslider-swiper-style"
+  ],
+  "viewScript": [
+    "file:./frontend.js",
+    "gutslider-swiper-script"
+  ],
+  "render": "file:./render.php"
+}

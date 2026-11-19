@@ -29,8 +29,8 @@ return apply_filters(
 		),
 		array(
 			'name'        => 'marquee',
-			'title'       => __( 'Marquee', 'slider-blocks' ),
-			'description' => __( 'Create amazing marquee with any type of content.', 'slider-blocks' ),
+			'title'       => __( 'Content Marquee', 'slider-blocks' ),
+			'description' => __( 'An endlessly scrolling strip of any content: text, logos, images or testimonials.', 'slider-blocks' ),
 			'is_pro'      => false,
 			'demo_slug'   => 'marquee',
 			'active'      => true,
@@ -92,8 +92,16 @@ return apply_filters(
 			'active'      => true,
 		),
 		array(
+			'name'        => 'backdrop-slider',
+			'title'       => __( 'Backdrop', 'slider-blocks' ),
+			'description' => __( 'One fixed background with static or dynamic content sliding over it.', 'slider-blocks' ),
+			'is_pro'      => false,
+			'demo_slug'   => 'backdrop',
+			'active'      => true,
+		),
+		array(
 			'name'        => 'shader-slider',
-			'title'       => __( 'Shader Slider', 'slider-blocks' ),
+			'title'       => __( 'Shader', 'slider-blocks' ),
 			'description' => __( 'Interactive shader slider for static and dynamic content.', 'slider-blocks' ),
 			'is_pro'      => true,
 			'demo_slug'   => 'shader-slider',
@@ -101,15 +109,69 @@ return apply_filters(
 		),
 		array(
 			'name'        => 'shutters-slider',
-			'title'       => __( 'Shutters Slider', 'slider-blocks' ),
+			'title'       => __( 'Shutters', 'slider-blocks' ),
 			'description' => __( 'Interactive shutters slider for static and dynamic content.', 'slider-blocks' ),
 			'is_pro'      => true,
 			'demo_slug'   => 'shutters-slider',
 			'active'      => true,
 		),
 		array(
+			'name'        => 'shape-slider',
+			'title'       => __( 'Shape Morph', 'slider-blocks' ),
+			'description' => __( 'Hero slider that shows each image through a shape, which shrinks, travels and morphs between slides.', 'slider-blocks' ),
+			'is_pro'      => true,
+			// no demo page yet; the dashboard hides the Demo link until there is one
+			'demo_slug'   => '',
+			'active'      => true,
+		),
+		array(
+			'name'        => 'xray-slider',
+			'title'       => __( 'X-Ray', 'slider-blocks' ),
+			'description' => __( 'Hero slider with a lens that follows the mouse and shows the next slide, then grows to reveal it.', 'slider-blocks' ),
+			'is_pro'      => true,
+			// no demo page yet; the dashboard hides the Demo link until there is one
+			'demo_slug'   => '',
+			'active'      => true,
+		),
+		array(
+			'name'        => 'grid-reveal-slider',
+			'title'       => __( 'Grid Reveal', 'slider-blocks' ),
+			'description' => __( 'Hero slider that pulls back to a grid of all the slides between changes, with a grid view to jump to any slide.', 'slider-blocks' ),
+			'is_pro'      => true,
+			// no demo page yet; the dashboard hides the Demo link until there is one
+			'demo_slug'   => '',
+			'active'      => true,
+		),
+		array(
+			'name'        => 'split-slider',
+			'title'       => __( 'Split Transitions', 'slider-blocks' ),
+			'description' => __( 'Hero slider whose next image arrives cut up (in sliding bands, repeating frames or puzzle pieces) and comes back together.', 'slider-blocks' ),
+			'is_pro'      => true,
+			// no demo page yet; the dashboard hides the Demo link until there is one
+			'demo_slug'   => '',
+			'active'      => true,
+		),
+		array(
+			'name'        => 'card-pile-slider',
+			'title'       => __( 'Card Pile', 'slider-blocks' ),
+			'description' => __( 'Hero slider with piles of photo cards in the corners; the top card lifts off and grows into the next slide.', 'slider-blocks' ),
+			'is_pro'      => true,
+			// no demo page yet; the dashboard hides the Demo link until there is one
+			'demo_slug'   => '',
+			'active'      => true,
+		),
+		array(
+			'name'        => 'gallery3d-slider',
+			'title'       => __( '3D Gallery', 'slider-blocks' ),
+			'description' => __( 'Hero slider whose slides sit on a 3D shape (a cube, a tube or a ring) that turns from one to the next.', 'slider-blocks' ),
+			'is_pro'      => true,
+			// no demo page yet; the dashboard hides the Demo link until there is one
+			'demo_slug'   => '',
+			'active'      => true,
+		),
+		array(
 			'name'        => 'slicer-slider',
-			'title'       => __( 'Slicer Slider', 'slider-blocks' ),
+			'title'       => __( 'Slicer', 'slider-blocks' ),
 			'description' => __( 'Interactive slicer slider for static and dynamic content.', 'slider-blocks' ),
 			'is_pro'      => true,
 			'demo_slug'   => 'slicer-slider',
@@ -117,7 +179,7 @@ return apply_filters(
 		),
 		array(
 			'name'        => 'fashion-slider',
-			'title'       => __( 'Fashion Slider', 'slider-blocks' ),
+			'title'       => __( 'Fashion', 'slider-blocks' ),
 			'description' => __( 'Interactive fashion slider for static and dynamic content.', 'slider-blocks' ),
 			'is_pro'      => true,
 			'demo_slug'   => 'fashion-slider',
@@ -125,7 +187,7 @@ return apply_filters(
 		),
 		array(
 			'name'        => 'triple-slider',
-			'title'       => __( 'Triple Slider', 'slider-blocks' ),
+			'title'       => __( 'Triple', 'slider-blocks' ),
 			'description' => __( 'Interactive triple slider for static and dynamic content.', 'slider-blocks' ),
 			'is_pro'      => true,
 			'demo_slug'   => 'triple-slider',
@@ -157,7 +219,7 @@ return apply_filters(
 		),
 		array(
 			'name'        => 'card-slider',
-			'title'       => __( 'Card Slider', 'slider-blocks' ),
+			'title'       => __( 'Card', 'slider-blocks' ),
 			'description' => __( 'Interactive card slider for static and dynamic content.', 'slider-blocks' ),
 			'is_pro'      => true,
 			'demo_slug'   => 'card-slider',
@@ -166,7 +228,7 @@ return apply_filters(
 		array(
 			'name'        => 'marquee-carousel',
 			'title'       => __( 'Marquee Carousel', 'slider-blocks' ),
-			'description' => __( 'Interactive marquee carousel for static and dynamic content.', 'slider-blocks' ),
+			'description' => __( 'A continuously looping carousel of image slides, built by hand or from your posts.', 'slider-blocks' ),
 			'is_pro'      => true,
 			'demo_slug'   => 'marquee-carousel',
 			'active'      => true,
@@ -181,7 +243,7 @@ return apply_filters(
 		),
 		array(
 			'name'        => 'tinder-slider',
-			'title'       => __( 'Tinder Slider', 'slider-blocks' ),
+			'title'       => __( 'Tinder', 'slider-blocks' ),
 			'description' => __( 'Interactive tinder slider for static and dynamic content.', 'slider-blocks' ),
 			'is_pro'      => true,
 			'demo_slug'   => 'tinder-slider',
@@ -189,7 +251,7 @@ return apply_filters(
 		),
 		array(
 			'name'        => 'hover-slider',
-			'title'       => __( 'Hover Slider', 'slider-blocks' ),
+			'title'       => __( 'Hover', 'slider-blocks' ),
 			'description' => __( 'Interactive hover slider for static and dynamic content.', 'slider-blocks' ),
 			'is_pro'      => true,
 			'demo_slug'   => 'hover-slider',

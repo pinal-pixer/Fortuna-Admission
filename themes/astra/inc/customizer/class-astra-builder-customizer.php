@@ -205,10 +205,14 @@ final class Astra_Builder_Customizer {
 			return;
 		}
 
-		// Enqueue Builder CSS.
+		$asset_dir  = SCRIPT_DEBUG ? '' : 'minified/';
+		$min_suffix = SCRIPT_DEBUG ? '' : '.min';
+		$rtl_suffix = is_rtl() ? '-rtl' : '';
+
+		// Enqueue Builder CSS ('customizer-preview.css' / 'customizer-preview-rtl.css', or their '.min' copies).
 		wp_enqueue_style(
 			'ahfb-customizer-preview-style',
-			ASTRA_THEME_URI . 'inc/assets/css/customizer-preview.css',
+			ASTRA_THEME_URI . 'inc/assets/css/' . $asset_dir . 'customizer-preview' . $min_suffix . $rtl_suffix . '.css',
 			null,
 			ASTRA_THEME_VERSION
 		);
@@ -216,30 +220,12 @@ final class Astra_Builder_Customizer {
 		// Advanced Dynamic CSS.
 		wp_enqueue_script(
 			'ahfb-customizer-preview',
-			ASTRA_THEME_URI . 'inc/assets/js/customizer-preview.js',
-			array( 'customize-preview' ),
+			ASTRA_THEME_URI . 'inc/assets/js/' . $asset_dir . 'customizer-preview' . $min_suffix . '.js',
+			array( 'customize-preview', 'wp-i18n' ),
 			ASTRA_THEME_VERSION,
 			true
 		);
-
-		// Base Dynamic CSS.
-		wp_enqueue_script(
-			'ahfb-base-customizer-preview',
-			ASTRA_THEME_URI . 'inc/builder/type/base/assets/js/customizer-preview.js',
-			array( 'customize-preview' ),
-			ASTRA_THEME_VERSION,
-			true
-		);
-
-		// Localize variables for Astra Breakpoints JS.
-		wp_localize_script(
-			'ahfb-base-customizer-preview',
-			'astraBuilderPreview',
-			array(
-				'tablet_break_point' => astra_get_tablet_breakpoint(),
-				'mobile_break_point' => astra_get_mobile_breakpoint(),
-			)
-		);
+		wp_set_script_translations( 'ahfb-customizer-preview', 'astra' );
 
 		wp_localize_script(
 			'ahfb-customizer-preview',

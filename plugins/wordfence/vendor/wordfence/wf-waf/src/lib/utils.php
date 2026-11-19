@@ -4,6 +4,17 @@ if (defined('WFWAF_VERSION') && !defined('WFWAF_RUN_COMPLETE')) {
 class wfWAFUtils {
 
 	/**
+	 * Parses form data while retaining literal NULs and subsequent parameters.
+	 *
+	 * @param string $string Encoded query, cookie, or form data.
+	 * @return array Parsed parameters.
+	 */
+	public static function parseQueryString($string) {
+		parse_str(str_replace("\0", '%00', $string), $result);
+		return $result;
+	}
+
+	/**
 	 * Return dot or colon notation of IPv4 or IPv6 address.
 	 *
 	 * @param string $ip
@@ -24,9 +35,14 @@ class wfWAFUtils {
 	 * @return string
 	 */
 	public static function inet_pton($ip) {
-		// convert the 4 char IPv4 to IPv6 mapped version.
-		$pton = str_pad(self::hasIPv6Support() ? inet_pton($ip) : self::_inet_pton($ip), 16,
-			"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\x00\x00\x00\x00", STR_PAD_LEFT);
+		$default = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\x00\x00\x00\x00";
+		try {
+			// convert the 4 char IPv4 to IPv6 mapped version.
+			$pton = str_pad(self::hasIPv6Support() ? inet_pton($ip) : self::_inet_pton($ip), 16, $default, STR_PAD_LEFT);
+		}
+		catch (Throwable $t) {
+			$pton = $default;
+		}
 		return $pton;
 	}
 

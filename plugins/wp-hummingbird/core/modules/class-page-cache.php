@@ -21,10 +21,12 @@ use Hummingbird\Core\Modules\Caching\Preload;
 use Hummingbird\Core\Settings;
 use Hummingbird\Core\Utils;
 use Hummingbird\Core\Modules\Caching\Fast_CGI;
+use Hummingbird\Core\SafeMode;
 use stdClass;
 use WP_Error;
 use WP_Post;
 use WP_Term;
+use Hummingbird\Core\Whitelabel;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -94,10 +96,6 @@ class Page_Cache extends Module {
 
 		add_action( 'admin_init', array( $this, 'maybe_update_advanced_cache' ) );
 
-		add_action( 'init', array( $this, 'init_preloader' ) );
-		// Preload page cache on post/page update.
-		add_action( 'wphb_page_cache_preload_page', array( new Preload(), 'preload_page_on_purge' ) );
-
 		/**
 		 * Trigger a cache clear.
 		 *
@@ -151,6 +149,8 @@ class Page_Cache extends Module {
 	 * @since 1.7.0
 	 */
 	public function init() {
+		// Register preload schedules even when page caching is disabled.
+		add_action( 'wphb_page_cache_preload_page', array( new Preload(), 'preload_page_on_purge' ) );
 		add_filter( 'wp_hummingbird_is_active_module_page_cache', array( $this, 'module_status' ) );
 		add_action( 'template_redirect', array( $this, 'wphb_maybe_start_buffer' ), 2 );
 	}
@@ -209,7 +209,6 @@ class Page_Cache extends Module {
 	 * check_plugin_compatibility()
 	 * check_minification_queue()
 	 * init_filesystem()
-	 * init_preloader()
 	 * maybe_update_advanced_cache()
 	 ***************************/
 
@@ -244,7 +243,7 @@ class Page_Cache extends Module {
 				$this->error = new WP_Error(
 					'caching-plugin-detected',
 					/* translators: %s: plugin name. */
-					sprintf( __( '%s plugin detected. Please disable it to use Hummingbird page caching functionality.', 'wphb' ), $plugin_name )
+					Whitelabel::replace_branding_terms( sprintf( __( '%s plugin detected. Please disable it to use Hummingbird page caching functionality.', 'wphb' ), $plugin_name ) )
 				);
 				break;
 			}
@@ -255,12 +254,14 @@ class Page_Cache extends Module {
 		if ( file_exists( $adv_cache_file ) && false === strpos( file_get_contents( $adv_cache_file ), 'WPHB_ADVANCED_CACHE' ) ) {
 			$this->error = new WP_Error(
 				'advanced-cache-detected',
-				sprintf( /* translators: %1$s - opening a tag, %2$s - closing a tag, %3$s - button tag, %4$s - closing button tag */
-					__( 'Hummingbird has detected an advanced-cache.php file in your site’s wp-content directory. %1$sManage your plugins%2$s and disable any other active caching plugins to ensure Hummingbird’s page caching works properly.<br>If no other caching plugins are active, the advanced-cache.php may have been left by a previously used caching plugin. You can remove the file from the wp-content directory, or remove it via your file manager or FTP.%3$sRemove file%4$s', 'wphb' ),
-					'<a href="' . esc_url( network_admin_url( 'plugins.php' ) ) . '">',
-					'</a>',
-					'<br><button id="wphb-remove-advanced-cache" style="margin-top: 10px" class="sui-button sui-button-blue" role="button">',
-					'</button>'
+				Whitelabel::replace_branding_terms(
+					sprintf( /* translators: %1$s - opening a tag, %2$s - closing a tag, %3$s - button tag, %4$s - closing button tag */
+						__( 'Hummingbird has detected an advanced-cache.php file in your site’s wp-content directory. %1$sManage your plugins%2$s and disable any other active caching plugins to ensure Hummingbird’s page caching works properly.<br>If no other caching plugins are active, the advanced-cache.php may have been left by a previously used caching plugin. You can remove the file from the wp-content directory, or remove it via your file manager or FTP.%3$sRemove file%4$s', 'wphb' ),
+						'<a href="' . esc_url( network_admin_url( 'plugins.php' ) ) . '">',
+						'</a>',
+						'<br><button id="wphb-remove-advanced-cache" style="margin-top: 10px" class="sui-button sui-button-blue" role="button">',
+						'</button>'
+					)
 				)
 			);
 		}
@@ -281,7 +282,7 @@ class Page_Cache extends Module {
 		if ( Fast_CGI::is_fast_cgi_enabled() ) {
 			$this->error = new WP_Error(
 				'fast-cgi-cache-active',
-				__( 'Hummingbird has halted page caching to prevent any issues with FastCGI cache', 'wphb' )
+				Whitelabel::replace_branding_terms( __( 'Hummingbird has halted page caching to prevent any issues with FastCGI cache', 'wphb' ) )
 			);
 		}
 	}
@@ -330,20 +331,6 @@ class Page_Cache extends Module {
 
 		// Try to define WP_CACHE in wp-config.php file.
 		$this->check_wp_settings();
-	}
-
-	/**
-	 * Init page caching preloader.
-	 *
-	 * @since 2.1.0
-	 */
-	public function init_preloader() {
-		$options = $this->get_options();
-		if ( ! isset( $options['preload'] ) || ! $options['preload'] ) {
-			return;
-		}
-
-		new Preload();
 	}
 
 	/**
@@ -466,6 +453,47 @@ class Page_Cache extends Module {
 		$wphb_cache_config->exclude_url     = isset( $settings['exclude']['url_strings'] ) && is_array( $settings['exclude']['url_strings'] ) ? $settings['exclude']['url_strings'] : array();
 		$wphb_cache_config->exclude_agents  = isset( $settings['exclude']['user_agents'] ) && is_array( $settings['exclude']['user_agents'] ) ? $settings['exclude']['user_agents'] : array();
 		$wphb_cache_config->exclude_cookies = isset( $settings['exclude']['cookies'] ) && is_array( $settings['exclude']['cookies'] ) ? $settings['exclude']['cookies'] : array();
+		$wphb_cache_config->safemode_status = isset( $settings['safemode_status'] ) ? (bool) $settings['safemode_status'] : false;
+	}
+
+	/**
+	 * Get the number of pages currently held in the cache.
+	 *
+	 * Stored as a network option to match how the counter behaved inside `wphb_settings`:
+	 * `filter_multisite_options()` puts `pages_cached` in the network half (it is not in
+	 * `get_blog_option_names( 'page_cache' )`, which allows only `cache_blog`), so every subsite
+	 * has always read one shared count.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @return int
+	 */
+	public static function get_cached_pages_count(): int {
+		return (int) get_site_option( Settings::PAGES_CACHED_OPTION, 0 );
+	}
+
+	/**
+	 * Set the number of pages currently held in the cache.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param int $count New count. Values below zero are stored as zero.
+	 *
+	 * @return void
+	 */
+	public static function set_cached_pages_count( int $count ): void {
+		update_site_option( Settings::PAGES_CACHED_OPTION, max( 0, $count ) );
+	}
+
+	/**
+	 * Increment the cached pages count by one.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @return void
+	 */
+	public static function increment_cached_pages_count(): void {
+		self::set_cached_pages_count( self::get_cached_pages_count() + 1 );
 	}
 
 	/**
@@ -559,12 +587,14 @@ class Page_Cache extends Module {
 		if ( ! file_exists( $this->wp_config_file ) ) {
 			$this->error = new WP_Error(
 				'no-wp-config-file',
-				sprintf( /* translators: %1$s - code tag, %2$s - closing code tag, %3$s - button tag, %4$s - closing button tag */
-					__( "Hummingbird could not locate your site’s wp-config.php file. Please ensure the following line has been added to the file:%1\$sdefine('WP_CACHE', true);%2\$sClick Retry to try again.%3\$sRetry%4\$s", 'wphb' ),
-					'<br><code>',
-					'</code><br><br>',
-					'<br><a href="' . esc_url( network_admin_url( 'admin.php?page=wphb-caching' ) ) . '" style="margin-top: 10px" class="sui-button sui-button-blue">',
-					'</a>'
+				Whitelabel::replace_branding_terms(
+					sprintf( /* translators: %1$s - code tag, %2$s - closing code tag, %3$s - button tag, %4$s - closing button tag */
+						__( "Hummingbird could not locate your site’s wp-config.php file. Please ensure the following line has been added to the file:%1\$sdefine('WP_CACHE', true);%2\$sClick Retry to try again.%3\$sRetry%4\$s", 'wphb' ),
+						'<br><code>',
+						'</code><br><br>',
+						'<br><a href="' . esc_url( network_admin_url( 'admin.php?page=wphb-caching' ) ) . '" style="margin-top: 10px" class="sui-button sui-button-blue">',
+						'</a>'
+					)
 				)
 			);
 
@@ -575,11 +605,13 @@ class Page_Cache extends Module {
 		if ( ! is_writable( $this->wp_config_file ) || ! is_writable( dirname( $this->wp_config_file ) ) ) {
 			$this->error = new WP_Error(
 				'wp-config-not-writable',
-				sprintf( /* translators: %1$s - code tag, %2$s - closing code tag, button tag, %3$s - closing button tag */
-					__( "Hummingbird could not write to your site’s wp-config.php file. Click Retry to try again, or manually add the following line to the file:%1\$sdefine('WP_CACHE', true);%2\$sRetry%3\$s", 'wphb' ),
-					'<br><code>',
-					'</code><br><a href="' . esc_url( network_admin_url( 'admin.php?page=wphb-caching' ) ) . '" style="margin-top: 10px" class="sui-button sui-button-blue">',
-					'</a>'
+				Whitelabel::replace_branding_terms(
+					sprintf( /* translators: %1$s - code tag, %2$s - closing code tag, button tag, %3$s - closing button tag */
+						__( "Hummingbird could not write to your site’s wp-config.php file. Click Retry to try again, or manually add the following line to the file:%1\$sdefine('WP_CACHE', true);%2\$sRetry%3\$s", 'wphb' ),
+						'<br><code>',
+						'</code><br><a href="' . esc_url( network_admin_url( 'admin.php?page=wphb-caching' ) ) . '" style="margin-top: 10px" class="sui-button sui-button-blue">',
+						'</a>'
+					)
 				)
 			);
 
@@ -606,7 +638,7 @@ class Page_Cache extends Module {
 		}
 
 		return array(
-			'frontpage' => __( 'Frontpage', 'wphb' ),
+			'frontpage' => __( 'Front page', 'wphb' ),
 			'home'      => __( 'Blog', 'wphb' ),
 			'page'      => __( 'Pages', 'wphb' ),
 			'single'    => __( 'Posts', 'wphb' ),
@@ -845,7 +877,7 @@ class Page_Cache extends Module {
 			return true;
 		} elseif ( is_page() && ! in_array( 'page', $wphb_cache_config->page_types, true ) ) {
 			return true;
-		} elseif ( is_single() && ! in_array( 'single', $wphb_cache_config->page_types, true ) ) {
+		} elseif ( is_single() && 'post' === get_post_type() && ! in_array( 'single', $wphb_cache_config->page_types, true ) ) {
 			return true;
 		} elseif ( is_archive() ) {
 			if ( in_array( 'archive', $wphb_cache_config->page_types, true ) ) {
@@ -1118,6 +1150,7 @@ class Page_Cache extends Module {
 		$config_file = $wphb_fs->basedir . 'wphb-cache.php';
 
 		self::log_msg( 'Writing configuration to: ' . $config_file );
+		$settings['safemode_status'] = SafeMode::instance()->get_status();
 		$this->write_file( $config_file, wp_json_encode( $settings ) );
 
 		$this->clear_cache();
@@ -1172,7 +1205,7 @@ class Page_Cache extends Module {
 		}
 
 		// Reset cached pages count to 0.
-		Settings::update_setting( 'pages_cached', 0, 'page_cache' );
+		self::set_cached_pages_count( 0 );
 	}
 
 	/**
@@ -1227,7 +1260,7 @@ class Page_Cache extends Module {
 		} elseif ( isset( $_GET['preview'] ) ) { // Input var okay.
 			self::log_msg( 'Do not cache preview post pages.' );
 			return false;
-		} elseif ( false === empty( $_GET ) && ! $wphb_cache_config->cache_with_get_params ) { // Input var ok.
+		} elseif ( false === empty( $_GET ) && ( ! $wphb_cache_config->cache_with_get_params && ! self::should_cache_safemode( $wphb_cache_config->safemode_status ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			self::log_msg( 'Skipping page with GET params.' );
 			return false;
 		} elseif ( preg_match( '/^\/wp.*php$/', strtok( $request_uri, '?' ) ) ) {
@@ -1249,6 +1282,9 @@ class Page_Cache extends Module {
 			return false;
 		} elseif ( ! isset( $_SERVER['HTTP_HOST'] ) ) { // Input var ok.
 			self::log_msg( 'Page can not be cached, no HTTP_HOST set.' );
+			return false;
+		} elseif ( $wphb_cache_config->safemode_status && ! isset( $_GET['wphb_preview_safe_mode'] ) && ( ! isset( $_SERVER['HTTP_USER_AGENT'] ) || strpos( $_SERVER['HTTP_USER_AGENT'], 'Lighthouse' ) === false ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			self::log_msg( 'Do not serve safemode cache for logged out users.' );
 			return false;
 		}
 
@@ -1361,8 +1397,7 @@ class Page_Cache extends Module {
 			}
 
 			// Update cached pages count.
-			$count = Settings::get_setting( 'pages_cached', 'page_cache' );
-			Settings::update_setting( 'pages_cached', ++$count, 'page_cache' );
+			self::increment_cached_pages_count();
 		}
 
 		return $buffer;
@@ -1627,7 +1662,7 @@ class Page_Cache extends Module {
 		// Purge whole cache directory.
 		if ( ! $directory ) {
 			// Reset cached pages count.
-			Settings::update_setting( 'pages_cached', 0, 'page_cache' );
+			self::set_cached_pages_count( 0 );
 
 			self::log_msg( 'Cache directory purged' );
 			$status = $wphb_fs->purge();
@@ -1677,7 +1712,7 @@ class Page_Cache extends Module {
 			return true;
 		}
 
-		$count = Settings::get_setting( 'pages_cached', 'page_cache' );
+		$count = self::get_cached_pages_count();
 
 		if ( is_dir( wp_normalize_path( $wphb_fs->cache_dir . '/mobile/' . $cache_dir ) ) ) {
 			if ( ! $skip_sub_dirs ) {
@@ -1697,7 +1732,7 @@ class Page_Cache extends Module {
 			( ! $skip_sub_dirs ) ? $count -= $files_purged : $count--;
 		}
 
-		Settings::update_setting( 'pages_cached', $count, 'page_cache' );
+		self::set_cached_pages_count( $count );
 
 		do_action( 'wphb_clear_cache_url', $directory_origin ); // Clear integrations cache.
 
@@ -1872,7 +1907,7 @@ class Page_Cache extends Module {
 				$this->clear_cache();
 
 				// Reset cached pages count.
-				Settings::update_setting( 'pages_cached', 0, 'page_cache' );
+				self::set_cached_pages_count( 0 );
 
 				return;
 			}
@@ -1926,7 +1961,7 @@ class Page_Cache extends Module {
 			$this->clear_cache();
 
 			// Reset cached pages count.
-			Settings::update_setting( 'pages_cached', 0, 'page_cache' );
+			self::set_cached_pages_count( 0 );
 		} else {
 			// Delete category and tag cache.
 			// Delete page cache.
@@ -1956,22 +1991,25 @@ class Page_Cache extends Module {
 			$message = print_r( $message, true );
 		}
 
-		$message = '[' . date( 'c' ) . '] ' . $message . PHP_EOL;
+		$file         = WP_CONTENT_DIR . '/wphb-logs/page-caching-log.php';
+		$guard        = '<?php die(); ?>' . PHP_EOL;
+		$guard_prefix = '<?php die();';
+		$needs_guard  = ! file_exists( $file ) || $guard_prefix !== @file_get_contents( $file, false, null, 0, strlen( $guard_prefix ) );
 
-		$file = WP_CONTENT_DIR . '/wphb-logs/page-caching-log.php';
-
-		// If file does not exist, we need to create it and add the die() header.
-		if ( ! file_exists( $file ) ) {
+		// If the file is missing or unguarded, create it with the die() header.
+		if ( $needs_guard ) {
 			global $wphb_fs;
 
-			if ( ! $wphb_fs && class_exists( 'Filesystem' ) ) {
+			if ( ! $wphb_fs && class_exists( Filesystem::class ) ) {
 				$wphb_fs = Filesystem::instance();
 			}
 
-			if ( $wphb_fs ) {
-				$wphb_fs->write( $file, '<?php die(); ?>' . PHP_EOL );
+			if ( ! $wphb_fs || true !== $wphb_fs->write( $file, $guard ) ) {
+				return;
 			}
 		}
+
+		$message = '[' . date( 'c' ) . '] ' . $message . PHP_EOL;
 
 		error_log( $message, 3, $file );
 	}
@@ -2039,13 +2077,15 @@ class Page_Cache extends Module {
 	 * @param bool $network Value for network. Default: false.
 	 */
 	public function toggle_service( $value, $network = false ) {
-		$options = parent::get_options();
+		$options        = parent::get_options();
+		$network_action = false;
 
 		if ( is_multisite() ) {
 			// We need to use this `define` for calls from Hub.
 			$is_network_admin = defined( 'WPHB_IS_NETWORK_ADMIN' ) && WPHB_IS_NETWORK_ADMIN;
 			if ( $network && ( is_network_admin() || Utils::is_ajax_network_admin() || $is_network_admin ) ) {
 				// Updating for the whole network.
+				$network_action        = true;
 				$options['enabled']    = $value;
 				$options['cache_blog'] = $value;
 			} else {
@@ -2062,6 +2102,14 @@ class Page_Cache extends Module {
 		}
 
 		$this->update_options( $options );
+		if ( ! $value ) {
+			if ( $network_action ) {
+				Preload::cleanup_network();
+			} else {
+				$preloader = new Preload();
+				$preloader->cleanup();
+			}
+		}
 
 		// Do not disable global cache, when disabled on subsite.
 		if ( is_multisite() && ! is_network_admin() ) {
@@ -2366,4 +2414,23 @@ class Page_Cache extends Module {
 
 		$this->clear_cache();
 	}
+
+	/**
+	 * Determine if we should cache the request for safemode is enabled.
+	 *
+	 * @since 3.18.0
+	 *
+	 * @param bool $safemode_status Current safemode status.
+	 *
+	 * @return bool
+	 */
+	private static function should_cache_safemode( $safemode_status ) :bool {
+		$preview = filter_input( INPUT_GET, 'wphb_preview_safe_mode', FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE );
+		if ( $safemode_status && $preview ) {
+			return true;
+		}
+
+		return false;
+	}
+
 }

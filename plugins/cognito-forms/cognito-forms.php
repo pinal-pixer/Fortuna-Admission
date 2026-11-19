@@ -20,7 +20,7 @@
  * Plugin Name:   Cognito Forms
  * Plugin URI:    http://wordpress.org/plugins/cognito-forms/
  * Description:   Cognito Forms is a free online form builder that integrates seamlessly with WordPress. Create contact forms, registrations forms, surveys, and more!
- * Version:       2.0.9
+ * Version:       2.0.12
  * Author:        Cognito Apps
  * Author URI:    https://www.cognitoforms.com
  * License:       GPL v2 or later
@@ -110,7 +110,12 @@ if ( !class_exists( 'CognitoFormsPlugin' ) ) {
 			) );
 
 			// If the flag to delete options was passed in, delete them
-			if ( isset( $_GET['cog_clear'] ) && $_GET['cog_clear'] == '1' ) {
+			if (
+				isset( $_GET['cog_clear'], $_GET['_wpnonce'] ) &&
+				'1' === sanitize_text_field( wp_unslash( $_GET['cog_clear'] ) ) &&
+				current_user_can( 'manage_options' ) &&
+				wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'cog_clear_key' )
+			) {
 				delete_option( 'cognito_public_key' );
 			}
 

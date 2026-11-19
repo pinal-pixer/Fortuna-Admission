@@ -3,7 +3,7 @@ Contributors: binsaifullah
 Tags: slider, carousel, slider block, gutenberg slider, image slider
 Requires at least: 6.5
 Tested up to: 7.1
-Stable tag: 3.2.0
+Stable tag: 3.4.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -24,30 +24,31 @@ Pick a ready-made design, drop in your content, and see the result live in the e
 
 ### ✨ Why Choose GutSlider
 
-* 🎨 **Design picker in every block** - start from a polished, ready-made design and adjust it in the sidebar.
-* 🧩 **Slide any content** - images, video, headings, buttons or any other block.
-* 🖱️ **Interactive motion** - slides that react to the mouse with depth, 3D tilt and spotlight effects, plus magnetic buttons.
-* ⚡ **Lightweight** - conditional asset loading, one CSS file per page, no jQuery.
-* 📱 **Fully responsive** - separate Desktop, Tablet and Mobile values for spacing, columns, typography and more.
-* 🎛️ **Complete slider controls** - autoplay, loop, speed, effects, centered mode, free mode and columns.
-* 🧭 **Custom navigation and pagination** - styles, positions, sizes, colours and gaps.
-* ♿ **Accessible** - keyboard support, pause buttons and respect for the reduced-motion setting.
-* 🔤 **Google Fonts and typography** - a full typography panel on every text element.
-* 📚 **Block patterns library** - ready-made slider layouts you can insert and edit.
-* 🔌 **Enable or disable blocks** - switch off the blocks you don't use from the GutSlider dashboard.
-* 🌍 **Translation ready** - fully internationalised and RTL friendly.
+* **Design picker in every block** - start from a polished, ready-made design and adjust it in the sidebar.
+* **Slide any content** - images, video, headings, buttons or any other block.
+* **Interactive motion** - slides that react to the mouse with depth, 3D tilt and spotlight effects, plus magnetic buttons.
+* **Lightweight** - conditional asset loading, one CSS file per page, no jQuery.
+* **Fully responsive** - separate Desktop, Tablet and Mobile values for spacing, columns, typography and more.
+* **Complete slider controls** - autoplay, loop, speed, effects, centered mode, free mode and columns.
+* **Custom navigation and pagination** - styles, positions, sizes, colours and gaps.
+* **Accessible** - keyboard support, pause buttons and respect for the reduced-motion setting.
+* **Google Fonts and typography** - a full typography panel on every text element.
+* **Block patterns library** - ready-made slider layouts you can insert and edit.
+* **Enable or disable blocks** - switch off the blocks you don't use from the GutSlider dashboard.
+* **Translation ready** - fully internationalised and RTL friendly.
 
 ### 🆓 Free Slider and Carousel Blocks
 
-* **[Static Slider](https://gutslider.com/static)** - a hero slider with image, heading, text and buttons, entrance animations for each element, pointer effects (depth, 3D tilt, spotlight) and magnetic buttons.
-* **[Flexible Slider](https://gutslider.com/flexible)** - slide any block content, with Hero and Cards designs and full background controls.
-* **[Testimonial Slider](https://gutslider.com/testimonial)** - reviews with photo, rating, name and designation.
-* **[Photo Carousel](https://gutslider.com/photo)** - image carousel with lightbox and a 3D Coverflow design.
-* **[Logo Carousel](https://gutslider.com/brand-logos)** - client and brand logo carousel.
-* **[Before After Slider](https://gutslider.com/before-after)** - drag, fade or toggle between two images, with labels and several designs.
-* **[Video Carousel](https://gutslider.com/videos)** - YouTube and Vimeo videos. Add many links at once, and titles and thumbnails fill in by themselves.
-* **[Blog Post Slider](https://gutslider.com/post-slider)** - dynamic post slider with query controls, related posts and Magazine Hero and Card Carousel designs.
-* **[Marquee](https://gutslider.com/marquee)** - an endlessly scrolling strip for logos, text or images, with Logo Strip, Text Ticker and Announcement Bar designs, a steady pixel speed, separators, fade edges, slow down or stop on hover, and a live motion preview in the editor.
+* **[Static Slider](https://demos.gutslider.com/static/)** - a hero slider with image, heading, text and buttons, entrance animations for each element, pointer effects (depth, 3D tilt, spotlight) and magnetic buttons.
+* **[Flexible Slider](https://demos.gutslider.com/flexible/)** - slide any block content, with Hero and Cards designs and full background controls.
+* **[Testimonial Slider](https://demos.gutslider.com/testimonial/)** - reviews with photo, rating, name and designation.
+* **[Photo Carousel](https://demos.gutslider.com/photos/)** - image carousel with lightbox and a 3D Coverflow design.
+* **[Logo Carousel](https://demos.gutslider.com/brand-logos/)** - client and brand logo carousel.
+* **[Before After Slider](https://demos.gutslider.com/before-after/)** - drag, fade or toggle between two images, with labels and several designs.
+* **[Video Carousel](https://demos.gutslider.com/videos-carousel/)** - YouTube and Vimeo videos. Add many links at once, and titles and thumbnails fill in by themselves.
+* **[Blog Post Slider](https://demos.gutslider.com/post-slider/)** - dynamic post slider with query controls, related posts and Magazine Hero and Card Carousel designs.
+* **Backdrop Slider** - one fixed background (colour, gradient or image, with an overlay) while slides of any blocks change over it. Ideal for hero sections.
+* **[Content Marquee](https://demos.gutslider.com/)** - an endlessly scrolling strip for logos, text or images, with Logo Strip, Text Ticker and Announcement Bar designs, a steady pixel speed, separators, fade edges, slow down or stop on hover, and a live motion preview in the editor.
 
 ### 🚀 GutSlider Pro: Make Every Slider Stand Out
 
@@ -55,14 +56,14 @@ The free blocks cover the essentials. **[GutSlider Pro](https://gutslider.com/pr
 
 **15 extra premium blocks**
 
-* **[Shader Slider](https://demos.gutslider.com/fashion-slider/)** - WebGL shader transitions between slides.
+* **[Shader Slider](https://demos.gutslider.com/shader-slider/)** - WebGL shader transitions between slides.
 * **[Shutters Slider](https://demos.gutslider.com/shutters-slider/)** - slides open and close like window shutters.
 * **[Slicer Slider](https://demos.gutslider.com/slicer-slider/)** - images slice apart as they change.
 * **[Fashion Slider](https://demos.gutslider.com/fashion-slider/)** - bold, editorial slider for fashion and lifestyle brands.
 * **[Triple Slider](https://demos.gutslider.com/triple-slider/)** - three images moving together.
 * **[Card Slider](https://demos.gutslider.com/card-slider/)** - stacked, swipeable cards.
 * **[Hover Slider](https://demos.gutslider.com/hover-slider/)** - hover a title to reveal its image.
-* **[Tinder Slider](https://gutslider.com/pricing/)** - swipe cards left and right.
+* **[Tinder Slider](https://demos.gutslider.com/tinder-slider/)** - swipe cards left and right.
 * **[Spring Carousel](https://demos.gutslider.com/spring-carousel/)** - springy, physics-style motion.
 * **[Panorama Carousel](https://demos.gutslider.com/panorama-carousel/)** - a curved, panoramic view.
 * **[3D Carousel](https://demos.gutslider.com/3d-carousel/)** - a rotating 3D ring of slides.
@@ -80,31 +81,33 @@ The free blocks cover the essentials. **[GutSlider Pro](https://gutslider.com/pr
 * **Before After** - Glass Handle, Rounded Card, Split Labels and Dark Studio.
 * **Video Carousel** - Cinema, Playlist and Video Cards.
 * **Blog Post Slider** - Overlay Grid, Featured + List and Minimal Timeline.
-* **Marquee** - Testimonials, Image Strip and Tag Cloud.
+* **Content Marquee** - Testimonials, Image Strip and Tag Cloud.
 
 **Premium features**
 
-* 🔍 **SEO schema markup** - video rich results (VideoObject) for the Video Carousel and ItemList markup for the Blog Post Slider.
-* 🎬 **Before-after video comparisons** - compare two videos playing in sync, not just images.
-* 🖼️ **Multiple comparisons in one block** - switch between before-after pairs with thumbnails.
-* ▶️ **Auto-play and fullscreen** for before-after comparisons.
-* 🎥 **Video extras** - play in a lightbox, preview on hover, silent looping backgrounds, custom thumbnails and custom end times.
-* 🎬 **Content reveal** for the Static Slider - subtitle, title, description and buttons play in one cinematic sequence. Choose words rise, letters flip, blur in or mask reveal, and a slow, normal or fast pace. It replays on every slide and waits until the slider is on screen.
-* ✨ **Content animations and background effects** for the Flexible Slider.
-* 🌊 **Marquee motion** - up to three rows moving in opposite directions, marquees that move with page scroll, drag or swipe to move, and reverse or speed up on scroll.
-* 🗂️ **Slide names as tabs** - turn any Flexible Slider into a tabbed showcase.
-* 📱 **Per-device slide visibility and responsive background images.**
-* 🔗 **Wrapper links** - make a whole slide clickable.
-* 🧭 **Remote navigation** - control a slider from buttons anywhere on the page.
-* 🧷 **Detached content and thumbnail gallery navigation** for the Static and Blog Post sliders.
-* 💬 **Priority support** from the team that builds GutSlider.
+* **SEO schema markup** - video rich results (VideoObject) for the Video Carousel and ItemList markup for the Blog Post Slider.
+* **Before-after video comparisons** - compare two videos playing in sync, not just images.
+* **Multiple comparisons in one block** - switch between before-after pairs with thumbnails.
+* **Auto-play and fullscreen** for before-after comparisons.
+* **Video extras** - play in a lightbox, preview on hover, silent looping backgrounds, custom thumbnails and custom end times.
+* **Content reveal** for the Static Slider - subtitle, title, description and buttons play in one cinematic sequence. Choose words rise, letters flip, blur in or mask reveal, and a slow, normal or fast pace. It replays on every slide and waits until the slider is on screen.
+* **Content animations and background effects** for the Flexible Slider.
+* **Dynamic Backdrop Slider** - fill the slides from posts, pages or any post type. Design one post template and it repeats for each post over the shared background.
+* **Video backgrounds** for the Backdrop Slider.
+* **Marquee motion** - up to three rows moving in opposite directions, marquees that move with page scroll, drag or swipe to move, and reverse or speed up on scroll.
+* **Slide names as tabs** - turn any Flexible Slider into a tabbed showcase.
+* **Per-device slide visibility and responsive background images.**
+* **Wrapper links** - make a whole slide clickable.
+* **Remote navigation** - control a slider from buttons anywhere on the page.
+* **Detached content and thumbnail gallery navigation** for the Static and Blog Post sliders.
+* **Priority support** from the team that builds GutSlider.
 
 👉 **[Upgrade to GutSlider Pro](https://gutslider.com/pricing/)**. Your existing free sliders keep working as they are, and the Pro options unlock in the same sidebar.
 
 ### 🔗 Useful Links
 
 * [All Demos](https://demos.gutslider.com/)
-* [Documentation](https://gutslider.com/)
+* [Documentation](https://gutslider.com/docs/gutslider/overview/)
 * [Get GutSlider Pro](https://gutslider.com/pricing/)
 
 == Installation ==
@@ -132,6 +135,9 @@ Yes. All the blocks listed under "Free Slider and Carousel Blocks" are free fore
 
 = What do I get with GutSlider Pro? =
 Pro adds 15 premium slider and carousel blocks (including WooCommerce product carousels), premium designs for every free block, SEO schema markup, before-after video comparisons, video lightbox and hover previews, content animations, remote navigation and priority support. See [the pricing page](https://gutslider.com/pricing/).
+
+= Is there a lifetime license, and can I get a refund? =
+Yes. GutSlider Pro comes as a yearly license or a one-time lifetime license, for 1, 10 or 1,000 websites. Every plan has a 14-day money-back guarantee. See [the pricing page](https://gutslider.com/pricing/).
 
 = Will my sliders break if I upgrade to Pro or stop using it? =
 No. Pro builds on the free plugin, so your existing sliders stay the same. Pro options simply unlock in the same sidebar.
@@ -165,6 +171,14 @@ Use the plugin's [support forum](https://wordpress.org/support/plugin/slider-blo
 
 == Screenshots ==
 
+1. Flexible Slider - hero slides built from ordinary blocks, with buttons, overlays and a rating line.
+2. Blog Post Slider - a magazine-style slider made from your latest posts.
+3. Testimonial Slider - customer quotes with photo, star rating, name and role.
+4. Before After Slider - drag to compare two images, with custom labels.
+5. WooCommerce Product Carousel (Pro) - live products with prices, sale badges and Add to cart.
+6. 3D Carousel (Pro) - a coverflow carousel with depth and an order button on each card.
+7. All GutSlider blocks in the block inserter, ready to add to any post, page or template.
+
 == External Services ==
 
 **Google Fonts** - When you select a Google Font in a block's typography settings, the font stylesheet is requested from `https://fonts.googleapis.com` and the font files from `https://fonts.gstatic.com` on the pages where that block appears. Visitors' IP address and browser user agent are sent to Google as part of that request. No request is made if you only use system or theme fonts.
@@ -179,6 +193,43 @@ YouTube Terms of Service: https://www.youtube.com/t/terms - Google Privacy Polic
 * [fslightbox](https://fslightbox.com/) - image lightbox for the Photo Carousel block.
 
 == Changelog ==
+= 3.4.2 =
+* Changed: New outline icons for every free block, in the same style as the GutSlider Pro blocks
+* Changed: The free Marquee block is now called Content Marquee, so it is easy to tell apart from the Pro Marquee Carousel
+
+= 3.4.1 =
+* Changed: The seasonal GutSlider Pro offer notice now reflects the early Black Friday sale (live until 1 December)
+
+= 3.4.0 =
+* Added: Backdrop Slider block - one fixed background (colour, gradient or image, with an overlay) with slides of any blocks changing over it
+* Added: Backdrop Slider - Slide, Fade and Rise effects, content position, responsive height, width and padding, arrow and pagination styling, and a pause button for autoplay
+* Added: Backdrop Slider - choose Static or Dynamic content when you set the block up, as in the Pro blocks
+* Added (Pro): Dynamic Backdrop Slider - slides from posts, pages or any post type, built from one editable post template, with post type, taxonomy, order and offset settings
+* Added (Pro): Video backgrounds for the Backdrop Slider
+* Changed: Overlay Opacity in the background settings now has the same reset button as the other range controls
+
+= 3.3.1 =
+* Added: A one-time, dismissible request for a WordPress.org review, shown a week after install on sites that use GutSlider blocks
+* Added: Dismissible notices for seasonal GutSlider Pro offers, shown only to admins on the Dashboard, Plugins and GutSlider screens
+
+= 3.3.0 =
+* Added: Slide Radius in the Flexible, Blog Post and Testimonial sliders
+* Added: Blog Post Slider - "Picked order" for hand-picked posts, with drag and arrow reordering, and Story List colours for the Featured + List design
+* Added: Testimonial - headline for Presets 1 and 2, and a "Top" photo direction for Preset 2
+* Added: Photo Carousel - Top Center and Bottom Center caption positions
+* Added: Brand Logos - Logo Colour: original, grey until hovered, or white for dark backgrounds
+* Added: Progress bar size now works in the Logo and Photo carousels
+* Fixed: Fade effect showing the text of two slides at once
+* Fixed: Static Slider - content margin cancelled the left/right content alignment
+* Fixed: Flexible Slider - content and slide padding overflowing on phones, Hero design ignoring Content Padding, and slides collapsing with more than one grid row
+* Fixed: Testimonial - content cut off on phones, star colour ignored by the modern designs, and pagination dots covering Preset 2 cards
+* Fixed: Blog Post Slider - category filter ignoring term ids, and an unused copy of the posts saved in the block
+* Fixed: Video Carousel - poster covering silent-loop videos, and Cards pagination outside the panel
+* Fixed: Navigation and pagination not working on newly inserted Logo, Photo, Blog Post, Testimonial and Video sliders until another setting was changed
+* Fixed: Line height of 1.15 printed as 1.15px, and settings saved without a value printing invalid CSS
+* Fixed: Mouse wheel control holding the page; the page now scrolls on at the first and last slide
+* Fixed: Linked padding or border width of 0 set from code being ignored
+
 = 3.2.0 =
 * Added: Design picker with ready-made designs in the Static, Flexible, Testimonial, Photo, Before After, Video, Blog Post and Marquee blocks
 * Added: Marquee - rewritten motion engine with a steady speed in pixels per second, new designs, separators, item width and alignment, fade edges, slow down on hover, and a "Preview motion" button in the editor
@@ -270,6 +321,9 @@ YouTube Terms of Service: https://www.youtube.com/t/terms - Google Privacy Polic
 For the full release history, see [changelog.txt](https://plugins.svn.wordpress.org/slider-blocks/trunk/changelog.txt).
 
 == Upgrade Notice ==
+
+= 3.3.0 =
+New slide radius, picked post order, logo colour and caption options, and many layout fixes for phones. Existing sliders keep working without block recovery.
 
 = 3.2.0 =
 Big design update: a design picker in every block, a rebuilt Marquee, interactive motion effects for the Static Slider, faster video setup and many fixes. Existing sliders keep working without block recovery.

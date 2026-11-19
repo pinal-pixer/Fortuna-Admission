@@ -21,7 +21,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Class Performance
  */
 class Performance extends Module {
-
 	use ModuleContract;
 
 	/**
@@ -66,23 +65,6 @@ class Performance extends Module {
 	}
 
 	/**
-	 * Do a cron scan.
-	 *
-	 * @return array|mixed|object|WP_Error
-	 */
-	public static function cron_scan() {
-		// Start the test.
-		self::set_doing_report();
-		$api    = Utils::get_api();
-		$report = $api->performance->check();
-		// Stop the test.
-		self::set_doing_report( false );
-
-		// Return the results.
-		return $report;
-	}
-
-	/**
 	 * Return the last Performance scan done data
 	 *
 	 * @return bool|mixed|WP_Error Data of the last scan or false of there's not such data
@@ -92,6 +74,24 @@ class Performance extends Module {
 		self::move_audits_without_score( $report );
 
 		return $report ? $report : false;
+	}
+
+	/**
+	 * Get last report scores.
+	 *
+	 * @since 3.18.0
+	 * @return array|false
+	 */
+	public static function get_last_report_scores() {
+		$report = self::get_last_report();
+		if ( ! $report || is_wp_error( $report ) ) {
+			return false;
+		}
+
+		return array(
+			'mobile'  => isset( $report->data->mobile->score ) ? $report->data->mobile->score : 0,
+			'desktop' => isset( $report->data->desktop->score ) ? $report->data->desktop->score : 0,
+		);
 	}
 
 	/**
@@ -167,6 +167,49 @@ class Performance extends Module {
 
 		// Only save reports from Performance module.
 		Settings::update( 'wphb-last-report', $results, false );
+
+		if ( ! is_wp_error( $results ) && ! empty( $results->data->time ) ) {
+			// Kept apart from the report, which clear_cache() (also run by a plugin reset) deletes.
+			set_transient( 'wphb-last-report-time', (int) $results->data->time, 300 );
+		}
+	}
+
+	/**
+	 * Stand-in for a report a plugin reset deleted: the time kept beside it (see refresh_report()).
+	 *
+	 * @since 4.0.0
+	 *
+	 * @return object|false Report-shaped object carrying only `data->time`, or false.
+	 */
+	private static function get_last_report_stub() {
+		$time = (int) get_transient( 'wphb-last-report-time' );
+
+		return $time ? (object) array( 'data' => (object) array( 'time' => $time ) ) : false;
+	}
+
+	/**
+	 * When the next performance test may start: 5 minutes after the last report.
+	 *
+	 * @since 4.0.0
+	 *
+	 * @param bool|wp_error|array|object $last_report  Last report.
+	 *
+	 * @return int Unix timestamp, or 0 when no test has run.
+	 */
+	public static function cooldown_ends_at( $last_report = false ) {
+		if ( ! $last_report || is_wp_error( $last_report ) ) {
+			$last_report = self::get_last_report();
+		}
+
+		if ( ! $last_report || is_wp_error( $last_report ) ) {
+			$last_report = self::get_last_report_stub();
+		}
+
+		if ( $last_report && ! is_wp_error( $last_report ) && ! empty( $last_report->data->time ) ) {
+			return (int) $last_report->data->time + 300;
+		}
+
+		return 0;
 	}
 
 	/**
@@ -179,6 +222,11 @@ class Performance extends Module {
 	public static function can_run_test( $last_report = false ) {
 		if ( ! $last_report || is_wp_error( $last_report ) ) {
 			$last_report = self::get_last_report();
+		}
+
+		// A plugin reset deletes the report; the time kept beside it still enforces the cooldown.
+		if ( ! $last_report || is_wp_error( $last_report ) ) {
+			$last_report = self::get_last_report_stub();
 		}
 
 		$current_gmt_time = time();
@@ -312,7 +360,7 @@ class Performance extends Module {
 	 * Triggered when a performance scan is initialized
 	 */
 	public function on_init_performance_scan() {
-		if ( Utils::is_member() ) {
+		if ( Utils::has_access_to_hub() ) {
 			return;
 		}
 
@@ -320,87 +368,6 @@ class Performance extends Module {
 		$options['reports'] = false;
 
 		$this->update_options( $options );
-	}
-
-	/**
-	 * Return audits mapped to metrics that they affect.
-	 *
-	 * @since 3.1.0
-	 *
-	 * @return array
-	 */
-	public static function get_maps() {
-		return array(
-			'fcp' => array(
-				'server-response-time',
-				'render-blocking-resources',
-				'redirects',
-				'critical-request-chains',
-				'uses-text-compression',
-				'uses-rel-preconnect',
-				'uses-rel-preload',
-				'font-display',
-				'unminified-javascript',
-				'unminified-css',
-				'unused-css-rules',
-			),
-			'lcp' => array(
-				'server-response-time',
-				'render-blocking-resources',
-				'redirects',
-				'critical-request-chains',
-				'uses-text-compression',
-				'uses-rel-preconnect',
-				'uses-rel-preload',
-				'font-display',
-				'unminified-javascript',
-				'unminified-css',
-				'unused-css-rules',
-				'largest-contentful-paint-element',
-				'preload-lcp-image',
-				'unused-javascript',
-				'efficient-animated-content',
-				'total-byte-weight',
-			),
-			'tbt' => array(
-				'long-tasks',
-				'third-party-summary',
-				'third-party-facades',
-				'bootup-time',
-				'mainthread-work-breakdown',
-				'dom-size',
-				'duplicated-javascript',
-				'legacy-javascript',
-			),
-			'cls' => array(
-				'layout-shift-elements',
-				'non-composited-animations',
-				'unsized-images',
-			),
-		);
-	}
-
-	/**
-	 * Return relevant metric IDs based on audit ID.
-	 *
-	 * @since 3.1.0
-	 *
-	 * @param string $audit  Audit ID.
-	 *
-	 * @return string  Metric IDs, separated with a space.
-	 */
-	public static function get_relevant_metrics( $audit ) {
-		$metrics = array();
-
-		foreach ( self::get_maps() as $metric => $audits ) {
-			if ( ! in_array( $audit, $audits, true ) ) {
-				continue;
-			}
-
-			$metrics[] = $metric;
-		}
-
-		return implode( ' ', $metrics );
 	}
 
 	/**

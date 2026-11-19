@@ -225,7 +225,7 @@ class Parser {
 	public function get_element_attributes( $element, $base_url ) {
 		$image_attributes = array();
 
-		$pattern = '#\b(?<name>(?:data-(?:[a-z0-9_-]+-)?)?(?:[a-z0-9_-]+))\s*=\s*(["\'])(?<value>[^\'"]+)\2#is';
+		$pattern = '#(?<!\.)\b(?<name>(?:data-(?:[a-z0-9_-]+-)?)?(?:[a-z0-9_-]+))\s*=\s*(["\'])(?<value>[^\'"]+)\2#is';
 		$pattern = apply_filters( 'wp_smush_image_attributes_regex', $pattern );
 
 		if ( ! preg_match_all( $pattern, $element, $matches, PREG_SET_ORDER ) ) {
@@ -275,7 +275,7 @@ class Parser {
 		 */
 
 		// Regex rule to get all inline style after background(-image) property.
-		$pattern = '#(?<!-)\b(?<property>background(?:-image)?):(?<value>[^;:]*?url\s*\([^>]+\)[^=:;]*);{0,1}#is';
+		$pattern = '#(?<!-)\b(?<property>background(?:-image)?):(?<value>[^;:]*?(?:url|image-set)\s*\([^>]+\)[^=:;]*);{0,1}#is';
 		$pattern = apply_filters( 'wp_smush_background_images_regex', $pattern );
 
 		if ( ! preg_match_all( $pattern, $style, $matches, PREG_SET_ORDER ) ) {
@@ -447,18 +447,50 @@ class Parser {
 	}
 
 	public function get_element_attribute_value( $element_markup, $attribute_name ) {
-		if ( strpos( $element_markup, $attribute_name ) === false ) {
+		if ( false === stripos( $element_markup, $attribute_name ) ) {
 			return '';
 		}
 
-		$pattern = '#' . $attribute_name . '\s*=\s*([\'|"])(?<value>(?:(?!\1).)*)\1#is';
+		$pattern = '#' . preg_quote( $attribute_name, '#' ) . '\s*=\s*([\'"])(?<value>(?:(?!\1).)*)\1#is';
 		if ( ! preg_match_all( $pattern, $element_markup, $matches, PREG_SET_ORDER ) ) {
 			return '';
 		}
 
-		return empty( $matches[0]['value'] )
-			? ''
-			: $matches[0]['value'];
+		$value = $matches[0]['value'];
+		if ( '' === $value ) {
+			return '';
+		}
+
+		if ( ! $this->is_valid_element_attribute_value( $element_markup, $attribute_name, $value ) ) {
+			return '';
+		}
+
+		// Preserve the original entity encoding used by existing callers/replacements.
+		return $value;
+	}
+
+	/**
+	 * Validate a regex-extracted value against the actual HTML attribute.
+	 *
+	 * @param string $element_markup Element markup.
+	 * @param string $attribute_name Attribute name.
+	 * @param string $value          Regex-extracted attribute value.
+	 * @return bool
+	 */
+	private function is_valid_element_attribute_value( $element_markup, $attribute_name, $value ) {
+		if ( ! class_exists( '\WP_HTML_Tag_Processor' ) ) {
+			return false;
+		}
+
+		$processor = new \WP_HTML_Tag_Processor( $element_markup );
+		if ( ! $processor->next_tag() ) {
+			return false;
+		}
+
+		$actual_value  = $processor->get_attribute( $attribute_name );
+		$decoded_value = html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+		return is_string( $actual_value ) && $decoded_value === $actual_value;
 	}
 
 	public function markup_contains_noscript( $markup ) {
@@ -517,18 +549,40 @@ class Parser {
 		$html_element_inner_markup   = null;
 		$html_element_inner_position = null;
 		if ( substr_count( $markup, '<' . $tag ) < 2 ) {
-			$pattern = '~<' . $tag . '\b[^>]*>(.*?)</' . $tag . '>~is';
+			$pattern = '~<(?<tag>' . $tag . ')\b[^>]*>(.*?)</' . $tag . '>~is';
 		} else {
-			$pattern = '~<' . $tag . '\b[^>]*>((?>(?:[^<]++|<(?!/?' . $tag . '\b[^>]*>))+|(?R))*)</' . $tag . '>~is';
+			$pattern = '~<(?<tag>[a-zA-Z][a-zA-Z0-9]*)\b[^>]*>((?>(?:[^<]+|<(?!/?\1\b[^>]*>)+|(?R))*))</\1>~is';
 		}
 		$tags_found = preg_match_all( $pattern, $markup, $matches, PREG_PATTERN_ORDER | PREG_OFFSET_CAPTURE );
 		if ( $tags_found ) {
-			$html_element_markup         = $this->array_utils->get_array_value( $matches, [ 0, $index, 0 ] );
-			$html_element_position       = $this->array_utils->get_array_value( $matches, [ 0, $index, 1 ] );
-			$html_element_inner_markup   = $this->array_utils->get_array_value( $matches, [ 1, $index, 0 ] );
-			$html_element_inner_position = $this->array_utils->get_array_value( $matches, [ 1, $index, 1 ] );
+			$matches = $this->filter_out_irrelevant_elements( $matches, $tag );
+			if ( $matches ) {
+				$html_element_markup         = $this->array_utils->get_array_value( $matches, [ 0, $index, 0 ] );
+				$html_element_position       = $this->array_utils->get_array_value( $matches, [ 0, $index, 1 ] );
+				$html_element_inner_markup   = $this->array_utils->get_array_value( $matches, [ 1, $index, 0 ] );
+				$html_element_inner_position = $this->array_utils->get_array_value( $matches, [ 1, $index, 1 ] );
+			}
 		}
 
 		return [ $html_element_markup, $html_element_position, $html_element_inner_markup, $html_element_inner_position ];
+	}
+
+	private function filter_out_irrelevant_elements( $matches, $target_tag ) {
+		$outer          = $matches[0];
+		$tags           = $matches[1];
+		$inner          = $matches[2];
+		$filtered_outer = array();
+		$filtered_inner = array();
+		foreach ( $outer as $index => $outer_element ) {
+			$tag = $tags[ $index ][0];
+			if ( $tag !== $target_tag ) {
+				continue;
+			}
+
+			$filtered_outer[] = $outer_element;
+			$filtered_inner[] = $inner[ $index ];
+		}
+
+		return array( $filtered_outer, $filtered_inner );
 	}
 }

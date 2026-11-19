@@ -2822,3 +2822,43 @@ msgstr ""
 msgctxt "block description"
 msgid "Display videos in a carousel."
 msgstr ""
+
+#: admin/cartlet-card.php:139
+msgid "Activate Cartlet"
+msgstr ""
+
+#: admin/cartlet-card.php:143
+msgid "Install Cartlet free"
+msgstr ""
+
+#: admin/cartlet-card.php:150
+msgid "Dismiss this recommendation"
+msgstr ""
+
+#: admin/cartlet-card.php:152
+msgid "Recommended for your store"
+msgstr ""
+
+#: admin/cartlet-card.php:156
+msgid "Cartlet: share & save carts"
+msgstr ""
+
+#: admin/cartlet-card.php:157
+msgid "Free, from the team behind this plugin"
+msgstr ""
+
+#: admin/cartlet-card.php:160
+msgid "Showing products in sliders? Let shoppers share the cart they fill as a link, or save it for later."
+msgstr ""
+
+#: admin/cartlet-card.php:162
+msgid "Cart as a link, QR code or WhatsApp message"
+msgstr ""
+
+#: admin/cartlet-card.php:163
+msgid "Saved carts, even for guests"
+msgstr ""
+
+#: admin/cartlet-card.php:164
+msgid "Ready-made cart links with a coupon"
+msgstr ""

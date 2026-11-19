@@ -118,6 +118,16 @@ final class EnqueueAssets {
 			true
 		);
 
+		/*
+		 * Mouse wheel control: once the first or last slide is reached, the wheel scrolls the
+		 * page again instead of being held by the slider. Saved options say `mousewheel: true`,
+		 * which Swiper fills in from these defaults.
+		 */
+		wp_add_inline_script(
+			'gutslider-swiper-script',
+			'window.Swiper && window.Swiper.extendDefaults({ mousewheel: { releaseOnEdges: true } });'
+		);
+
 		wp_localize_script(
 			'gutslider-swiper-script',
 			'gutslider_swiper',

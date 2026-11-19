@@ -3,7 +3,6 @@
 namespace Smush\Core\LCP;
 
 use DOMDocument;
-use DOMXPath;
 use Smush\Core\Parser\Element;
 use Smush\Core\Parser\Parser;
 
@@ -99,18 +98,33 @@ class LCP_Locator {
 	}
 
 	private function get_lcp_element_by_url() {
-		$element   = null;
 		$image_url = $this->lcp_data->get_image_url();
-		if ( ! empty( $image_url ) ) {
-			$elements = $this->parser->get_elements_with_image_url( $this->markup, $image_url, $this->base_url );
-			if ( count( $elements ) > 1 ) {
-				$element = $this->disambiguate_lcp_element( $elements );
-			} else if ( count( $elements ) === 1 ) {
-				$element = $elements[0];
+		if ( empty( $image_url ) ) {
+			return null;
+		}
+
+		// Prepare possible image URLs to check.
+		$image_urls = array( $image_url );
+		// We escaped attribute, so we need to check the escaped version as well.
+		$image_urls[] = esc_attr( $image_url );
+
+		foreach ( $image_urls as $url ) {
+			$elements = $this->parser->get_elements_with_image_url( $this->markup, $url, $this->base_url );
+			if ( empty( $elements ) ) {
+				continue;
+			}
+
+			if ( count( $elements ) === 1 ) {
+				return $elements[0];
+			}
+
+			$element = $this->disambiguate_lcp_element( $elements );
+			if ( $element ) {
+				return $element;
 			}
 		}
 
-		return $element;
+		return null;
 	}
 
 	private function locate_lcp_element_using_xpath( $markup ) {

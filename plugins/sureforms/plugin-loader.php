@@ -36,8 +36,11 @@ use SRFM\Inc\Duplicate_Form;
 use SRFM\Inc\Email_Delivery\Suremail_Adapter;
 use SRFM\Inc\Events_Scheduler;
 use SRFM\Inc\Export;
+use SRFM\Inc\Features;
 use SRFM\Inc\Form_Restriction;
+use SRFM\Inc\Form_Start;
 use SRFM\Inc\Form_Submit;
+use SRFM\Inc\Form_Templates;
 use SRFM\Inc\Form_Views;
 use SRFM\Inc\Forms_Data;
 use SRFM\Inc\Frontend_Assets;
@@ -54,6 +57,7 @@ use SRFM\Inc\Migrator\Bootstrap as Migrator_Bootstrap;
 use SRFM\Inc\Onboarding;
 use SRFM\Inc\Page_Builders\Page_Builders;
 use SRFM\Inc\Payments\Payments;
+use SRFM\Inc\Payments\Stripe\Stripe_Webhook;
 use SRFM\Inc\Post_Types;
 use SRFM\Inc\Rest_Api;
 use SRFM\Inc\Single_Form_Settings\Compliance_Settings;
@@ -231,7 +235,12 @@ class Plugin_Loader {
 		// outside the admin context (REST dispatch runs with `is_admin()` ===
 		// false, so admin-only instantiation would 404 the endpoint).
 		Html_Form_Detector::get_instance();
-		Payments::get_instance();
+		if ( Features::is_enabled( 'payments' ) ) {
+			Payments::get_instance();
+		}
+		// Booted whatever the Payments switch says: renewals, refunds and disputes on
+		// existing subscriptions keep arriving and must still be recorded.
+		Stripe_Webhook::get_instance();
 		Duplicate_Form::get_instance();
 		Learn::get_instance();
 	}
@@ -312,9 +321,14 @@ class Plugin_Loader {
 		Smart_Tags::get_instance();
 		Generate_Form_Markup::get_instance();
 		Create_New_Form::get_instance();
+		Form_Templates::get_instance();
+		Form_Start::get_instance();
 		Global_Settings::get_instance();
 		Global_Settings_Defaults::get_instance();
-		Email_Summary::get_instance();
+		// The summary reports stored entries, so it has nothing to send without them.
+		if ( Features::is_enabled( 'entries' ) ) {
+			Email_Summary::get_instance();
+		}
 		add_action( Suremail_Adapter::QUOTA_REFRESH_HOOK, [ Suremail_Adapter::class, 'refresh_surecontact_quota' ] );
 		Compliance_Settings::get_instance();
 		Form_Settings_Api::get_instance();
@@ -324,6 +338,8 @@ class Plugin_Loader {
 		Background_Process::get_instance();
 		Page_Builders::get_instance();
 		Rest_Api::get_instance();
+		add_filter( 'srfm_rest_api_endpoints', [ Features::class, 'filter_endpoints' ], PHP_INT_MAX );
+		add_action( 'admin_page_access_denied', [ Features::class, 'redirect_disabled_page' ] );
 		// region: form-migration — Phase P1 foundation.
 		Migrator_Bootstrap::get_instance();
 		// endregion: form-migration.

@@ -64,6 +64,6 @@ if ( apply_filters( 'astra_header_profile_gmpg_link', true ) ) {
 
 	astra_content_before();
 	?>
-	<main id="content" class="site-content">
+	<div id="content" class="site-content">
 		<div class="ast-container">
 		<?php astra_content_top(); ?>

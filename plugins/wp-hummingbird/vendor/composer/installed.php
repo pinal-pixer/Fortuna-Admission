@@ -1,9 +1,9 @@
 <?php return array(
     'root' => array(
         'name' => 'incsub/wp-hummingbird',
-        'pretty_version' => 'dev-release/3.17.1',
-        'version' => 'dev-release/3.17.1',
-        'reference' => 'b5ae7fcfa751217062322a736ba3c416d586147b',
+        'pretty_version' => 'dev-release/4.0.1',
+        'version' => 'dev-release/4.0.1',
+        'reference' => 'd5ae75139405f702bf56bf35307733d4c7edc768',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -11,20 +11,11 @@
     ),
     'versions' => array(
         'incsub/wp-hummingbird' => array(
-            'pretty_version' => 'dev-release/3.17.1',
-            'version' => 'dev-release/3.17.1',
-            'reference' => 'b5ae7fcfa751217062322a736ba3c416d586147b',
+            'pretty_version' => 'dev-release/4.0.1',
+            'version' => 'dev-release/4.0.1',
+            'reference' => 'd5ae75139405f702bf56bf35307733d4c7edc768',
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
-            'aliases' => array(),
-            'dev_requirement' => false,
-        ),
-        'predis/predis' => array(
-            'pretty_version' => 'v1.1.10',
-            'version' => '1.1.10.0',
-            'reference' => 'a2fb02d738bedadcffdbb07efa3a5e7bd57f8d6e',
-            'type' => 'library',
-            'install_path' => __DIR__ . '/../predis/predis',
             'aliases' => array(),
             'dev_requirement' => false,
         ),

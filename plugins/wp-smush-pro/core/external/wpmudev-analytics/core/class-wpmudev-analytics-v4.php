@@ -164,9 +164,9 @@ if ( ! class_exists( 'WPMUDEV_Analytics_V4' ) ) {
 			" );
 			$updated     = $wpdb->query( "
 				UPDATE {$table}
-				SET
+				SET 
 				  {$value_column} = CASE
-				      WHEN COALESCE(JSON_EXTRACT({$value_column}, '$.timestamp'), 0) + {$time_window} < {$time_now} THEN
+				      WHEN COALESCE(JSON_EXTRACT({$value_column}, '$.timestamp'), 0) + {$time_window} < {$time_now} THEN 
 				        JSON_SET({$value_column}, '$.timestamp', {$time_now}, '$.event_count', 0)
 				      ELSE
 				        JSON_SET({$value_column}, '$.event_count', COALESCE(JSON_EXTRACT({$value_column}, '$.event_count'), 0) + 1)

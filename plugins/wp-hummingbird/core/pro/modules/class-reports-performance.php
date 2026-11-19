@@ -67,8 +67,8 @@ class Reports_Performance extends Reports {
 		$options = Settings::get_setting( 'reports', self::$module );
 
 		return array(
-			'NOTIFICATIONS_URL' => admin_url( 'admin.php?page=wphb-notifications' ),
-			'FULL_REPORT_URL'   => admin_url( 'admin.php?page=wphb-performance' ),
+			'NOTIFICATIONS_URL' => admin_url( 'admin.php?page=wphb-advanced&view=alerts_reports' ),
+			'FULL_REPORT_URL'   => admin_url( 'admin.php?page=wphb' ),
 			'SITE_MANAGE_URL'   => admin_url( 'admin.php?page=wphb' ),
 			'DEVICE'            => $options['type'], // Can be: desktop, mobile, both.
 			'SHOW_METRICS'      => $options['metrics'],
@@ -93,7 +93,7 @@ class Reports_Performance extends Reports {
 		$options = Settings::get_settings( 'performance' );
 
 		// Don't do any reports if they are not set in the options.
-		if ( ! $options['reports']['enabled'] ) {
+		if ( ! isset( $options['reports']['enabled'] ) || ! $options['reports']['enabled'] ) {
 			return;
 		}
 

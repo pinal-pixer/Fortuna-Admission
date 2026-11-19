@@ -887,6 +887,12 @@ class Log_Query {
 		 * 1 = where clause.
 		 * 2 = limit clause.
 		 * 3 = table name for events.
+		 *
+		 * subsequentOccasions is hard coded because the column exists in the
+		 * overview query. The join adds the context message key.
+		 *
+		 * No "#" comments inside the SQL: this query also runs on SQLite, and
+		 * the SQLite driver fails on them, so no occasions were returned there.
 		 */
 		$sql_statement_template = '
 			SELECT 
@@ -898,36 +904,45 @@ class Log_Query {
 				h.initiator,
 				h.occasionsID,
 				c1.value AS context_message_key,
-				# Hard code subsequentOccasions column that exist in overview query
 				1 as subsequentOccasions
 			FROM %3$s AS h
-			
-			# Add context message key
 			LEFT OUTER JOIN %4$s AS c1 ON (c1.history_id = h.id AND c1.key = "_message_key")
-			
-			# Where
 			%1$s
 			
 			ORDER BY date DESC, id DESC
 			%2$s
 		';
 
+		global $wpdb;
+
 		/** @var array Where clauses for outer query. */
 		$outer_where = [];
+
+		// Only include loggers that the current user can view, same as get_inner_where().
+		// Occasion IDs are predictable, so without this a user could read events
+		// from loggers they have no access to by guessing an occasion ID.
+		if ( empty( $args['ignore_logger_capabilities'] ) ) {
+			$sql_loggers_user_can_view = $simpe_history->get_loggers_that_user_can_read( get_current_user_id(), 'sql' );
+			$outer_where[]             = "h.logger IN {$sql_loggers_user_can_view}";
+		}
 
 		// Get rows with id lower than logRowID, i.e. previous rows.
 		$outer_where[] = 'h.id < ' . (int) $args['logRowID'];
 
 		// Get rows with occasionsID equal to occasionsID.
-		$outer_where[] = "h.occasionsID = '" . esc_sql( $args['occasionsID'] ) . "'";
+		$outer_where[] = $wpdb->prepare( 'h.occasionsID = %s', (string) $args['occasionsID'] );
 
-		if ( isset( $args['occasionsCountMaxReturn'] ) && $args['occasionsCountMaxReturn'] < $args['occasionsCount'] ) {
+		// Clamp the number of occasions to a sane range.
+		// A missing or negative value would otherwise give invalid SQL.
+		$occasions_count = max( 0, min( 1000, (int) $args['occasionsCount'] ) );
+
+		if ( isset( $args['occasionsCountMaxReturn'] ) && $args['occasionsCountMaxReturn'] < $occasions_count ) {
 			// Limit to max nn events if occasionsCountMaxReturn is set.
 			// Used for example in GUI to prevent to many events returned, that can stall the browser.
-			$limit = 'LIMIT ' . $args['occasionsCountMaxReturn'];
+			$limit = 'LIMIT ' . max( 0, (int) $args['occasionsCountMaxReturn'] );
 		} else {
 			// Regular limit that gets all occasions.
-			$limit = 'LIMIT ' . $args['occasionsCount'];
+			$limit = 'LIMIT ' . $occasions_count;
 		}
 
 		// Create where string.
@@ -946,8 +961,6 @@ class Log_Query {
 			$events_table_name, // 3
 			$contexts_table_name // 4
 		);
-
-		global $wpdb;
 
 		/** @var array<string,object> Log rows matching where queries. */
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared

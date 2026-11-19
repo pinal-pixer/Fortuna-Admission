@@ -95,7 +95,7 @@ require GUTSLIDER_DIR . '/admin/views/header.php';
 			$gs_is_pro  = ! empty( $gs_block['is_pro'] );
 			$gs_locked  = ! empty( $gs_block['locked'] );
 			$gs_on      = ! empty( $gs_block['enabled'] );
-			$gs_demo    = 'https://demos.gutslider.com/' . $gs_block['demo_slug'];
+			$gs_demo    = ! empty( $gs_block['demo_slug'] ) ? 'https://demos.gutslider.com/' . $gs_block['demo_slug'] : '';
 			$gs_toggle  = 'gs-toggle-' . sanitize_html_class( $gs_block['name'] );
 			$gs_classes = 'gs-block';
 			$gs_classes .= $gs_is_pro ? ' is-pro' : ' is-free';
@@ -122,12 +122,17 @@ require GUTSLIDER_DIR . '/admin/views/header.php';
 				<p class="gs-block__text"><?php echo esc_html( $gs_block['description'] ); ?></p>
 
 				<div class="gs-block__foot">
-					<a class="gs-link gs-link--sm" href="<?php echo esc_url( $gs_demo ); ?>" target="_blank" rel="noopener noreferrer">
-						<?php esc_html_e( 'Demo', 'slider-blocks' ); ?>
-						<svg class="gs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-							<path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
-						</svg>
-					</a>
+					<?php if ( $gs_demo ) : ?>
+						<a class="gs-link gs-link--sm" href="<?php echo esc_url( $gs_demo ); ?>" target="_blank" rel="noopener noreferrer">
+							<?php esc_html_e( 'Demo', 'slider-blocks' ); ?>
+							<svg class="gs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+								<path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+							</svg>
+						</a>
+					<?php else : ?>
+						<?php /* keeps the toggle on the right, where the Demo link would push it */ ?>
+						<span></span>
+					<?php endif; ?>
 
 					<?php if ( $gs_locked ) : ?>
 						<a class="gs-lock" href="https://gutslider.com/pricing" target="_blank" rel="noopener noreferrer">

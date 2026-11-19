@@ -1,0 +1,139 @@
+.wpallimport-plugin .wpallimport-user-data .wpallimport-help {
+	top:0;
+}
+
+.wpallimport-plugin .pmui-account-fields input[type="text"],
+.wpallimport-plugin .pmui-other-fields input[type="text"],
+.wpallimport-plugin .pmui-other-fields select {
+    height: 40px;
+}
+
+.wpallimport-plugin .pmui-other-fields select {
+    font-size: 15px !important;
+}
+
+.wpallimport-plugin .pmui-other-fields textarea {
+    font-size: 14px !important;
+	padding: 6px !important;
+}
+
+.wpallimport-plugin .pmui-account-fields,
+.wpallimport-plugin .pmui-other-fields {
+    width: 100%;
+}
+
+.wpallimport-plugin .pmui-account-fields div.input label {
+    vertical-align: 0;
+}
+
+.wpallimport-plugin .pmui-account-fields a.wpallimport-help,
+.wpallimport-plugin .pmui-other-fields a.wpallimport-help
+ {
+    margin-top: -5px;
+    top: 0;
+}
+
+.wpallimport-plugin .pmui-half > .pmui-half-left,
+.wpallimport-plugin .pmui-half > .pmui-half-right {
+    width: 48%;
+}
+
+.wpallimport-plugin .pmui-half > .pmui-half-left {
+    float: left;
+}
+
+.wpallimport-plugin .pmui-half > .pmui-half-right {
+    float: right;
+}
+
+.wpallimport-plugin .pmui-half,
+.wpallimport-plugin .pmui-full {
+    overflow: auto;
+}
+
+.wpallimport-plugin .pmui-quarter > .pmui-quarter-piece {
+    float: left;
+    width: 22%;
+}
+
+/* Matching method sub-fields alignment */
+.wpallimport-plugin .switcher-target-duplicate_indicator_custom_field {
+	margin-left: 28px;
+	padding: 5px 0 5px 0;
+	position: relative;
+	display: block;
+}
+
+.wpallimport-plugin .switcher-target-duplicate_indicator_pid {
+	margin-left: 20px;
+	padding: 5px 0 5px 0;
+	position: relative;
+	display: block;
+}
+
+.wpallimport-plugin .switcher-target-duplicate_indicator_custom_field input[type="text"],
+.wpallimport-plugin .switcher-target-duplicate_indicator_pid input[type="text"] {
+	margin-left: 8px;
+	margin-right: 8px;
+}
+
+/* Wizard type matching options container */
+.wpallimport-plugin .wpallimport-wizard-type-options {
+	margin-top: 10px;
+	margin-left: -4px;
+}
+
+/* Wizard target padding - using padding instead of margin to avoid animation conflicts */
+.wpallimport-plugin .switcher-target-wizard_type_new .wpallimport-unique-key-wrapper {
+	padding-left: 26px;
+	padding-top: 20px;
+	padding-bottom: 20px !important;
+}
+
+.wpallimport-plugin .wpallimport-wizard-type-options {
+	padding-left: 26px;
+}
+
+.wpallimport-plugin .wpallimport-wizard-description {
+	padding-bottom: 10px;
+	padding-left: 26px;
+	font-size: 13px;
+}
+
+.wpallimport-plugin .wpallimport-wizard-section-spacing {
+	padding-top: 10px;
+}
+
+.wpallimport-plugin .wpallimport-unique-key-input {
+	width: 300px;
+	padding-left: 10px;
+}
+
+/* Remove left margin for wizard type radio inputs */
+.wpallimport-plugin input[type="radio"]#wizard_type_new,
+.wpallimport-plugin input[type="radio"]#wizard_type_matching {
+	margin-left: 0;
+}
+
+/* Remove left margin for delete missing section radio inputs */
+.wpallimport-plugin .switcher-target-is_delete_missing input[type="radio"] {
+	margin-left: 0;
+}
+
+/* notices */
+.wpallimport-plugin .wpai-user-free-edition-notice{
+	display: block;
+	font-weight:400 !important;
+	margin-top: 40px;
+	padding: 20px;
+	background-color: #FFB8B8;
+	border: 1px solid #FF8383;
+	color: #000;
+	text-align:center;
+}
+
+.wpallimport-plugin .wpai-user-free-edition-notice p{
+	color: #000 !important;
+	font-size: 1.3em !important;
+	margin-bottom: 0;
+}

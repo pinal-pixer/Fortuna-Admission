@@ -32,6 +32,7 @@ $gutslider_options = array(
 	'gutslider_blocks',
 	'gutslider_blocks_version',
 	'gutsliderblocks_do_activation_redirect',
+	'gutslider_installed_at',
 );
 
 $gutslider_blocks_file = plugin_dir_path( __FILE__ ) . 'includes/Api/blocks.php';

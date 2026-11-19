@@ -3,6 +3,7 @@
 namespace Smush\Core\LCP;
 
 use Smush\Core\Array_Utils;
+use Smush\Core\Parser\Background_Url;
 
 /**
  * Parses the
@@ -35,6 +36,11 @@ class LCP_Data {
 
 	private $background_property;
 
+	/**
+	 * Get the background image URLs.
+	 *
+	 * @var Background_Url[]
+	 */
 	private $background_urls;
 	/**
 	 * @var int
@@ -42,9 +48,9 @@ class LCP_Data {
 	private $version;
 	private $allowed_url_hostnames;
 
-	public function __construct( array $data, int $version = LCP_Helper::DEFAULT_VERSION ) {
+	public function __construct( $data, $version = null ) {
 		$this->data        = $data;
-		$this->version     = $version;
+		$this->version     = $version ?? LCP_Helper::get_default_version();
 		$this->array_utils = new Array_Utils();
 	}
 
@@ -136,18 +142,19 @@ class LCP_Data {
 		return $this->background_type;
 	}
 
-	public function get_background_property() {
-		if ( is_null( $this->background_property ) ) {
-			$this->background_property = $this->array_utils->get_array_value( $this->data, array( 'background_data', 'property' ) );
-		}
-
-		return $this->background_property;
-	}
-
 	public function get_background_urls() {
 		if ( is_null( $this->background_urls ) ) {
-			$background_urls       = $this->array_utils->get_array_value( $this->data, array( 'background_data', 'urls' ) );
-			$this->background_urls = array_filter( $this->array_utils->ensure_array( $background_urls ) );
+			$background_data = $this->array_utils->get_array_value( $this->data, array( 'background_data', 'image_urls' ) );
+			if ( empty( $background_data ) ) {
+				// Support legacy version.
+				$background_data = $this->array_utils->get_array_value( $this->data, array( 'background_data', 'urls' ) );
+			}
+			$this->background_urls = array_map(
+				function ( $background_data ) {
+					return new Background_Url( $background_data );
+				},
+				$this->array_utils->ensure_array( $background_data )
+			);
 		}
 
 		return $this->background_urls;
@@ -165,7 +172,7 @@ class LCP_Data {
 	public static function from_array( $data ) {
 		$version = ! empty( $data['version'] )
 			? (int) $data['version']
-			: LCP_Helper::DEFAULT_VERSION;
+			: LCP_Helper::get_default_version();
 
 		unset( $data['version'] );
 

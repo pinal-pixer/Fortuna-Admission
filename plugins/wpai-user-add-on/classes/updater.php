@@ -120,6 +120,8 @@ if( ! class_exists('PMUI_Updater') ) {
 
                     if( version_compare( $this->version, $version_info->new_version, '<' ) ) {
 
+                        $version_info->plugin = $this->name;
+
                         $_transient_data->response[ $this->name ] = $version_info;
 
                     }
@@ -161,6 +163,11 @@ if( ! class_exists('PMUI_Updater') ) {
 
             if ( ! is_object( $update_cache ) || empty( $update_cache->response ) || empty( $update_cache->response[ $this->name ] ) ) {
 
+                // On a multisite subsite the update_plugins transient is never populated, so it reads back as false.
+                if( ! is_object( $update_cache ) ) {
+                    $update_cache = new stdClass;
+                }
+
                 $cache_key    = md5( 'edd_plugin_' .sanitize_key( $this->name ) . '_version_info' );
                 $version_info = get_transient( $cache_key );
 
@@ -177,6 +184,8 @@ if( ! class_exists('PMUI_Updater') ) {
                 }
 
                 if( version_compare( $this->version, $version_info->new_version, '<' ) ) {
+
+                    $version_info->plugin = $this->name;
 
                     $update_cache->response[ $this->name ] = $version_info;
 
@@ -200,7 +209,7 @@ if( ! class_exists('PMUI_Updater') ) {
 
                 // build a plugin list row, with update notification
                 $wp_list_table = _get_list_table( 'WP_Plugins_List_Table' );
-                echo '<tr class="plugin-update-tr"><td colspan="' . $wp_list_table->get_column_count() . '" class="plugin-update colspanchange"><div class="update-message">';
+                echo '<tr class="plugin-update-tr"><td colspan="' . intval($wp_list_table->get_column_count()) . '" class="plugin-update colspanchange"><div class="update-message">';
 
                 $changelog_link = self_admin_url( 'index.php?edd_sl_action=view_plugin_changelog&plugin=' . $this->name . '&slug=' . $this->slug . '&TB_iframe=true&width=772&height=911' );
 
@@ -288,7 +297,7 @@ if( ! class_exists('PMUI_Updater') ) {
         function http_request_args( $args, $url ) {
             // If it is an https request and we are performing a package download, disable ssl verification
             if ( strpos( $url, 'https://' ) !== false && strpos( $url, 'edd_action=package_download' ) ) {
-                $args['sslverify'] = false;
+                $args['sslverify'] = true;
             }
             return $args;
         }
@@ -377,7 +386,7 @@ if( ! class_exists('PMUI_Updater') ) {
             $response = $this->api_request( 'show_changelog', array( 'slug' => $_REQUEST['slug'] ) );
 
             if( $response && isset( $response->sections['changelog'] ) ) {
-                echo '<div style="background:#fff;padding:10px;">' . $response->sections['changelog'] . '</div>';
+                echo '<div style="background:#fff;padding:10px;">' . wp_kses_post($response->sections['changelog']) . '</div>';
             }
 
 

@@ -54,8 +54,12 @@ class Smart_Tags {
 			return $block_content;
 		}
 
+		// Form content renders inside the_content, whose do_shortcode() runs after the
+		// blocks, so a resolved value must not carry shortcode brackets: values such as
+		// {get_input:*}, {get_cookie:*} and {http_referer} come from the visitor. Only
+		// the resolved values are encoded; shortcodes written into the form still run.
 		return Helper::get_string_value(
-			self::process_smart_tags( $block_content, null, [ 'form-id' => $form_id ] )
+			self::process_smart_tags( $block_content, null, [ 'form-id' => $form_id ], true )
 		);
 	}
 
@@ -128,11 +132,14 @@ class Smart_Tags {
 	 * @param string            $content Form content.
 	 * @param array<mixed>|null $submission_data data from submission.
 	 * @param array<mixed>|null $form_data data from form.
+	 * @param bool              $encode_shortcode_brackets Encode `[` and `]` in each resolved value,
+	 *                                                     for content that do_shortcode() runs over next.
 	 * @since 0.0.1 - return string
 	 * @since 1.11.0 - return array<mixed>
+	 * @since 2.13.0 - $encode_shortcode_brackets
 	 * @return string|array<mixed>
 	 */
-	public function process_smart_tags( $content, $submission_data = null, $form_data = null ) {
+	public function process_smart_tags( $content, $submission_data = null, $form_data = null, $encode_shortcode_brackets = false ) {
 
 		if ( ! $content ) {
 			return $content;
@@ -220,6 +227,9 @@ class Smart_Tags {
 			}
 
 			$replace = Helper::get_string_value( $smart_tag_value );
+			if ( $encode_shortcode_brackets ) {
+				$replace = str_replace( [ '[', ']' ], [ '&#91;', '&#93;' ], $replace );
+			}
 			$content = str_replace( $tag, $replace, $content );
 		}
 
@@ -345,7 +355,7 @@ class Smart_Tags {
 				}
 
 				if ( 0 === strpos( $tag, '{form-payment:' ) ) {
-					return self::parse_payment_smart_tag( $tag, $submission_data );
+					return self::parse_payment_smart_tag( $tag, $submission_data, $form_data );
 				}
 				break;
 		}
@@ -574,10 +584,11 @@ class Smart_Tags {
 	 *
 	 * @param string            $value tag.
 	 * @param array<mixed>|null $submission_data data from submission.
+	 * @param array<mixed>|null $form_data smart-tag context (expects 'form-id' of the form being rendered).
 	 * @since  2.0.0
 	 * @return string
 	 */
-	public static function parse_payment_smart_tag( $value, $submission_data = null ) {
+	public static function parse_payment_smart_tag( $value, $submission_data = null, $form_data = null ) {
 		if ( ! $submission_data ) {
 			return '';
 		}
@@ -646,6 +657,16 @@ class Smart_Tags {
 		$payment_entry = Payments::get( $payment_entry_id );
 
 		if ( ! $payment_entry || ! is_array( $payment_entry ) ) {
+			return '';
+		}
+
+		// A payment row is only resolved for the form being rendered, identified by the
+		// caller's 'form-id' context. The row id comes from submission data, which not
+		// every consumer has verified, so a row is never read without that binding:
+		// a missing or non-numeric context resolves nothing.
+		$context_form_id = is_array( $form_data ) && isset( $form_data['form-id'] ) && is_numeric( $form_data['form-id'] ) ? absint( $form_data['form-id'] ) : 0;
+		$entry_form_id   = isset( $payment_entry['form_id'] ) && is_numeric( $payment_entry['form_id'] ) ? absint( $payment_entry['form_id'] ) : 0;
+		if ( 0 === $context_form_id || $context_form_id !== $entry_form_id ) {
 			return '';
 		}
 

@@ -726,6 +726,12 @@ if ( ! class_exists( 'GutSlider_Admin' ) ) {
 				'gallery-thumbnails'  => '<rect width="18" height="14" x="3" y="3" rx="2"/><path d="M4 21h1M9.5 21h1M15 21h1M20 21h1"/>',
 				'columns'             => '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/>',
 				'blinds'              => '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18M15 3v18"/>',
+				'shape-morph'         => '<circle cx="6" cy="12" r="4"/><path d="m11.5 9.5 2.5 2.5-2.5 2.5"/><path d="M16.5 18.5V9.5a3 3 0 0 1 6 0v9z"/>',
+				'xray'                => '<rect width="20" height="16" x="2" y="4" rx="2"/><circle cx="14" cy="12" r="4.5" stroke-dasharray="2.4 1.8"/><circle cx="14" cy="12" r="1.8"/>',
+				'grid-reveal'         => '<rect width="8" height="8" x="2.5" y="2.5" rx="1.5"/><rect width="8" height="8" x="13.5" y="2.5" rx="1.5"/><rect width="8" height="8" x="2.5" y="13.5" rx="1.5"/><path d="M17.5 14.5v6M14.5 17.5h6"/>',
+				'split'               => '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="M5.5 8.5h9M9.5 12h9M5.5 15.5h8"/>',
+				'card-pile'           => '<rect width="13" height="10" x="2.5" y="8" rx="1" transform="rotate(-10 9 13)"/><rect width="13" height="10" x="8.5" y="6" rx="1" transform="rotate(8 15 11)"/>',
+				'cube'                => '<path d="M12 2.5l8.5 4.75v9.5L12 21.5l-8.5-4.75v-9.5z"/><path d="M3.5 7.25L12 12l8.5-4.75M12 12v9.5"/>',
 				'sparkles'            => '<path d="m12 3 1.9 5 5.1 1.9-5.1 1.9L12 17l-1.9-5.2L5 9.9 10.1 8z"/><path d="M19 15.5 19.7 18l2.3.8-2.3.8L19 22l-.7-2.4-2.3-.8 2.3-.8z"/>',
 				'scissors'            => '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.12 8.12 20 20M20 4 8.12 15.88"/>',
 				'shirt'               => '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>',
@@ -791,8 +797,15 @@ if ( ! class_exists( 'GutSlider_Admin' ) ) {
 				'before-after'                => 'columns',
 				'videos-carousel'             => 'video',
 				'post-slider'                 => 'newspaper',
+				'backdrop-slider'             => 'layers',
 				'shader-slider'               => 'sparkles',
 				'shutters-slider'             => 'blinds',
+				'shape-slider'                => 'shape-morph',
+				'xray-slider'                 => 'xray',
+				'grid-reveal-slider'          => 'grid-reveal',
+				'split-slider'                => 'split',
+				'card-pile-slider'            => 'card-pile',
+				'gallery3d-slider'            => 'cube',
 				'slicer-slider'               => 'scissors',
 				'fashion-slider'              => 'shirt',
 				'triple-slider'               => 'rows',
@@ -1167,3 +1180,13 @@ if ( ! class_exists( 'GutSlider_Admin' ) ) {
 }
 
 new GutSlider_Admin();
+
+// Cartlet recommendation in the dashboard sidebar (WooCommerce sites only).
+if ( is_admin() ) {
+	require_once GUTSLIDER_DIR . '/admin/cartlet-card.php';
+	( new GutSlider_Cartlet_Card(
+		'toplevel_page_' . GutSlider_Admin::MENU_SLUG,
+		GUTSLIDER_URL . 'admin/img/cartlet.png',
+		'gutslider_dashboard_sidebar'
+	) )->register();
+}

@@ -87,6 +87,14 @@ class Pro_AJAX {
 	public function resend_confirmation() {
 		check_ajax_referer( 'wphb-fetch', 'nonce' );
 
+		if ( ! current_user_can( Utils::get_admin_capability() ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Current user cannot modify settings.', 'wphb' ),
+				)
+			);
+		}
+
 		$name  = filter_input( INPUT_POST, 'name', FILTER_UNSAFE_RAW );
 		$name  = sanitize_text_field( $name );
 		$email = filter_input( INPUT_POST, 'email', FILTER_SANITIZE_EMAIL );
@@ -325,7 +333,7 @@ class Pro_AJAX {
 					$response = Utils::get_api()->uptime->sync_hub( $request_data );
 
 					if (  ! is_wp_error( $response ) && isset(  $response->notification->recipients ) && is_array(  $response->notification->recipients ) ) {
-
+						
 						$recipients = json_decode( wp_json_encode( $response->notification->recipients ), true ); // Convert to array.
 
 						foreach ( $recipients as $id => $recipient ) {

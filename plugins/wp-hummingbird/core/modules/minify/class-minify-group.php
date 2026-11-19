@@ -12,6 +12,7 @@ use Hummingbird\Core\Filesystem;
 use Hummingbird\Core\Utils;
 use stdClass;
 use WP_Error;
+use Hummingbird\Core\Whitelabel;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -265,7 +266,7 @@ class Minify_Group {
 				$placeholders = implode( ',', array_fill( 0, count( $posts_ids ), '%d' ) );
 
 				$query   = $wpdb->prepare(
-					"SELECT ID, post_title FROM $wpdb->posts WHERE ID IN ($placeholders)", //phpcs:ignore
+					"SELECT ID, post_title FROM $wpdb->posts WHERE ID IN ($placeholders)", //phpcs:ignore 
 					$posts_ids
 				);
 				$results = $wpdb->get_results( $query, ARRAY_A ); //phpcs:ignore
@@ -302,8 +303,8 @@ class Minify_Group {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$posts_ids = $wpdb->get_col(
 				"
-				SELECT ID
-				FROM {$wpdb->posts}
+				SELECT ID 
+				FROM {$wpdb->posts} 
 				WHERE post_type = 'wphb_minify_group'
 			"
 			);
@@ -862,12 +863,6 @@ class Minify_Group {
 	 * a file should not be generated and should pick the default one instead
 	 */
 	public function should_generate_file() {
-		$cdn_status = Utils::get_module( 'minify' )->get_cdn_status();
-		// Always generate file when uploading to CDN and file is not excluded from CDN.
-		if ( $cdn_status && apply_filters( 'wphb_cdn_resource', $cdn_status, $this->get_handles(), $this->type ) ) {
-			return true;
-		}
-
 		$handles = $this->get_handles();
 
 		if ( count( $handles ) === 1 && ! $this->should_do_handle( $handles[0], 'minify' ) ) {
@@ -1279,7 +1274,7 @@ class Minify_Group {
 					$handle,
 					$this->type,
 					'after-compression',
-					__( 'Hummingbird could not parse the content of this file', 'wphb' ),
+					Whitelabel::replace_branding_terms( __( 'Hummingbird could not parse the content of this file', 'wphb' ) ),
 					array( 'minify', 'combine' )
 				);
 			} else {
@@ -1305,11 +1300,6 @@ class Minify_Group {
 		}
 
 		/**
-		 * If the files should be kept remote in CDN
-		 */
-		$upload_to_cdn = apply_filters( 'wphb_cdn_resource', $minify_module->get_cdn_status(), $handles, $this->type );
-
-		/**
 		 * Function that will get files minified
 		 *
 		 * The callback should return WP_Error or array with the file details:
@@ -1324,7 +1314,7 @@ class Minify_Group {
 		}
 
 		// Generate the file.
-		$result = call_user_func_array( $minify_callback, array( $files_data, $upload_to_cdn, $this ) );
+		$result = call_user_func_array( $minify_callback, array( $files_data, $this ) );
 
 		if ( is_wp_error( $result ) ) {
 			// Something happened to compression on the API, but it's probably not a server error.
@@ -1489,18 +1479,17 @@ class Minify_Group {
 	/**
 	 * Process remote files.
 	 *
-	 * @param array $files          List of files.
-	 * @param bool  $upload_to_cdn  Upload to CDN.
+	 * @param array $files List of files.
 	 *
 	 * @return array|mixed|object|WP_Error
 	 */
-	public function process_remote_files( $files, $upload_to_cdn = true ) {
+	public function process_remote_files( $files ) {
 		$f           = new stdClass();
 		$f->contents = array();
 		$f->hash     = $this->hash;
 		$f->type     = $this->type;
 		$f->expires  = $this->expires_on();
-		$f->cdn      = $upload_to_cdn;
+		$f->cdn      = false;
 		foreach ( $files as $file ) {
 			$c             = new stdClass();
 			$c->handle     = $file['handle'];
@@ -1513,6 +1502,11 @@ class Minify_Group {
 
 		if ( is_wp_error( $upload ) ) {
 			return $upload;
+		}
+
+		// Check for errorType and errorMessage in the response body.
+		if ( isset( $upload->errorType ) && isset( $upload->errorMessage ) ) {
+			return new WP_Error( 2001, sprintf( __( 'API Error: %s - %s', 'wphb' ), $upload->errorType, $upload->errorMessage ) );
 		}
 
 		if ( false !== $upload->files[0]->error && ! empty( $upload->files[0]->message ) ) {
@@ -1610,8 +1604,6 @@ class Minify_Group {
 	 * @return bool
 	 */
 	public function should_process_group() {
-		$minify = Utils::get_module( 'minify' );
-
 		$handles = $this->get_handles();
 
 		if ( ! $handles ) {
@@ -1625,11 +1617,6 @@ class Minify_Group {
 
 		if ( ! is_array( $handles ) ) {
 			$handles = array( $handles );
-		}
-
-		// Always process group if CDN is enabled.
-		if ( $minify->get_cdn_status() && $this->is_handle_local( $handles[0] ) ) {
-			return true;
 		}
 
 		$handles_count = count( $handles );
@@ -1793,6 +1780,8 @@ class Minify_Group {
 	 * @param array $dependencies  Dependencies.
 	 */
 	public function enqueue( $in_footer, $dependencies ) {
+		do_action( 'wphb_minify_group_enqueued', $this );
+
 		$this->preload_group( set_url_scheme( $this->get_group_src() ) );
 
 		// Enqueue the group.

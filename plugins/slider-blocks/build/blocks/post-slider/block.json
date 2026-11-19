@@ -1,7 +1,7 @@
 {
   "apiVersion": 3,
   "name": "gutsliders/post-slider",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "title": "Blog Post",
   "category": "slider-blocks",
   "description": "Show blog posts in sliding mode.",

@@ -106,7 +106,7 @@ final class DynamicStyle {
 				}
 
 				if ( is_string( $style ) && '' !== $style ) {
-					$style = $this->sanitize_css( $style );
+					$style = $this->fix_saved_css( $this->sanitize_css( $style ) );
 
 					if ( '' !== $style ) {
 						$this->styles[ md5( $style ) ] = $style;
@@ -337,6 +337,29 @@ final class DynamicStyle {
 		} while ( $css !== $previous );
 
 		return $css;
+	}
+
+	/**
+	 * Drop the px from multiplier line-heights, and declarations whose value is `undefined`.
+	 *
+	 * Older saved styles printed every line-height with the unit, so a
+	 * value of 1.15 became `line-height: 1.15px` and wrapped lines overlapped.
+	 * No real line-height is 3px or less, so those values are printed unitless.
+	 *
+	 * @param string $css The CSS string.
+	 * @return string The CSS string.
+	 */
+	private function fix_saved_css( string $css ): string {
+		$css = (string) preg_replace_callback(
+			'/(line-height\s*:\s*)(\d*\.?\d+)px\b/i',
+			static function ( array $match ): string {
+				return (float) $match[2] <= 3 ? $match[1] . $match[2] : $match[0];
+			},
+			$css
+		);
+
+		// Unset settings saved as `undefined` (e.g. `-webkit-text-stroke-width:undefinedpx`): drop the declaration.
+		return (string) preg_replace( '/(?<=[{;\s])-?[a-z][a-z-]*\s*:\s*undefined[a-z%]*\s*(;|(?=}))/i', '', $css );
 	}
 
 	/**

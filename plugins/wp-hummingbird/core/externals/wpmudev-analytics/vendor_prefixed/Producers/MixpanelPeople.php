@@ -53,7 +53,7 @@ class Producers_MixpanelPeople extends Producers_MixpanelBaseProducer
      * @param array $props associative array of properties to set on the profile
      * @param string|null $ip the ip address of the client (used for geo-location)
      * @param boolean $ignore_time If the $ignore_time property is true, Mixpanel will not automatically update the "Last Seen" property of the profile. Otherwise, Mixpanel will add a "Last Seen" property associated with the current time
-     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found
+     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found     
      */
     public function setOnce($distinct_id, $props, $ip = null, $ignore_time = \false, $ignore_alias = \false)
     {
@@ -68,7 +68,7 @@ class Producers_MixpanelPeople extends Producers_MixpanelBaseProducer
      * @param array $props associative array of properties to unset on the profile
      * @param string|null $ip the ip address of the client (used for geo-location)
      * @param boolean $ignore_time If the $ignore_time property is true, Mixpanel will not automatically update the "Last Seen" property of the profile. Otherwise, Mixpanel will add a "Last Seen" property associated with the current time
-     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found
+     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found     
      */
     public function remove($distinct_id, $props, $ip = null, $ignore_time = \false, $ignore_alias = \false)
     {
@@ -83,7 +83,7 @@ class Producers_MixpanelPeople extends Producers_MixpanelBaseProducer
      * @param int $val the amount to increment the property by
      * @param string|null $ip the ip address of the client (used for geo-location)
      * @param boolean $ignore_time If the $ignore_time property is true, Mixpanel will not automatically update the "Last Seen" property of the profile. Otherwise, Mixpanel will add a "Last Seen" property associated with the current time
-     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found
+     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found     
      */
     public function increment($distinct_id, $prop, $val, $ip = null, $ignore_time = \false, $ignore_alias = \false)
     {
@@ -98,7 +98,7 @@ class Producers_MixpanelPeople extends Producers_MixpanelBaseProducer
      * @param string|array $val items to add to the list
      * @param string|null $ip the ip address of the client (used for geo-location)
      * @param boolean $ignore_time If the $ignore_time property is true, Mixpanel will not automatically update the "Last Seen" property of the profile. Otherwise, Mixpanel will add a "Last Seen" property associated with the current time
-     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found
+     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found     
      */
     public function append($distinct_id, $prop, $val, $ip = null, $ignore_time = \false, $ignore_alias = \false)
     {
@@ -113,7 +113,7 @@ class Producers_MixpanelPeople extends Producers_MixpanelBaseProducer
      * @param null $timestamp the timestamp of when the transaction occurred (default to current timestamp)
      * @param string|null $ip the ip address of the client (used for geo-location)
      * @param boolean $ignore_time If the $ignore_time property is true, Mixpanel will not automatically update the "Last Seen" property of the profile. Otherwise, Mixpanel will add a "Last Seen" property associated with the current time
-     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found
+     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found     
      */
     public function trackCharge($distinct_id, $amount, $timestamp = null, $ip = null, $ignore_time = \false, $ignore_alias = \false)
     {
@@ -129,7 +129,7 @@ class Producers_MixpanelPeople extends Producers_MixpanelBaseProducer
      * @param string|int $distinct_id the distinct_id or alias of a user
      * @param string|null $ip the ip address of the client (used for geo-location)
      * @param boolean $ignore_time If the $ignore_time property is true, Mixpanel will not automatically update the "Last Seen" property of the profile. Otherwise, Mixpanel will add a "Last Seen" property associated with the current time
-     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found
+     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found     
      */
     public function clearCharges($distinct_id, $ip = null, $ignore_time = \false, $ignore_alias = \false)
     {
@@ -141,7 +141,7 @@ class Producers_MixpanelPeople extends Producers_MixpanelBaseProducer
      * @param string|int $distinct_id the distinct_id or alias of a user
      * @param string|null $ip the ip address of the client (used for geo-location)
      * @param boolean $ignore_time If the $ignore_time property is true, Mixpanel will not automatically update the "Last Seen" property of the profile. Otherwise, Mixpanel will add a "Last Seen" property associated with the current time
-     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found
+     * @param boolean $ignore_alias If the $ignore_alias property is true, an alias look up will not be performed after ingestion. Otherwise, a lookup for the distinct ID will be performed, and replaced if a match is found     
      */
     public function deleteUser($distinct_id, $ip = null, $ignore_time = \false, $ignore_alias = \false)
     {

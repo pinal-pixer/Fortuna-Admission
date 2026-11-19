@@ -1,7 +1,7 @@
 {
   "apiVersion": 3,
   "name": "gutsliders/photo-carousel",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "title": "Photos",
   "category": "slider-blocks",
   "description": "Show photos in carousel mode.",

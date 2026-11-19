@@ -4,6 +4,90 @@ Tested up to: 6.0
 
 Change Log:
 
+= 4.0.1 ( 2026-11-04 ) =
+- Improvement: WhiteLabel improvements
+- Fix: Relative URLs in CSS files not working with CDN
+- Fix: Security hardening
+
+= 4.0.0 ( 2026-10-27 ) =
+- New: A fresh new look! Hummingbird has been completely redesigned for a cleaner, faster and more intuitive experience
+- New: Activity Logs
+- New: Settings are now saved automatically
+- Improvement: Improved Safe Mode flow
+- Improvement: Improved Clear Cache shortcut UI
+- Improvement: Added "Last name" field for email recipients
+- Improvement: CDN now serves your files automatically on demand instead of waiting for the asset optimization flow
+- Improvement: CDN now uses a new domain, assetcdn.net
+- Improvement: Security hardening
+- Fix: Performance test cooldown being bypassed, causing the test to get stuck at 99%
+- Fix: PHP notice when permanently deleting entries in Database Cleanup
+
+= 3.21.2 ( 2026-08-26 ) =
+- Fix: Performance Test Notification Report is not sent
+- Fix: Security hardening
+
+= 3.21.1 ( 2026-08-18 ) =
+- Fix: Network-scoped option writable by a subsite administrator
+
+= 3.21.0 ( 2026-08-04 ) =
+- Improvement: Improved Safe Mode UX and stability
+- Fix: JavaScript delay exclusion list not working as expected
+- Fix: Disabling Safe Mode after changing Advanced Tools settings does not refresh or clear active state
+- Fix: Divi hamburger menu unresponsive when Delay JS is enabled
+- Fix: Divi blog post featured image failing to load
+- Fix: Safe Mode notice incorrectly shown when the feature is not enabled
+- Fix: Console error when removing a file from Asset Optimization exclusions
+
+= 3.20.0 ( 2026-07-13 ) =
+- New: Improved error messaging when generating Critical CSS while site is in maintenance mode
+- Improvement: Refactored Safe Mode architecture with a centralized Safe Mode controller
+- Improvement: Improved Clear Cache button UX in admin area
+- Improvement: PHP 8.5 compatibility
+- Improvement: Prevent WordPress assets (e.g. dashicons) from loading in Asset Optimization when only needed for logged-in users
+- Improvement: Improved Asset Optimization compatibility with TranslatePress frontend editor
+- Improvement: Improved Critical CSS exclusion handling for Elementor
+- Improvement: Show confirmation notice when clearing individual cache types from the admin bar
+- Improvement: Show success message when "Clear Cache" is triggered from file change detection notice
+- Fix: Enable WPMU DEV CDN toggle in Settings not changing state
+- Fix: File location in Asset Optimization Settings saves after adding input
+- Fix: Asset Optimization including non-existent CSS files
+- Fix: Asset Optimization filters displaying assets incorrectly when WooCommerce and Advanced Coupons for WooCommerce are active together
+- Fix: Configs not including all Asset Optimization and Exclusion Optimization settings and exclusions
+- Fix: Outdated Defender bot trap URL being cached, causing 404 errors and bypassing bot protection
+- Fix: Incorrect script loading order and Asset Optimization not detecting some scripts
+- Fix: Extension search feature in Asset Optimization Dev Mode filter not functioning correctly
+- Fix: Error shown after regenerating Critical CSS
+- Fix: "Instant site health alerts and notifications" incorrectly shown in Hummingbird Pro Widget
+- Fix: PHP deprecated warnings for curl_close() in PHP 8.5
+- Fix: PHP warnings when reloading the Hummingbird Uptime page
+- Fix: PHP warnings after removing SmartCrawl or Defender while Hummingbird is active
+
+= 3.19.0 ( 2026-01-22 ) =
+- New: Success notification when cache is cleared from the admin bar
+- Improvement: Updated optimization labels in Hummingbird Onboarding Wizard Summary
+- Improvement: Enhanced Asset Optimization background file scan across all relevant locations
+- Improvement: Mobile-specific Above-the-Fold critical CSS is now supported on sites using Static Server Cache
+- Improvement: Improved caching plugin conflict detection to cover more popular caching solutions
+- Fix: Browser caching only updating Images when generating the server script for individual file types
+- Fix: Error in Debug log when Page caching is active
+- Fix: Custom post type cache not working when "Posts" cache is disabled
+- Fix: "Connect Site" button icon display issue
+- Fix: Fatal error when enabling Asset Optimization after activating Safe Mode
+
+= 3.18.1 ( 2025-12-16 ) =
+- Improvement: Security hardening
+
+= 3.18.0 ( 2025-12-10 ) =
+- New: Safe Mode now covers all plugin settings, allowing you to test any change in a sandbox environment before going live
+- New: Ability to run performance test in the safe mode
+- Improvement: Refined the UX for Critical CSS generation
+- Improvement: Enhanced Hummingbird Delay JS compatibility with Divi
+- Improvement: Automatically excluded specific WooCommerce files from Asset Optimization to prevent product image issues
+- Fix: Resolved an issue causing excessive cache folder size
+- Fix: Resolved Hummingbird Delay JS and Critical CSS conflicts with other plugins
+- Fix: Bulk Update issue in Asset Optimization Dev Mode
+- Fix: Minor UX and copy adjustments
+
 = 3.17.1 ( 2025-10-29 ) =
 - Fix: Deletion of Asset Optimization database data sometimes not working
 
@@ -436,6 +520,3 @@ Change Log:
 - Fix: Page cache clearing taking too long during post edit
 - Fix: Cloudflare browser caching settings not syncing with Hub
 
-
-
-0-1769033898

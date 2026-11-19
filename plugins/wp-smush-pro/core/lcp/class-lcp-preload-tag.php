@@ -3,6 +3,7 @@
 namespace Smush\Core\LCP;
 
 use Smush\Core\Array_Utils;
+use Smush\Core\Parser\Background_Url;
 use Smush\Core\Parser\Composite_Element;
 use Smush\Core\Parser\Element;
 use Smush\Core\Parser\Page;
@@ -30,7 +31,7 @@ class LCP_Preload_Tag {
 	 */
 	private $allowed_url_hostnames;
 
-	public function __construct( Page $page, LCP_Data $lcp_data ) {
+	public function __construct( $page, $lcp_data ) {
 		$this->page        = $page;
 		$this->array_utils = new Array_Utils();
 		$this->lcp_data    = $lcp_data;
@@ -46,37 +47,58 @@ class LCP_Preload_Tag {
 	}
 
 	public function make_preload_tag() {
-		$tag             = '';
 		$background_urls = $this->get_validated_background_urls();
-		if ( ! empty( $background_urls ) ) {
-			if ( count( $background_urls ) === 1 ) {
-				$single_background_url  = $background_urls[0];
-				$escaped_background_url = $this->url_utils->is_relative( $single_background_url )
-					? esc_attr( $single_background_url )
-					: esc_url( $single_background_url );
 
-				$tag = $this->start_tag() . 'href="' . $escaped_background_url . '"' . $this->end_tag();
-			} else {
-				$tag = $this->start_tag() . 'imagesrcset="' . esc_attr( join( ', ', $background_urls ) ) . '"' . $this->end_tag();
-			}
-		} else {
-			$parsed_page = $this->page;
-			$element     = $parsed_page->get_lcp_element();
-			if ( is_a( $element, Composite_Element::class ) ) {
-				if ( $element->get_tag() === 'picture' ) {
-					$tag = $this->make_preload_tag_for_composite_element( $element );
-				}
-			} else if ( is_a( $element, Element::class ) ) {
-				if ( $element->is_image_element() ) {
-					$tag = $this->make_preload_tag_for_img_element( $element );
-				}
-			}
+		if ( ! empty( $background_urls ) ) {
+			return $this->make_preload_tag_for_background_urls( $background_urls );
 		}
 
-		return $tag;
+		$element = $this->page->get_lcp_element();
+		if ( is_a( $element, Composite_Element::class ) && $element->get_tag() === 'picture' ) {
+			return $this->make_preload_tag_for_composite_element( $element );
+		}
+		if ( is_a( $element, Element::class ) && $element->is_image_element() ) {
+			return $this->make_preload_tag_for_img_element( $element );
+		}
+
+		return '';
 	}
 
-	private function analyze_composite_element( Composite_Element $composite_element ) {
+	/**
+	 * @param Background_Url[] $background_urls
+	 *
+	 * @return string
+	 */
+	private function make_preload_tag_for_background_urls( $background_urls ) {
+		// Group by format type so we can preload only the first (best) format.
+		$type_groups = array();
+		foreach ( $background_urls as $background_url ) {
+			$type                  = $background_url->get_type() ?: '';
+			$type_groups[ $type ][] = $background_url;
+		}
+
+		$first_group = reset( $type_groups );
+		$first_type  = key( $type_groups );
+		$type_attr   = $first_type ? ' type="' . esc_attr( $first_type ) . '"' : '';
+
+		if ( count( $first_group ) === 1 ) {
+			$url         = $first_group[0]->get_url();
+			$escaped_url = $this->url_utils->is_relative( $url ) ? esc_attr( $url ) : esc_url( $url );
+
+			return $this->start_tag() . 'href="' . $escaped_url . '"' . $type_attr . $this->end_tag();
+		}
+
+		$imagesrcset = array();
+		foreach ( $first_group as $background_url ) {
+			$url           = $background_url->get_url();
+			$resolution    = $background_url->get_resolution();
+			$imagesrcset[] = $url . ( $resolution ? ' ' . $resolution : '' );
+		}
+
+		return $this->start_tag() . 'imagesrcset="' . esc_attr( implode( ', ', $imagesrcset ) ) . '"' . $type_attr . $this->end_tag();
+	}
+
+	private function analyze_composite_element( $composite_element ) {
 		$data                  = array(
 			'src_url' => '',
 			'sources' => array(),
@@ -151,7 +173,7 @@ class LCP_Preload_Tag {
 		return $data;
 	}
 
-	private function make_preload_tag_for_composite_element( Composite_Element $composite_element ) {
+	private function make_preload_tag_for_composite_element( $composite_element ) {
 		$composite_data = $this->analyze_composite_element( $composite_element );
 		switch ( $composite_data['type'] ) {
 			case 'multi_format':
@@ -289,7 +311,7 @@ class LCP_Preload_Tag {
 	 *
 	 * @return mixed|string
 	 */
-	private function get_attribute_value( Element $element, string $attribute ) {
+	private function get_attribute_value( $element, $attribute ) {
 		return $element->has_attribute( $attribute )
 			? $element->get_attribute( $attribute )->get_value()
 			: '';
@@ -301,7 +323,7 @@ class LCP_Preload_Tag {
 	 *
 	 * @return string
 	 */
-	private function get_attribute_single_url( Element $element, string $attribute_name ): string {
+	private function get_attribute_single_url( $element, $attribute_name ) {
 		$url = $element->has_attribute( $attribute_name )
 			? $element->get_attribute( $attribute_name )->get_single_image_url()
 			: null;
@@ -315,8 +337,9 @@ class LCP_Preload_Tag {
 		$tag = '';
 		foreach ( $composite_data['sources'] as $source ) {
 			if ( ! empty( $source['type'] ) ) {
+				$type_attribute = ' type="' . esc_attr( $source['type'] ) . '"';
 				$link_attribute = $source['srcset_url_count'] > 1 ? 'imagesrcset' : 'href';
-				$tag            = $this->start_tag() . $link_attribute . '="' . $source['srcset'] . '"' . $this->end_tag();
+				$tag            = $this->start_tag() . $link_attribute . '="' . $source['srcset'] . '"' . $type_attribute . $this->end_tag();
 				break;
 			}
 		}
@@ -373,7 +396,7 @@ class LCP_Preload_Tag {
 		$all_background_urls = $this->lcp_data->get_background_urls();
 		$validated           = array();
 		foreach ( $all_background_urls as $background_url ) {
-			if ( $this->is_valid_url( $background_url ) ) {
+			if ( $this->is_valid_url( $background_url->get_url() ) ) {
 				$validated[] = $background_url;
 			}
 		}

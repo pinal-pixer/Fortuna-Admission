@@ -2,6 +2,7 @@
 require_once(dirname(__FILE__) . '/wfDB.php');
 require_once(dirname(__FILE__) . '/wfUtils.php');
 require_once(dirname(__FILE__) . '/wfBrowscap.php');
+require_once(dirname(__FILE__) . '/wfAuthenticationLog.php');
 class wfLog {
 	public $canLogHit = true;
 	private $effectiveUserID = 0;
@@ -17,6 +18,7 @@ class wfLog {
 	 * @var wfRequestModel
 	 */
 	private $currentRequest;
+	private $authenticationLog;
 	
 	public static function shared() {
 		static $_shared = null;
@@ -94,9 +96,31 @@ class wfLog {
 		$this->loginsTable = wfDB::networkTable('wfLogins');
 		$this->statusTable = wfDB::networkTable('wfStatus');
 		
+		$this->authenticationLog = new wfAuthenticationLog();
 		add_filter('determine_current_user', array($this, '_userIDDetermined'), 99, 1);
+		add_filter('rest_pre_serve_request', array($this, 'recordRestResponseStatus'), PHP_INT_MAX, 4);
 	}
 	
+	/** @return wfAuthenticationLog Authentication event collector for this request. */
+	public function getAuthenticationLog() {
+		return $this->authenticationLog;
+	}
+
+	/**
+	 * Captures the final outer REST response status before request persistence.
+	 * @param bool $served Whether another handler already served the response.
+	 * @param WP_REST_Response $response Final response, including any envelope.
+	 * @param WP_REST_Request $request Served REST request.
+	 * @param WP_REST_Server $server REST server.
+	 * @return bool Unchanged serving decision.
+	 */
+	public function recordRestResponseStatus($served, $response, $request, $server) {
+		if ($this->currentRequest !== null) {
+			$this->currentRequest->statusCode = $response->get_status();
+		}
+		return $served;
+	}
+
 	public function _userIDDetermined($userID) {
 		//Needed because the REST API will clear the authenticated user if it fails a nonce check on the request
 		$this->effectiveUserID = (int) $userID;
@@ -249,6 +273,8 @@ class wfLog {
 	 * @return bool|int
 	 */
 	public function logHit() {
+		if ($this->currentRequest === null) { return false; }
+		$this->authenticationLog->annotateRequest($this->currentRequest);
 		$liveTrafficEnabled = wfConfig::liveTrafficEnabled();
 		$action = $this->currentRequest->action;
 		$logHitOK = $this->logHitOK();
@@ -269,49 +295,51 @@ class wfLog {
 	public function getHits($hitType /* 'hits' or 'logins' */, $type, $afterTime, $limit = 50, $IP = false){
 		global $wpdb;
 		$IPSQL = "";
-		if($IP){
+		$sqlArgs = array($afterTime, $limit);
+		if ($IP) {
 			$ipHex = wfDB::binaryValueToSQLHex(wfUtils::inet_pton($IP));
 			$IPSQL = " and IP={$ipHex} ";
-			$sqlArgs = array($afterTime, $limit);
-		} else {
-			$sqlArgs = array($afterTime, $limit);
 		}
-		if($hitType == 'hits'){
+		
+		if ($hitType == 'hits') {
 			$securityOnly = !wfConfig::liveTrafficEnabled();
 			$delayedHumanBotFiltering = false;
 			
-			if($type == 'hit'){
-				$typeSQL = " ";
-			} else if($type == 'crawler'){
+			$typeSQL = " ";
+			if ($type == 'crawler') {
 				if ($securityOnly) {
-					$typeSQL = " ";
 					$delayedHumanBotFiltering = true;
 				}
 				else {
 					$now = time();
 					$typeSQL = " and jsRun = 0 and {$now} - ctime > 30 ";
 				}
-			} else if($type == 'gCrawler'){
+			}
+			else if ($type == 'gCrawler') {
 				$typeSQL = " and isGoogle = 1 ";
-			} else if($type == '404'){
+			}
+			else if ($type == '404') {
 				$typeSQL = " and statusCode = 404 ";
-			} else if($type == 'human'){
+			}
+			else if ($type == 'human') {
 				if ($securityOnly) {
-					$typeSQL = " ";
 					$delayedHumanBotFiltering = true;
 				}
 				else {
 					$typeSQL = " and jsRun = 1 ";
 				}
-			} else if($type == 'ruser'){
+			}
+			else if ($type == 'ruser') {
 				$typeSQL = " and userID > 0 ";
-			} else {
+			}
+			else if ($type != 'hit') {
 				wordfence::status(1, 'error', sprintf(/* translators: Error message. */ __("Invalid log type to wfLog: %s", 'wordfence'), $type));
 				return false;
 			}
-			array_unshift($sqlArgs, "select h.*, u.display_name from {$this->hitsTable} h
-				LEFT JOIN {$wpdb->users} u on h.userID = u.ID
-				where ctime > %f $IPSQL $typeSQL order by ctime desc limit %d");
+			
+			array_unshift($sqlArgs, "SELECT h.*, u.`display_name` FROM `{$this->hitsTable}` h
+				LEFT JOIN `{$wpdb->users}` u ON h.`userID` = u.`ID`
+				WHERE `ctime` > %f $IPSQL $typeSQL ORDER BY `ctime` DESC LIMIT %d");
 			$results = call_user_func_array(array($this->getDB(), 'querySelect'), $sqlArgs);
 			
 			if ($delayedHumanBotFiltering) {
@@ -333,13 +361,15 @@ class wfLog {
 				}
 			}
 
-		} else if($hitType == 'logins'){
+		}
+		else if ($hitType == 'logins') {
 			array_unshift($sqlArgs, "select l.*, u.display_name from {$this->loginsTable} l
 				LEFT JOIN {$wpdb->users} u on l.userID = u.ID
 				where ctime > %f $IPSQL order by ctime desc limit %d");
 			$results = call_user_func_array(array($this->getDB(), 'querySelect'), $sqlArgs ); 
 
-		} else {
+		}
+		else {
 			wordfence::status(1, 'error', sprintf(/* translators: Error message. */ __("getHits got invalid hitType: %s", 'wordfence'), $hitType));
 			return false;
 		}
@@ -357,6 +387,10 @@ class wfLog {
 	}
 
 	/**
+	 * Processes the $results array into one suitable for output.
+	 *
+	 * Note: This may be passed content from different tables, so it won't always have the same columns present.
+	 *
 	 * @param string $type
 	 * @param array $results
 	 * @throws Exception
@@ -372,7 +406,15 @@ class wfLog {
 
 		$patternBlocks = wfBlock::patternBlocks(true);
 
-		foreach($results as &$res){
+		foreach ($results as &$res) {
+			$res['id'] = (int) $res['id'];
+			if (array_key_exists('statusCode', $res)) { $res['statusCode'] = (int) $res['statusCode']; }
+			if (array_key_exists('userID', $res)) { $res['userID'] = (int) $res['userID']; }
+			$res['ctime'] = floatval($res['ctime']);
+			if (array_key_exists('attackLogTime', $res)) { $res['attackLogTime'] = floatval($res['attackLogTime']); }
+			if (array_key_exists('jsRun', $res)) { $res['jsRun'] = wfUtils::truthyToBoolean($res['jsRun']); }
+			if (array_key_exists('isGoogle', $res)) { $res['isGoogle'] = wfUtils::truthyToBoolean($res['isGoogle']); }
+			if (array_key_exists('newVisit', $res)) { $res['newVisit'] = wfUtils::truthyToBoolean($res['newVisit']); }
 			$res['type'] = $type;
 			$res['IP'] = wfUtils::inet_ntop($res['IP']);
 			$res['timeAgo'] = wfUtils::makeTimeAgo($serverTime - $res['ctime']);
@@ -399,80 +441,83 @@ class wfLog {
 			}
 			
 			$res['extReferer'] = false;
-			if(isset( $res['referer'] ) && $res['referer']){
+			if (isset($res['referer'] ) && $res['referer']) {
 				if(wfUtils::hasXSS($res['referer'] )){ //filtering out XSS
 					$res['referer'] = '';
 				}
 			}
-			if( isset( $res['referer'] ) && $res['referer']){
+			if (isset( $res['referer'] ) && $res['referer']) {
 				$refURL = parse_url($res['referer']);
-				if(is_array($refURL) && isset($refURL['host']) && $refURL['host']){
+				if (is_array($refURL) && isset($refURL['host']) && $refURL['host']) {
 					$refHost = strtolower(preg_replace('/^www\./i', '', $refURL['host']));
-					if($refHost != $ourHost){
+					if ($refHost != $ourHost) {
 						$res['extReferer'] = true;
 						//now extract search terms
 						$q = false;
-						if(preg_match('/(?:google|bing|alltheweb|aol|ask)\./i', $refURL['host'])){
+						if (preg_match('/(?:google|bing|alltheweb|aol|ask)\./i', $refURL['host'])) {
 							$q = 'q';
-						} else if(stristr($refURL['host'], 'yahoo.')){
+						}
+						else if (stristr($refURL['host'], 'yahoo.')) {
 							$q = 'p';
-						} else if(stristr($refURL['host'], 'baidu.')){
+						}
+						else if(stristr($refURL['host'], 'baidu.')) {
 							$q = 'wd';
 						}
-						if($q){
+						if ($q) {
 							$queryVars = array();
-							if( isset( $refURL['query'] ) ) {
+							if (isset( $refURL['query'])) {
 								parse_str($refURL['query'], $queryVars);
-								if(isset($queryVars[$q])){
+								if (isset($queryVars[$q])) {
 									$res['searchTerms'] = urlencode($queryVars[$q]);
 								}
 							}
 						}
 					}
 				}
-				if($res['extReferer']){
-					if ( isset( $referringPage ) && stristr( $referringPage['host'], 'google.' ) )
+				if ($res['extReferer']) {
+					if (isset($referringPage) && stristr($referringPage['host'], 'google.'))
 					{
-						parse_str( $referringPage['query'], $queryVars );
-						// echo $queryVars['q']; // This is the search term used
+						parse_str($referringPage['query'], $queryVars);
 					}
 				}
 			}
+			
 			$res['browser'] = false;
-			if($res['UA']){
+			if ($res['UA']) {
 				$b = $browscap->getBrowser($res['UA']);
-				if($b && $b['Parent'] != 'DefaultProperties'){
+				if ($b && $b['Parent'] != 'DefaultProperties') {
 					$res['browser'] = array(
 						'browser'   => !empty($b['Browser']) ? $b['Browser'] : "",
 						'version'   => !empty($b['Version']) ? $b['Version'] : "",
 						'platform'  => !empty($b['Platform']) ? $b['Platform'] : "",
-						'isMobile'  => !empty($b['isMobileDevice']) ? $b['isMobileDevice'] : "",
-						'isCrawler' => !empty($b['Crawler']) ? $b['Crawler'] : "",
+						'isMobile'  => (isset($b['isMobileDevice']) && $b['isMobileDevice']),
+						'isCrawler' => (isset($b['Crawler']) && $b['Crawler']),
 					);
 					
 					if (isset($res['jsRun']) && !wfConfig::liveTrafficEnabled() && !wfUtils::truthyToBoolean($res['jsRun'])) {
-						$res['jsRun'] = !(isset($b['Crawler']) && $b['Crawler']) ? '1' : '0';
+						$res['jsRun'] = !(isset($b['Crawler']) && $b['Crawler']);
 					}
 				}
 				else {
 					$IP = wfUtils::getIP();
 					$res['browser'] = array(
-						'isCrawler' => !wfLog::isHumanRequest($IP, $res['UA']) ? 'true' : ''
+						'isCrawler' => !wfLog::isHumanRequest($IP, $res['UA'])
 					);
 				}
 			}
 
 
-			if($res['userID']){
+			if ($res['userID']) {
 				$ud = get_userdata($res['userID']);
-				if($ud){
+				if ($ud) {
 					$res['user'] = array(
 						'editLink' => wfUtils::editUserLink($res['userID']),
 						'display_name' => $res['display_name'],
-						'ID' => $res['userID']
+						'ID' => (int) $res['userID']
 					);
 				}
-			} else {
+			}
+			else {
 				$res['user'] = false;
 			}
 			
@@ -762,18 +807,22 @@ class wfLog {
 		//$msg = '[' . sprintf('%.2f', memory_get_usage(true) / (1024 * 1024)) . '] ' . $msg;
 		$this->getDB()->queryWrite("insert into " . $this->statusTable . " (ctime, level, type, msg) values (%s, %d, '%s', '%s')", sprintf('%.6f', microtime(true)), $level, $type, $msg);
 	}
-	public function getStatusEvents($lastCtime){
-		if($lastCtime < 1){
-			$lastCtime = $this->getDB()->querySingle("select ctime from " . $this->statusTable . " order by ctime desc limit 1000,1");
-			if(! $lastCtime){
-				$lastCtime = 0;
+	public function getStatusEvents($lastID){
+		if($lastID < 1){
+			$lastID = $this->getDB()->querySingle("select id from " . $this->statusTable . " order by id desc limit 1000,1");
+			if(! $lastID){
+				$lastID = 0;
 			}
 		}
-		$results = $this->getDB()->querySelect("select ctime, level, type, msg from " . $this->statusTable . " where ctime > %f order by ctime asc", $lastCtime);
+		$results = $this->getDB()->querySelect("select id, ctime, level, type, msg from " . $this->statusTable . " where id > %d order by id asc", $lastID);
 		$timeOffset = 3600 * get_option('gmt_offset');
 		foreach($results as &$rec){
 			//$rec['timeAgo'] = wfUtils::makeTimeAgo(time() - $rec['ctime']);
+			$rec['id'] = (int) $rec['id'];
+			$rec['ctime'] = (float) $rec['ctime'];
+			$rec['level'] = (int) $rec['level'];
 			$rec['date'] = date('M d H:i:s', (int) $rec['ctime'] + $timeOffset);
+			$rec['timestampDisplay'] = wfUtils::formatLocalTime('M d H:i:s P', $rec['ctime']);
 			$rec['msg'] = wp_kses_data( (string) $rec['msg']);
 		}
 		return $results;
@@ -1749,7 +1798,7 @@ class wfLiveTrafficQueryFilterCollection {
 		if ($filters) {
 			/** @var wfLiveTrafficQueryFilter $filter */
 			foreach ($filters as $filter) {
-				$params[$filter->getParam()][] = $filter;
+				$params[$filter->getGroup() . ':' . $filter->getParam()][] = $filter;
 			}
 		}
 
@@ -1796,12 +1845,15 @@ class wfLiveTrafficQueryFilter {
 	private $param;
 	private $operator;
 	private $value;
+	private $group;
 
 	protected $validOperators = array(
 		'=',
 		'!=',
 		'contains',
+		'!contains',
 		'match',
+		'!match',
 		'hregexp',
 		'hnotregexp',
 	);
@@ -1818,12 +1870,19 @@ class wfLiveTrafficQueryFilter {
 	 * @param string $param
 	 * @param string $operator
 	 * @param string $value
+	 * @param string|null $group Optional logical group; invalid identifiers use legacy grouping.
 	 */
-	public function __construct($query, $param, $operator, $value) {
+	public function __construct($query, $param, $operator, $value, $group = null) {
 		$this->query = $query;
 		$this->param = $param;
 		$this->operator = $operator;
 		$this->value = $value;
+		$this->group = is_string($group) && preg_match('/^[a-zA-Z0-9_.:-]{1,100}$/D', $group) ? $group : '';
+	}
+
+	/** @return string Validated logical group, empty for legacy parameter grouping. */
+	public function getGroup() {
+		return $this->group;
 	}
 
 	/**
@@ -1845,9 +1904,18 @@ class wfLiveTrafficQueryFilter {
 					$like = addcslashes($value, '_%\\');
 					$sql = $wpdb->prepare("$param LIKE %s", "%$like%");
 					break;
+					
+				case '!contains':
+					$like = addcslashes($value, '_%\\');
+					$sql = $wpdb->prepare("$param NOT LIKE %s", "%$like%");
+					break;
 
 				case 'match':
 					$sql = $wpdb->prepare("$param LIKE %s", $value);
+					break;
+				
+				case '!match':
+					$sql = $wpdb->prepare("$param NOT LIKE %s", $value);
 					break;
 				
 				case 'hregexp':

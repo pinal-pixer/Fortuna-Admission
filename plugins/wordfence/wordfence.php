@@ -4,7 +4,7 @@ Plugin Name: Wordfence Security
 Plugin URI: https://www.wordfence.com/
 Description: Wordfence Security - Anti-virus, Firewall and Malware Scan
 Author: Wordfence
-Version: 8.1.2
+Version: 9.1.1
 Author URI: https://www.wordfence.com/
 Text Domain: wordfence
 Domain Path: /languages
@@ -14,7 +14,7 @@ Requires PHP: 7.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
-@copyright Copyright (C) 2012-2023 Defiant Inc.
+@copyright Copyright (C) 2012-2026 Defiant Inc.
 @license http://www.gnu.org/licenses/gpl-3.0.html GNU General Public License, version 3 or higher
 
 This program is free software: you can redistribute it and/or modify
@@ -38,8 +38,8 @@ if(defined('WP_INSTALLING') && WP_INSTALLING){
 if (!defined('ABSPATH')) {
 	exit;
 }
-define('WORDFENCE_VERSION', '8.1.2');
-define('WORDFENCE_BUILD_NUMBER', '1762970008');
+define('WORDFENCE_VERSION', '9.1.1');
+define('WORDFENCE_BUILD_NUMBER', '1794335325');
 define('WORDFENCE_BASENAME', function_exists('plugin_basename') ? plugin_basename(__FILE__) :
 	basename(dirname(__FILE__)) . '/' . basename(__FILE__));
 
@@ -130,10 +130,29 @@ if(! defined('WORDFENCE_VERSIONONLY_MODE')){ //Used to get version from file.
 	define('WFWAF_SUBDIRECTORY_INSTALL', class_exists('wfWAF') &&
 		!in_array(realpath(dirname(__FILE__) . '/vendor/wordfence/wf-waf/src/init.php'), get_included_files()));
 	if (!WFWAF_SUBDIRECTORY_INSTALL) {
-		require_once(dirname(__FILE__) . '/vendor/wordfence/wf-waf/src/init.php');
-		if (!wfWAF::getInstance()) {
-			define('WFWAF_AUTO_PREPEND', false);
-			require_once(dirname(__FILE__) . '/waf/bootstrap.php');
+		// Only the installation loading the engine may require its health helper. Older children may not contain it.
+		require_once(dirname(__FILE__) . '/vendor/wordfence/wf-waf/src/lib/health.php');
+		wfWAFRuntimeHealth::begin(realpath(dirname(__FILE__)), defined('WFWAF_LOG_PATH') ? WFWAF_LOG_PATH : WP_CONTENT_DIR . '/wflogs/');
+		// Basic Protection loads the engine before the WAF bootstrap's own display guard.
+		$wfWAFPluginDisplayErrors = function_exists('ini_set') ? @ini_set('display_errors', '0') : false;
+		try {
+			require_once(dirname(__FILE__) . '/vendor/wordfence/wf-waf/src/init.php');
+			if (!wfWAF::getInstance()) {
+				define('WFWAF_AUTO_PREPEND', false);
+				require_once(dirname(__FILE__) . '/waf/bootstrap.php');
+			}
+		}
+		catch (Exception $e) {
+			wfWAFRuntimeHealth::failure('bootstrap', 'initialization-failed', $e);
+		}
+		catch (Throwable $e) {
+			wfWAFRuntimeHealth::failure('bootstrap', 'initialization-failed', $e);
+		}
+		finally {
+			if ($wfWAFPluginDisplayErrors !== false) {
+				@ini_set('display_errors', $wfWAFPluginDisplayErrors);
+			}
+			unset($wfWAFPluginDisplayErrors);
 		}
 	}
 	

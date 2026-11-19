@@ -4,7 +4,7 @@ Contributors: eskapism, wpsimplehistory
 Donate link: https://simple-history.com/sponsor/?utm_source=wordpress_org&utm_medium=plugin_directory&utm_campaign=sponsorship&utm_content=readme_donate_link
 Tags: history, audit log, event log, user tracking, activity
 Tested up to: 7.1
-Stable tag: 5.35.0
+Stable tag: 5.36.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -72,6 +72,9 @@ _"I see three failed logins from an unfamiliar IP address overnight. Let me clic
 
 Simple History includes built-in logging for:
 
+-   **Two Factor** – Logins are logged when the two-factor code is accepted, with the method used, and wrong codes as failed logins
+-   **Wordfence** – Whether a login used two-factor authentication and which method, and wrong codes as failed logins
+-   **Kadence Security (formerly Solid Security)** – Wrong two-factor codes as failed logins
 -   **WordPress AI plugin** – Feature toggles, AI provider and model changes, and connector approval requests, grants, and revocations
 -   **Jetpack** – Module activations and deactivations
 -   **Advanced Custom Fields (ACF)** – Field group and field changes
@@ -265,6 +268,41 @@ For more information, see our support page [GDPR and Privacy: How Your Data is S
 -   [Get the premium add-on for more features.](https://simple-history.com/add-ons/premium?utm_source=wordpress_org&utm_medium=plugin_directory&utm_campaign=documentation&utm_content=readme_doc_premium)
 
 > Experimental entries are gated behind the "Experimental features" checkbox under Simple History → Settings. Tick it to try them, then share feedback so we know what to ship for everyone.
+
+### 5.36.0 (October 2026)
+
+Post edits are easier to read outside the log: Copy as JSON, log files and forwarded events list each changed field with its old and new value. This release also contains security fixes.
+[Screenshots and details in the release post](https://simple-history.com/2026/simple-history-5-36-0-released/)
+
+**Added**
+
+-   Experimental — A short "Updated to Simple History X.Y.Z" line at the top of the log after an update, with how many new features and fixes it brought and a link to the release post. Premium updates get their own line.
+-   Experimental — Premium customers see a message on the log page when a subscription payment didn't go through or the subscription is about to end, and sites with an expired Premium license see what's new in Premium since their version.
+
+**Changed**
+
+-   Post title, permalink, excerpt and content changes are separate fields with old and new values in the REST API, Copy as JSON and Copy as Markdown. For long posts, only the changed lines of the content are listed.
+-   Premium and other add-ons check for updates only when WordPress itself checks for updates, so admin pages no longer wait for simple-history.com.
+-   For developers: the `simple_history/post_logger/label_for_key` filter also gets the status, publish date, comment status, author and template labels of post changes. Labels are escaped, so return plain text.
+-   For developers: the `simple_history/post_logger/post_updated/diff_table_output` filter no longer gets the title, permalink, excerpt, content and other changed fields, only the rows that callbacks add. `Post_Logger::extra_diff_record()` is deprecated and no longer used.
+
+**Fixed**
+
+-   Similar events didn't load on sites that use SQLite instead of MySQL with version 2.x of the [SQLite Database Integration](https://wordpress.org/plugins/sqlite-database-integration/) plugin.
+-   Log files written by [Log Forwarding](https://simple-history.com/features/log-forwarding/?utm_source=wordpress_org&utm_medium=plugin_directory&utm_campaign=documentation&utm_content=readme_changelog_log_forwarding) → Local Files now include what changed in each event, like the roles added and removed on a profile edit, not only the event message.
+-   The one-click [weekly email](https://simple-history.com/features/weekly-email-report/?utm_source=wordpress_org&utm_medium=plugin_directory&utm_campaign=documentation&utm_content=readme_changelog_weekly_email) offer and its confirmation now name everyone who will get the email, like the site admin, not only you.
+-   Page template changes: the first template picked for a page wasn't logged, block themes showed the template slug instead of its name, and an extra row labelled "page_template_name" showed next to the Template row.
+-   "Check again" on Dashboard → Updates now checks for new versions of Premium and other add-ons right away, instead of up to an hour later.
+
+**Security**
+
+-   Similar events now follow the same access rules as the log, so editors no longer see events like failed logins there.
+-   Forwarded IP addresses, usernames and user agents are now capped in length, so a single crafted request can't fill the log.
+-   IP addresses in Limit Login Attempts events are now anonymized and hidden from users who can't view IP addresses.
+-   Plugin and theme file edits are logged only when WordPress accepts the edit.
+-   Stealth Mode now also hides events in the REST API and Abilities API, and history links, notices and the command palette, from users outside the allowlist.
+-   Hardened database queries and output escaping in the plugin stats and the category and settings events.
+-   Line breaks and control characters in event text are escaped in the log file, so they can't add fake lines or change what a terminal shows.
 
 ### 5.35.0 (October 2026)
 

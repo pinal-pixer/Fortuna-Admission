@@ -2145,6 +2145,95 @@ class Helper {
 	}
 
 	/**
+	 * The SureForms Pro plan this site runs: 'free', 'starter', 'pro' or 'business'.
+	 *
+	 * Read from the Pro build itself, which is what decides the features a site
+	 * has; the licence does not. Builds before Pro 2.13.1 shipped a loader class
+	 * per tier; from 2.13.1 there is one build, SureForms Business, so the product
+	 * name it defines (SRFM_PRO_PRODUCT) is the signal (see tier_from_product()).
+	 * Detected once per request, as checking a class loads it, so call it on
+	 * `init` or later.
+	 *
+	 * @since 2.13.0
+	 * @since 2.13.1 Reads SRFM_PRO_PRODUCT when the tier loader classes are absent.
+	 * @return string
+	 */
+	public static function get_pro_tier() {
+		static $detected = null;
+
+		if ( null === $detected ) {
+			if ( ! self::has_pro() ) {
+				$detected = 'free';
+			} elseif ( class_exists( 'SRFM_Pro\Inc\Business\Init' ) ) {
+				$detected = 'business';
+			} elseif ( class_exists( 'SRFM_Pro\Inc\Pro\Init' ) ) {
+				$detected = 'pro';
+			} else {
+				$detected = self::tier_from_product( defined( 'SRFM_PRO_PRODUCT' ) ? constant( 'SRFM_PRO_PRODUCT' ) : '' );
+			}
+		}
+
+		/**
+		 * Filters the SureForms Pro plan tier. Applied on every call, after the
+		 * detection is cached, so tests and custom builds can change it.
+		 *
+		 * @since 2.13.0
+		 * @param string $tier 'free', 'starter', 'pro' or 'business'.
+		 */
+		$tier = self::get_string_value( apply_filters( 'srfm_pro_tier', $detected ) );
+
+		return 0 === self::tier_rank( $tier ) ? 'free' : $tier;
+	}
+
+	/**
+	 * The plan tier a Pro build's product name stands for.
+	 *
+	 * Each build defines SRFM_PRO_PRODUCT as its product name: 'SureForms Starter',
+	 * 'SureForms Pro' or 'SureForms Business'. Any other value is read as
+	 * 'starter', the lowest paid tier, so an unknown build unlocks nothing extra.
+	 *
+	 * @param mixed $product Value of SRFM_PRO_PRODUCT.
+	 * @since 2.13.1
+	 * @return string 'starter', 'pro' or 'business'.
+	 */
+	public static function tier_from_product( $product ) {
+		$tiers = [
+			'SureForms Starter'  => 'starter',
+			'SureForms Pro'      => 'pro',
+			'SureForms Business' => 'business',
+		];
+		return is_string( $product ) && isset( $tiers[ $product ] ) ? $tiers[ $product ] : 'starter';
+	}
+
+	/**
+	 * Rank of a plan tier, for comparing tiers. Unknown tiers rank as 'free'.
+	 *
+	 * @param string $tier 'free', 'starter', 'pro' or 'business'.
+	 * @since 2.13.0
+	 * @return int 0 to 3.
+	 */
+	public static function tier_rank( $tier ) {
+		$ranks = [
+			'free'     => 0,
+			'starter'  => 1,
+			'pro'      => 2,
+			'business' => 3,
+		];
+		return is_string( $tier ) && isset( $ranks[ $tier ] ) ? $ranks[ $tier ] : 0;
+	}
+
+	/**
+	 * Whether this site's plan includes a tier.
+	 *
+	 * @param string $required 'free', 'starter', 'pro' or 'business'.
+	 * @since 2.13.0
+	 * @return bool
+	 */
+	public static function has_tier( $required ) {
+		return self::tier_rank( self::get_pro_tier() ) >= self::tier_rank( $required );
+	}
+
+	/**
 	 * Whether SureForms promotional content should be hidden.
 	 *
 	 * Covers review requests, cross-sell banners and announcements. The free
