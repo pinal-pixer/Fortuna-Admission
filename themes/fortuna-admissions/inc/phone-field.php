@@ -73,6 +73,46 @@ function fa_phone_field_assets() {
 .iti { width: 100%; display: block; }
 .iti__country-container { z-index: 2; }
 .iti--fullscreen-popup.iti--container { z-index: 100000; }
+
+/* Country search box inside the dropdown (theme input styles override it). */
+.iti .iti__search-input-wrapper { position: relative; }
+.iti .iti__search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+.iti input.iti__search-input,
+.iti input.iti__search-input[type="search"] {
+    width: 100%;
+    height: auto;
+    margin: 0;
+    padding: 10px 36px 10px 38px !important;
+    border: none;
+    border-bottom: 1px solid #ddd;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: none;
+    outline: none;
+    font-size: 15px;
+    line-height: 1.4;
+    box-sizing: border-box;
+}
+.iti input.iti__search-input:focus {
+    outline: none;
+    box-shadow: none;
+    border-bottom-color: #bbb;
+}
+.iti .iti__search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 4px;
+    background: transparent !important;
+    border: none;
+}
 </style>
 <script src="<?php echo esc_url( $base . 'js/intlTelInput.min.js' ); ?>"></script>
 <script>
