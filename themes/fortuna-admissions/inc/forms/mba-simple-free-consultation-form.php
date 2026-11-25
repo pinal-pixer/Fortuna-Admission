@@ -133,6 +133,8 @@
 }
 </style>
 
+<?php fa_phone_field_assets(); ?>
+
 <form class="mba-simple-consultation-form" action="#" method="post" enctype="multipart/form-data">
 
     <input type="hidden" name="g-recaptcha-response" value="">
@@ -191,9 +193,11 @@
             <input
                 type="tel"
                 id="phone"
-                name="phone"
+                name="phone_local"
                 autocomplete="tel"
             >
+            <!-- Full international number (e.g. +447911123456), filled on submit -->
+            <input type="hidden" name="phone" value="">
         </div>
     </div>
 
@@ -450,7 +454,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Show SMS consent when a phone number is entered; auto-check the box so the
     // user opts in by default (matching MIM/UG behaviour).
-    const phoneInput   = form.querySelector('input[name="phone"]');
+    const phoneInput   = document.getElementById("phone");
+    const phoneField   = window.faPhoneField
+        ? window.faPhoneField.init({
+            input: phoneInput,
+            hidden: form.querySelector('input[name="phone"]'),
+            countrySelect: document.getElementById("country"),
+            ajaxUrl: ajaxUrl
+        })
+        : null;
+
+    function syncPhone() {
+        if (phoneField) {
+            phoneField.sync();
+            return;
+        }
+        const hidden = form.querySelector('input[name="phone"]');
+        if (hidden && phoneInput) hidden.value = phoneInput.value.trim();
+    }
     const consentCb    = document.getElementById("mba_simple_sms_consent");
     const consentGroup = document.getElementById("mba_simple_sms_consent_group");
 
@@ -615,6 +636,8 @@ document.addEventListener("DOMContentLoaded", function () {
             form.reportValidity();
             return;
         }
+
+        syncPhone();
 
         const btn = form.querySelector('button[type="submit"]');
 

@@ -32,6 +32,7 @@ require_once('inc/menu-walker.php');
 require_once('inc/shortcodes.php');
 require_once('inc/form-submissions.php');
 require_once('inc/ab-testing.php');
+require_once('inc/phone-field.php');
 require_once('blocks/index.php');
 
 /*------------------------------------*\
