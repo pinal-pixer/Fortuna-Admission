@@ -188,7 +188,7 @@ $fa_prefill = array(
     <input type="hidden" name="g-recaptcha-response" value="">
     <input type="hidden" name="action" value="mba_full_consultation_submit">
     <input type="hidden" name="completed_full_form" value="True">
-	<input type="hidden" name="code" value="MBAMain">
+	<input type="hidden" name="code" value="Main">
     <?php wp_nonce_field('mba_full_consultation_nonce', 'mba_full_consultation_nonce_field'); ?>
 
     <!-- Prefilled from Form 1 — passed through as hidden fields so the Podio webhook still receives them -->

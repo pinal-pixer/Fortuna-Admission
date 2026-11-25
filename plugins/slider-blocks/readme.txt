@@ -3,7 +3,7 @@ Contributors: binsaifullah
 Tags: slider, carousel, slider block, gutenberg slider, image slider
 Requires at least: 6.5
 Tested up to: 7.1
-Stable tag: 3.4.2
+Stable tag: 3.5.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -193,6 +193,17 @@ YouTube Terms of Service: https://www.youtube.com/t/terms - Google Privacy Polic
 * [fslightbox](https://fslightbox.com/) - image lightbox for the Photo Carousel block.
 
 == Changelog ==
+= 3.5.0 =
+* Added: Playback panel on every slider - play/pause button, slide counter, progress line, scrollbar, deep links (#anchor-2 opens slide 2), full-screen height and transition easing (Smooth, Snappy, Gentle, Bounce, Linear)
+* Added: Slide Duration - keep one slide on show longer or shorter than the others (Flexible slides, and the slides of the Pro sliders)
+* Added: Cube and Cards effects for the Static, Flexible, Post and Testimonial sliders
+* Improved: Autoplay waits until a slider is in view and pauses while it is scrolled out of view
+* Improved: Videos - YouTube and Vimeo players load only when a visitor clicks play, with the video's own thumbnail until then
+* Improved: Slider images get their width, height and responsive sizes, so the page doesn't jump as they load and further-down images load lazily
+* Improved: In block themes, a slider whose slides all use an H1 title keeps one H1; the other titles become H2s that look the same
+* Improved: Accessibility - a clear focus ring on slider controls, arrows reachable by keyboard on every slider, and autoplay starts paused for visitors who ask for reduced motion
+* Changed: The "Important links to get started" panel is gone from the block settings
+
 = 3.4.2 =
 * Changed: New outline icons for every free block, in the same style as the GutSlider Pro blocks
 * Changed: The free Marquee block is now called Content Marquee, so it is easy to tell apart from the Pro Marquee Carousel

@@ -4,7 +4,7 @@
  * Description:       A collection of custom Gutenberg Slider Blocks to slide your content.
  * Requires at least: 6.5
  * Requires PHP:      7.4
- * Version:           3.4.2
+ * Version:           3.5.0
  * Author:            Binsaifullah
  * License:           GPLv2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @since 1.0.0
  * @var string
  */
-define( 'GUTSLIDER_VERSION', '3.4.2' );
+define( 'GUTSLIDER_VERSION', '3.5.0' );
 
 /**
  * Plugin directory URL with trailing slash.

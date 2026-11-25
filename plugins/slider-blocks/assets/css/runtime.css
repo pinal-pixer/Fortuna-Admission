@@ -1,0 +1,30 @@
+/*
+ * GutSlider runtime: the Playback panel's controls (src/runtime), full-screen height and easing.
+ * Printed inline, once per page, only when a slider uses one of them (Assets\RuntimeStyles).
+ * Colours follow --gs-runtime-* custom properties, so a block or a theme can restyle them.
+ */
+.gs-runtime-bar{position:absolute;z-index:12;display:flex;align-items:center;gap:10px;margin:16px;padding:4px;border-radius:999px;
+background:var(--gs-runtime-bg,rgba(10,10,15,.55));color:var(--gs-runtime-color,#fff);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+font:600 12px/1 system-ui,-apple-system,sans-serif;letter-spacing:.04em;pointer-events:auto}
+.gs-runtime-bar.is-bottom-left{left:0;bottom:0}.gs-runtime-bar.is-bottom-right{right:0;bottom:0}
+.gs-runtime-bar.is-top-left{left:0;top:0}.gs-runtime-bar.is-top-right{right:0;top:0}
+.gs-runtime-play{display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer}
+.gs-runtime-play svg{width:16px;height:16px;fill:currentColor}
+.gs-runtime-play:hover{background:rgba(255,255,255,.16)}
+.gs-runtime-play:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.gs-runtime-counter{display:flex;align-items:center;gap:8px;padding:0 10px;font-variant-numeric:tabular-nums}
+.gs-runtime-play+.gs-runtime-counter{padding-left:0}
+.gs-runtime-counter i{display:block;width:18px;height:1px;background:currentColor;opacity:.6}
+.gs-runtime-progress{position:absolute;z-index:12;left:0;right:0;bottom:0;height:3px;background:var(--gs-runtime-track,rgba(255,255,255,.25));pointer-events:none}
+.gs-runtime-progress::after{content:"";position:absolute;inset:0;background:var(--gs-runtime-accent,#fff);transform-origin:left;transform:scaleX(var(--gs-progress,0))}
+.swiper-rtl .gs-runtime-progress::after{transform-origin:right}
+.gs-runtime-scrollbar.swiper-scrollbar{z-index:30}
+.gs-scrollbar .swiper-pagination{pointer-events:none}.gs-scrollbar .swiper-pagination>*{pointer-events:auto}
+.swiper-horizontal>.gs-runtime-scrollbar.swiper-scrollbar{left:16px;right:16px;bottom:8px;width:auto;height:5px}
+.swiper-vertical>.gs-runtime-scrollbar.swiper-scrollbar{top:16px;bottom:16px;right:8px;height:auto;width:5px}
+@media (prefers-reduced-motion:no-preference){.gs-runtime-progress::after{transition:transform .2s linear}}
+[class*="wp-block-gutsliders-"].gs-fullscreen>.swiper:not(.gutslider-thumbs),[class*="wp-block-gutsliders-"].gs-fullscreen .swiper:not(.gutslider-thumbs){box-sizing:border-box!important;height:calc(100vh - var(--gs-screen-offset,0px))!important;height:calc(100svh - var(--gs-screen-offset,0px))!important;max-height:none!important}
+[class*="wp-block-gutsliders-"].gs-fullscreen .swiper:not(.gutslider-thumbs)>.swiper-wrapper,[class*="wp-block-gutsliders-"].gs-fullscreen .swiper:not(.gutslider-thumbs)>.swiper-wrapper>.swiper-slide{height:100%!important;max-height:none!important}
+[class*="wp-block-gutsliders-"].gs-fullscreen .swiper:not(.gutslider-thumbs)>.swiper-wrapper>.swiper-slide>:is(.swiper-container-outer,.swiper-testimonial-outer,.gs-backdrop-slide__inner,.gutslider-slide),[class*="wp-block-gutsliders-"].gs-fullscreen .swiper:not(.gutslider-thumbs)>.swiper-wrapper>.swiper-slide>.swiper-container-outer>.gutslider-content-wrapper{height:100%!important;max-height:none!important}
+.gs-ease-smooth{--gs-ease:cubic-bezier(.65,0,.35,1)}.gs-ease-snappy{--gs-ease:cubic-bezier(.22,1,.36,1)}.gs-ease-gentle{--gs-ease:ease}.gs-ease-bounce{--gs-ease:cubic-bezier(.34,1.45,.64,1)}.gs-ease-linear{--gs-ease:linear}
+[class*="gs-ease-"] .swiper-wrapper,[class*="gs-ease-"] .swiper-slide{transition-timing-function:var(--gs-ease)!important}

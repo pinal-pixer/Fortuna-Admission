@@ -147,7 +147,7 @@
     <input type="hidden" name="g-recaptcha-response" value="">
     <input type="hidden" name="action" value="mba_simple_consultation_submit_ab">
     <input type="hidden" name="completed_full_form" value="False">
-    <input type="hidden" name="code" value="MBAMain">
+    <input type="hidden" name="code" value="Main">
     <input type="hidden" name="ab_variation" value="">
     <?php wp_nonce_field('mba_simple_consultation_nonce_ab', 'mba_simple_consultation_nonce_field_ab'); ?>
 

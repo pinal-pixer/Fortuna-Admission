@@ -111,7 +111,7 @@ final class EnqueueAssets {
 		);
 
 		wp_register_script(
-			'gutslider-swiper-script',
+			'gutslider-swiper-lib',
 			GUTSLIDER_URL . 'assets/js/swiper-bundle.min.js',
 			array(),
 			GUTSLIDER_VERSION,
@@ -124,15 +124,40 @@ final class EnqueueAssets {
 		 * which Swiper fills in from these defaults.
 		 */
 		wp_add_inline_script(
-			'gutslider-swiper-script',
+			'gutslider-swiper-lib',
 			'window.Swiper && window.Swiper.extendDefaults({ mousewheel: { releaseOnEdges: true } });'
 		);
 
+		/*
+		 * Every block depends on `gutslider-swiper-script`. In the editor it is Swiper itself; on the
+		 * front end it is the runtime (src/runtime), which loads Swiper first and adds what every
+		 * slider shares: autoplay only while in view, and the Playback panel's options.
+		 */
+		$runtime = GUTSLIDER_DIR_PATH . 'build/runtime/runtime.asset.php';
+		if ( ! is_admin() && file_exists( $runtime ) ) {
+			$runtime_asset = include $runtime;
+			wp_register_script(
+				'gutslider-swiper-script',
+				GUTSLIDER_URL . 'build/runtime/runtime.js',
+				array_merge( array( 'gutslider-swiper-lib' ), $runtime_asset['dependencies'] ?? array() ),
+				$runtime_asset['version'] ?? GUTSLIDER_VERSION,
+				true
+			);
+		} else {
+			wp_register_script( 'gutslider-swiper-script', false, array( 'gutslider-swiper-lib' ), GUTSLIDER_VERSION, true );
+		}
+
 		wp_localize_script(
-			'gutslider-swiper-script',
+			'gutslider-swiper-lib',
 			'gutslider_swiper',
 			array(
 				'placeholder' => esc_url( GUTSLIDER_URL . 'assets/images/placeholder.svg' ),
+				'i18n'        => array(
+					'pause' => __( 'Pause slideshow', 'slider-blocks' ),
+					'play'  => __( 'Play slideshow', 'slider-blocks' ),
+					'next'  => __( 'Next slide', 'slider-blocks' ),
+					'prev'  => __( 'Previous slide', 'slider-blocks' ),
+				),
 			)
 		);
 

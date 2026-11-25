@@ -238,7 +238,7 @@ $fa_ab_variation = isset($_GET['ab_variation'])
     <input type="hidden" name="g-recaptcha-response" value="">
     <input type="hidden" name="action" value="mba_full_consultation_submit_ab">
     <input type="hidden" name="completed_full_form" value="True">
-    <input type="hidden" name="code" value="MBAMain">
+    <input type="hidden" name="code" value="Main">
     <input type="hidden" name="ab_variation" value="<?php echo esc_attr($fa_ab_variation); ?>">
     <?php wp_nonce_field('mba_full_consultation_nonce_ab', 'mba_full_consultation_nonce_field_ab'); ?>
 

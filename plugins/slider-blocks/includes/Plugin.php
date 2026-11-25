@@ -77,7 +77,9 @@ final class Plugin {
 		new Blocks\FlexibleSlider();
 		new Blocks\Marquee();
 		new Blocks\StaticSlider();
+		new Blocks\SliderMarkup();
 		new Assets\EnqueueAssets();
+		new Assets\RuntimeStyles();
 		new Assets\LoadFonts();
 		new Style\DynamicStyle();
 		new Api\BlocksApi();
