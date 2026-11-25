@@ -7,7 +7,8 @@
  *   geo headers (Cloudflare, CloudFront, etc.). This is done via AJAX rather
  *   than inline in the page because full-page caching (Hummingbird) would
  *   otherwise bake one visitor's country into the HTML for everyone.
- * - Falls back to the browser locale (e.g. en-GB -> gb), then "us".
+ * - Shows UK ("gb") immediately; switches to the detected country only if the
+ *   lookup returns a valid code. If the lookup fails or times out, UK stays.
  *
  * Usage inside a form template:
  *   <?php fa_phone_field_assets(); ?>
@@ -122,52 +123,53 @@ function fa_phone_field_assets() {
     var UTILS_URL = <?php echo wp_json_encode( $base . 'js/utils.js' ); ?>;
     var STORAGE_KEY = "fa_geo_country";
 
-    function localeCountry() {
-        var langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ""];
-        for (var i = 0; i < langs.length; i++) {
-            var m = String(langs[i]).match(/[-_]([A-Za-z]{2})(?:$|[-_])/);
-            if (m) return m[1].toLowerCase();
+    var DEFAULT_COUNTRY = "gb";
+
+    function isValidCountry(code) {
+        if (!code || typeof code !== "string") return false;
+        code = code.toLowerCase();
+        var list = (window.intlTelInput && window.intlTelInput.getCountryData) ? window.intlTelInput.getCountryData() : [];
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].iso2 === code) return true;
         }
-        return "us";
+        return false;
     }
 
-    function makeGeoLookup(ajaxUrl) {
-        return function (success) {
-            var done = false;
-            function finish(code) {
-                if (done) return;
-                done = true;
-                success(code);
+    // Look up the visitor's country via our AJAX endpoint. Calls done(code)
+    // with a valid ISO2 code, or done("") if the lookup fails / times out.
+    function lookupCountry(ajaxUrl, done) {
+        var finished = false;
+        function finish(code) {
+            if (finished) return;
+            finished = true;
+            done(isValidCountry(code) ? code.toLowerCase() : "");
+        }
+
+        try {
+            var cached = sessionStorage.getItem(STORAGE_KEY);
+            if (isValidCountry(cached)) return finish(cached);
+        } catch (e) {}
+
+        if (!ajaxUrl || typeof fetch !== "function") return finish("");
+
+        // Never wait on the lookup for long.
+        var timer = setTimeout(function () { finish(""); }, 2500);
+
+        fetch(ajaxUrl + (ajaxUrl.indexOf("?") === -1 ? "?" : "&") + "action=fa_geo_country", {
+            credentials: "same-origin"
+        }).then(function (res) {
+            return res.json();
+        }).then(function (res) {
+            clearTimeout(timer);
+            var code = res && res.success && res.data && res.data.country;
+            if (isValidCountry(code)) {
+                try { sessionStorage.setItem(STORAGE_KEY, code.toLowerCase()); } catch (e) {}
             }
-
-            try {
-                var cached = sessionStorage.getItem(STORAGE_KEY);
-                if (cached) return finish(cached);
-            } catch (e) {}
-
-            if (!ajaxUrl || typeof fetch !== "function") return finish(localeCountry());
-
-            // Never let the lookup hold the field hostage.
-            var timer = setTimeout(function () { finish(localeCountry()); }, 1500);
-
-            fetch(ajaxUrl + (ajaxUrl.indexOf("?") === -1 ? "?" : "&") + "action=fa_geo_country", {
-                credentials: "same-origin"
-            }).then(function (res) {
-                return res.json();
-            }).then(function (res) {
-                clearTimeout(timer);
-                var code = res && res.success && res.data && res.data.country;
-                if (code) {
-                    try { sessionStorage.setItem(STORAGE_KEY, code); } catch (e) {}
-                    finish(code);
-                } else {
-                    finish(localeCountry());
-                }
-            }).catch(function () {
-                clearTimeout(timer);
-                finish(localeCountry());
-            });
-        };
+            finish(code);
+        }).catch(function () {
+            clearTimeout(timer);
+            finish("");
+        });
     }
 
     function init(opts) {
@@ -175,12 +177,14 @@ function fa_phone_field_assets() {
         var hidden = opts.hidden;
         var countrySelect = opts.countrySelect;
         var iti = null;
+        var userChoseCountry = false;
 
         if (input && typeof window.intlTelInput === "function") {
             try {
+                // Start with UK straight away so the flag is never blank,
+                // then switch to the detected country if the lookup succeeds.
                 iti = window.intlTelInput(input, {
-                    initialCountry: "auto",
-                    geoIpLookup: makeGeoLookup(opts.ajaxUrl),
+                    initialCountry: DEFAULT_COUNTRY,
                     separateDialCode: true,
                     countrySearch: true,
                     countryOrder: ["us", "gb", "ca", "cn", "in"],
@@ -189,6 +193,16 @@ function fa_phone_field_assets() {
             } catch (e) {
                 iti = null;
             }
+        }
+
+        if (iti) {
+            // Don't override a country the visitor picked themselves.
+            input.addEventListener("open:countrydropdown", function () { userChoseCountry = true; });
+
+            lookupCountry(opts.ajaxUrl, function (code) {
+                if (!code || userChoseCountry || input.value.trim()) return;
+                try { iti.setCountry(code); } catch (e) {}
+            });
         }
 
         // If the visitor picks a Country of Residence before typing a number,
@@ -201,6 +215,7 @@ function fa_phone_field_assets() {
                 for (var i = 0; i < list.length; i++) {
                     if (list[i].name === name) {
                         iti.setCountry(list[i].iso2);
+                        userChoseCountry = true;
                         break;
                     }
                 }
