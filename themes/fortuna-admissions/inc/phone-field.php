@@ -7,8 +7,13 @@
  *   geo headers (Cloudflare, CloudFront, etc.). This is done via AJAX rather
  *   than inline in the page because full-page caching (Hummingbird) would
  *   otherwise bake one visitor's country into the HTML for everyone.
- * - Shows UK ("gb") immediately; switches to the detected country only if the
- *   lookup returns a valid code. If the lookup fails or times out, UK stays.
+ * - Country lookup order: CDN geo headers via our AJAX endpoint, then
+ *   api.country.is, then get.geojs.io (visitor IP is sent to these two).
+ * - Lookup starts as soon as the script loads; the result is cached in
+ *   localStorage for 30 days so returning visitors see their flag instantly.
+ * - First visit: neutral placeholder until the lookup answers (no UK -> India
+ *   flicker). If every source fails or it takes over 4s, no country is
+ *   selected (neutral globe) and the visitor picks one from the dropdown.
  *
  * Usage inside a form template:
  *   <?php fa_phone_field_assets(); ?>
@@ -121,9 +126,9 @@ function fa_phone_field_assets() {
     if (window.faPhoneField) return;
 
     var UTILS_URL = <?php echo wp_json_encode( $base . 'js/utils.js' ); ?>;
-    var STORAGE_KEY = "fa_geo_country";
-
-    var DEFAULT_COUNTRY = "gb";
+    var STORAGE_KEY = "fa_geo_country_v2";
+    var CACHE_DAYS = 30;
+    var AJAX_URL = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 
     function isValidCountry(code) {
         if (!code || typeof code !== "string") return false;
@@ -135,56 +140,103 @@ function fa_phone_field_assets() {
         return false;
     }
 
-    // Look up the visitor's country via our AJAX endpoint. Calls done(code)
-    // with a valid ISO2 code, or done("") if the lookup fails / times out.
-    function lookupCountry(ajaxUrl, done) {
-        var finished = false;
-        function finish(code) {
-            if (finished) return;
-            finished = true;
-            done(isValidCountry(code) ? code.toLowerCase() : "");
-        }
-
+    // Country remembered from an earlier visit (localStorage, 30 days), or "".
+    function cachedCountry() {
         try {
-            var cached = sessionStorage.getItem(STORAGE_KEY);
-            if (isValidCountry(cached)) return finish(cached);
-        } catch (e) {}
-
-        if (!ajaxUrl || typeof fetch !== "function") return finish("");
-
-        // Never wait on the lookup for long.
-        var timer = setTimeout(function () { finish(""); }, 2500);
-
-        fetch(ajaxUrl + (ajaxUrl.indexOf("?") === -1 ? "?" : "&") + "action=fa_geo_country", {
-            credentials: "same-origin"
-        }).then(function (res) {
-            return res.json();
-        }).then(function (res) {
-            clearTimeout(timer);
-            var code = res && res.success && res.data && res.data.country;
-            if (isValidCountry(code)) {
-                try { sessionStorage.setItem(STORAGE_KEY, code.toLowerCase()); } catch (e) {}
+            var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+            if (saved && isValidCountry(saved.c) && (Date.now() - saved.t) < CACHE_DAYS * 864e5) {
+                return saved.c;
             }
-            finish(code);
-        }).catch(function () {
-            clearTimeout(timer);
-            finish("");
+        } catch (e) {}
+        return "";
+    }
+
+    function saveCountry(code) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ c: code, t: Date.now() })); } catch (e) {}
+    }
+
+    // Fetch JSON with its own timeout; resolves null on any failure.
+    function getJSON(url, ms, opts) {
+        return new Promise(function (resolve) {
+            var timer = setTimeout(function () { resolve(null); }, ms);
+            fetch(url, opts || {})
+                .then(function (res) { return res.ok ? res.json() : null; })
+                .then(function (data) { clearTimeout(timer); resolve(data); })
+                .catch(function () { clearTimeout(timer); resolve(null); });
         });
     }
+
+    // Where to look up the visitor's country, in order. Each resolves a code or "".
+    //  1. Our own server: CDN geo headers (Cloudflare etc.). Empty locally.
+    //  2. api.country.is, 3. get.geojs.io: free IP-to-country services that see
+    //     the visitor's real public IP (works on local sites too).
+    var SOURCES = [
+        function () {
+            return getJSON(AJAX_URL + "?action=fa_geo_country", 1500, { credentials: "same-origin" })
+                .then(function (r) { return (r && r.success && r.data && r.data.country) || ""; });
+        },
+        function () {
+            return getJSON("https://api.country.is/", 2000)
+                .then(function (r) { return (r && r.country) || ""; });
+        },
+        function () {
+            return getJSON("https://get.geojs.io/v1/ip/country.json", 2000)
+                .then(function (r) { return (r && r.country) || ""; });
+        }
+    ];
+
+    // Start the lookup as soon as this script runs (not on DOMContentLoaded).
+    // Resolves to a valid ISO2 code, or "" if every source fails.
+    var lookupPromise = (function () {
+        var cached = cachedCountry();
+        if (cached) return Promise.resolve(cached);
+        if (typeof fetch !== "function" || typeof Promise === "undefined") return Promise.resolve("");
+
+        function trySource(i) {
+            if (i >= SOURCES.length) return Promise.resolve("");
+            return SOURCES[i]().then(function (code) {
+                if (isValidCountry(code)) {
+                    code = code.toLowerCase();
+                    saveCountry(code);
+                    return code;
+                }
+                return trySource(i + 1);
+            }, function () { return trySource(i + 1); });
+        }
+
+        // Hard cap so the field never waits too long; no country after that.
+        return Promise.race([
+            trySource(0),
+            new Promise(function (resolve) { setTimeout(function () { resolve(""); }, 4000); })
+        ]);
+    })();
 
     function init(opts) {
         var input = opts.input;
         var hidden = opts.hidden;
         var countrySelect = opts.countrySelect;
         var iti = null;
-        var userChoseCountry = false;
 
         if (input && typeof window.intlTelInput === "function") {
+            // Returning visitor: country already known, show it instantly.
+            // First visit: "auto" shows a neutral placeholder (no wrong flag)
+            // until the lookup answers, then the real country. If it fails,
+            // no country is selected and the visitor can pick one.
+            var known = cachedCountry();
             try {
-                // Start with UK straight away so the flag is never blank,
-                // then switch to the detected country if the lookup succeeds.
                 iti = window.intlTelInput(input, {
-                    initialCountry: DEFAULT_COUNTRY,
+                    initialCountry: known || "auto",
+                    geoIpLookup: function (success, failure) {
+                        lookupPromise.then(function (code) {
+                            // No country found: leave the field without a
+                            // country (neutral globe) instead of guessing.
+                            if (code) {
+                                success(code);
+                            } else if (typeof failure === "function") {
+                                failure();
+                            }
+                        });
+                    },
                     separateDialCode: true,
                     countrySearch: true,
                     countryOrder: ["us", "gb", "ca", "cn", "in"],
@@ -193,16 +245,6 @@ function fa_phone_field_assets() {
             } catch (e) {
                 iti = null;
             }
-        }
-
-        if (iti) {
-            // Don't override a country the visitor picked themselves.
-            input.addEventListener("open:countrydropdown", function () { userChoseCountry = true; });
-
-            lookupCountry(opts.ajaxUrl, function (code) {
-                if (!code || userChoseCountry || input.value.trim()) return;
-                try { iti.setCountry(code); } catch (e) {}
-            });
         }
 
         // If the visitor picks a Country of Residence before typing a number,
@@ -215,7 +257,6 @@ function fa_phone_field_assets() {
                 for (var i = 0; i < list.length; i++) {
                     if (list[i].name === name) {
                         iti.setCountry(list[i].iso2);
-                        userChoseCountry = true;
                         break;
                     }
                 }
